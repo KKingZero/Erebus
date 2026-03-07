@@ -1,0 +1,192 @@
+syntax = "proto3";
+
+package erebus.c2;
+
+option go_package = "github.com/KKingZero/erebus-exploit-framwork/pkg/pb";
+
+import "c2.proto";
+import "listener.proto";
+
+// --- Session Info ---
+
+message SessionInfo {
+  string session_id      = 1;
+  string implant_id      = 2;
+  string hostname        = 3;
+  string username         = 4;
+  string os              = 5;
+  string arch            = 6;
+  uint32 pid             = 7;
+  string integrity_level = 8;
+  string transport       = 9;
+  string remote_addr     = 10;
+  int64  registered_at   = 11;
+  int64  last_checkin    = 12;
+  bool   alive           = 13;
+}
+
+// --- Requests / Responses ---
+
+message StartListenerRequest {
+  ListenerConfig config = 1;
+}
+message StartListenerResponse {
+  bool   success = 1;
+  string error   = 2;
+  ListenerStatus status = 3;
+}
+
+message StopListenerRequest {
+  string id = 1;
+}
+message StopListenerResponse {
+  bool   success = 1;
+  string error   = 2;
+}
+
+message ListListenersRequest {}
+message ListListenersResponse {
+  repeated ListenerStatus listeners = 1;
+}
+
+message ListSessionsRequest {}
+message ListSessionsResponse {
+  repeated SessionInfo sessions = 1;
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+message GetSessionResponse {
+  SessionInfo session = 1;
+}
+
+message KillSessionRequest {
+  string session_id = 1;
+}
+message KillSessionResponse {
+  bool   success = 1;
+  string error   = 2;
+}
+
+message ExecuteTaskRequest {
+  string   session_id = 1;
+  TaskType task_type  = 2;
+  bytes    data       = 3;
+  int64    timeout_ms = 4;
+  bool     wait       = 5;  // Block until result
+}
+message ExecuteTaskResponse {
+  string     task_id = 1;
+  TaskResult result  = 2;  // Populated only if wait=true
+}
+
+message GetTaskResultRequest {
+  string task_id = 1;
+}
+message GetTaskResultResponse {
+  TaskResult result  = 1;
+  bool       pending = 2;
+}
+
+message ListTasksRequest {
+  string session_id = 1;
+}
+message ListTasksResponse {
+  repeated Task tasks = 1;
+}
+
+// --- Events ---
+
+enum EventType {
+  EVENT_UNKNOWN      = 0;
+  EVENT_SESSION_NEW  = 1;
+  EVENT_SESSION_LOST = 2;
+  EVENT_TASK_RESULT  = 3;
+  EVENT_LOG          = 4;
+}
+
+message Event {
+  EventType type      = 1;
+  int64     timestamp = 2;
+  string    session_id = 3;
+  string    task_id   = 4;
+  string    message   = 5;
+  bytes     data      = 6;
+}
+
+message SubscribeRequest {}
+
+// --- Implant Generation ---
+
+message GenerateImplantRequest {
+  string os        = 1;
+  string arch      = 2;
+  string transport = 3;
+  repeated string callbacks = 4;
+  int64  sleep_ms   = 5;
+  int32  jitter_pct = 6;
+  bool   garble     = 7;
+}
+
+message GenerateImplantResponse {
+  bool   success   = 1;
+  string error     = 2;
+  string build_id  = 3;
+  bytes  binary    = 4;
+  string filename  = 5;
+}
+
+// --- Loot ---
+
+message LootItem {
+  string id        = 1;
+  string type      = 2;
+  string source    = 3;
+  string session_id = 4;
+  bytes  data      = 5;
+  int64  created_at = 6;
+}
+
+message ListLootRequest {
+  string session_id = 1;  // Optional filter
+}
+message ListLootResponse {
+  repeated LootItem items = 1;
+}
+
+message GetLootRequest {
+  string id = 1;
+}
+message GetLootResponse {
+  LootItem item = 1;
+}
+
+// --- Service ---
+
+service ErebusC2 {
+  // Listeners
+  rpc StartListener(StartListenerRequest) returns (StartListenerResponse);
+  rpc StopListener(StopListenerRequest) returns (StopListenerResponse);
+  rpc ListListeners(ListListenersRequest) returns (ListListenersResponse);
+
+  // Sessions
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc KillSession(KillSessionRequest) returns (KillSessionResponse);
+
+  // Tasks
+  rpc ExecuteTask(ExecuteTaskRequest) returns (ExecuteTaskResponse);
+  rpc GetTaskResult(GetTaskResultRequest) returns (GetTaskResultResponse);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+
+  // Events
+  rpc Subscribe(SubscribeRequest) returns (stream Event);
+
+  // Builder
+  rpc GenerateImplant(GenerateImplantRequest) returns (GenerateImplantResponse);
+
+  // Loot
+  rpc ListLoot(ListLootRequest) returns (ListLootResponse);
+  rpc GetLoot(GetLootRequest) returns (GetLootResponse);
+}

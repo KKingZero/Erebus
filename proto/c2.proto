@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package erebus.c2;
+
+option go_package = "github.com/KKingZero/erebus-exploit-framwork/pkg/pb";
+
+// --- Enums ---
+
+enum TaskType {
+  TASK_UNKNOWN       = 0;
+  TASK_SHELL         = 1;
+  TASK_FILE_DOWNLOAD = 2;
+  TASK_FILE_UPLOAD   = 3;
+  TASK_PROCESS_LIST  = 4;
+  TASK_PROCESS_KILL  = 5;
+  TASK_NET_IFCONFIG  = 6;
+  TASK_NET_PORTSCAN  = 7;
+  TASK_CREDS_DUMP    = 8;
+  TASK_SCREENSHOT    = 9;
+  TASK_KEYLOG_START  = 10;
+  TASK_KEYLOG_STOP   = 11;
+  TASK_KEYLOG_DUMP   = 12;
+  TASK_PIVOT_START   = 13;
+  TASK_PIVOT_STOP    = 14;
+  TASK_INJECT        = 15;
+  TASK_PE_LOAD       = 16;
+  TASK_SOCKS_START   = 17;
+  TASK_SOCKS_STOP    = 18;
+  TASK_EXIT          = 19;
+  TASK_SLEEP         = 20;
+  TASK_MODULE        = 21;
+}
+
+// --- Implant <-> Teamserver ---
+
+message Register {
+  string implant_id       = 1;
+  string hostname         = 2;
+  string username         = 3;
+  string os               = 4;
+  string arch             = 5;
+  uint32 pid              = 6;
+  string integrity_level  = 7;
+  int64  timestamp        = 8;
+  bytes  hmac             = 9;   // HMAC-SHA256(secret, implant_id + timestamp)
+}
+
+message RegisterResponse {
+  bool   success        = 1;
+  string session_id     = 2;
+  int64  next_checkin_ms = 3;
+}
+
+message Beacon {
+  string       implant_id = 1;
+  string       session_id = 2;
+  int64        timestamp  = 3;
+  bytes        hmac       = 4;
+  repeated TaskResult results = 5;
+}
+
+message BeaconResponse {
+  repeated Task tasks          = 1;
+  int64         next_checkin_ms = 2;
+  bool          terminate      = 3;
+}
+
+message Task {
+  string   task_id    = 1;
+  string   implant_id = 2;
+  TaskType task_type  = 3;
+  bytes    data       = 4;  // Serialized per-task payload
+  int64    timeout_ms = 5;
+}
+
+message TaskResult {
+  string task_id          = 1;
+  bool   success          = 2;
+  bytes  data             = 3;  // Serialized per-task result
+  string error            = 4;
+  int64  execution_time_ms = 5;
+}
+
+// --- Per-Task Payloads (Phase 1: Shell only) ---
+
+message ShellTask {
+  string command = 1;
+  repeated string args = 2;
+}
+
+message ShellResult {
+  string stdout    = 1;
+  string stderr    = 2;
+  int32  exit_code = 3;
+}
+
+// Phase 2+ task payloads (stubs)
+message FileDownloadTask {
+  string remote_path = 1;
+}
+
+message FileDownloadResult {
+  string filename = 1;
+  bytes  data     = 2;
+}
+
+message FileUploadTask {
+  string remote_path = 1;
+  bytes  data        = 2;
+}
+
+message FileUploadResult {
+  bool success = 1;
+}
+
+message SleepTask {
+  int64 sleep_ms   = 1;
+  int32 jitter_pct = 2;
+}
+
+message ModuleTask {
+  string module_name = 1;
+  bytes  config      = 2;
+}

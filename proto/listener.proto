@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package erebus.c2;
+
+option go_package = "github.com/KKingZero/erebus-exploit-framwork/pkg/pb";
+
+enum ListenerProtocol {
+  LISTENER_UNKNOWN = 0;
+  LISTENER_HTTPS   = 1;
+  LISTENER_MTLS    = 2;
+  LISTENER_DNS     = 3;
+}
+
+message ListenerConfig {
+  string           id       = 1;
+  string           name     = 2;
+  ListenerProtocol protocol = 3;
+  string           host     = 4;
+  uint32           port     = 5;
+
+  // TLS
+  string cert_path = 6;
+  string key_path  = 7;
+
+  // DNS specific
+  string domain = 8;
+
+  // Domain fronting
+  string cdn_domain = 9;
+}
+
+message ListenerStatus {
+  string           id       = 1;
+  string           name     = 2;
+  ListenerProtocol protocol = 3;
+  string           address  = 4;
+  bool             active   = 5;
+  int64            started_at = 6;
+}
