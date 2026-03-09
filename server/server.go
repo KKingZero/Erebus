@@ -15,6 +15,7 @@ import (
 	zcrypto "github.com/KKingZero/erebus-exploit-framwork/pkg/crypto"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/server/db"
+	"github.com/KKingZero/erebus-exploit-framwork/server/approval"
 	"github.com/KKingZero/erebus-exploit-framwork/server/listeners"
 	"github.com/KKingZero/erebus-exploit-framwork/server/sessions"
 	"github.com/KKingZero/erebus-exploit-framwork/server/tasks"
@@ -30,6 +31,7 @@ type Teamserver struct {
 	Dispatcher *tasks.Dispatcher
 	Listeners  *listeners.Manager
 	Events     *EventBus
+	Approval   *approval.Gate
 	CA         *zcrypto.CertificateAuthority
 
 	grpcServer *grpc.Server
@@ -74,6 +76,8 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 	sessMgr := sessions.NewManager(store)
 	dispatcher := tasks.NewDispatcher(sessMgr, store, events.Publish)
 
+	approvalGate := approval.NewGate(events.Publish)
+
 	ts := &Teamserver{
 		Config:     cfg,
 		Store:      store,
@@ -81,6 +85,7 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 		Dispatcher: dispatcher,
 		Listeners:  listeners.NewManager(),
 		Events:     events,
+		Approval:   approvalGate,
 		CA:         ca,
 		secret:     secret,
 		done:       make(chan struct{}),
@@ -131,6 +136,18 @@ func (ts *Teamserver) CreateListener(cfg *pb.ListenerConfig) (listeners.Listener
 	switch cfg.Protocol {
 	case pb.ListenerProtocol_LISTENER_HTTPS:
 		l, err := listeners.NewHTTPSListener(cfg, handler, ts.CA)
+		if err != nil {
+			return nil, err
+		}
+		if err := ts.Listeners.Add(l); err != nil {
+			return nil, err
+		}
+		if err := ts.Listeners.Start(l.ID()); err != nil {
+			return nil, err
+		}
+		return l, nil
+	case pb.ListenerProtocol_LISTENER_DNS:
+		l, err := listeners.NewDNSListener(cfg, handler)
 		if err != nil {
 			return nil, err
 		}

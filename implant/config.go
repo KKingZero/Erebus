@@ -10,21 +10,27 @@ import (
 
 // Build-time injected via ldflags
 var (
-	implantID     = ""
-	implantSecret = ""
-	callbackURL   = "https://127.0.0.1:443"
-	sleepMs       = "5000"
-	jitterPct     = "20"
-	caCertPEM     = "" // Base64-encoded CA cert PEM, injected at build time
+	implantID      = ""
+	implantSecret  = ""
+	callbackURL    = "https://127.0.0.1:443"
+	sleepMs        = "5000"
+	jitterPct      = "20"
+	caCertPEM      = "" // Base64-encoded CA cert PEM, injected at build time
+	transportType  = "https" // "https" or "dns"
+	dnsDomain      = "" // DNS C2 domain (for DNS transport)
+	dnsServer      = "" // DNS server to query (for DNS transport)
 )
 
 type Config struct {
-	ImplantID string
-	Secret    []byte
-	Callback  string
-	Sleep     time.Duration
-	JitterPct int
-	CACertPEM string // Decoded CA cert PEM for TLS pinning
+	ImplantID     string
+	Secret        []byte
+	Callback      string
+	Sleep         time.Duration
+	JitterPct     int
+	CACertPEM     string // Decoded CA cert PEM for TLS pinning
+	TransportType string // "https" or "dns"
+	DNSDomain     string // DNS C2 domain
+	DNSServer     string // DNS server address
 }
 
 func LoadConfig() (*Config, error) {
@@ -59,12 +65,20 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	tt := transportType
+	if tt == "" {
+		tt = "https"
+	}
+
 	return &Config{
-		ImplantID: implantID,
-		Secret:    secret,
-		Callback:  callbackURL,
-		Sleep:     time.Duration(sleep) * time.Millisecond,
-		JitterPct: jitter,
-		CACertPEM: decodedCACert,
+		ImplantID:     implantID,
+		Secret:        secret,
+		Callback:      callbackURL,
+		Sleep:         time.Duration(sleep) * time.Millisecond,
+		JitterPct:     jitter,
+		CACertPEM:     decodedCACert,
+		TransportType: tt,
+		DNSDomain:     dnsDomain,
+		DNSServer:     dnsServer,
 	}, nil
 }

@@ -19,19 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ErebusC2_StartListener_FullMethodName   = "/erebus.c2.ErebusC2/StartListener"
-	ErebusC2_StopListener_FullMethodName    = "/erebus.c2.ErebusC2/StopListener"
-	ErebusC2_ListListeners_FullMethodName   = "/erebus.c2.ErebusC2/ListListeners"
-	ErebusC2_ListSessions_FullMethodName    = "/erebus.c2.ErebusC2/ListSessions"
-	ErebusC2_GetSession_FullMethodName      = "/erebus.c2.ErebusC2/GetSession"
-	ErebusC2_KillSession_FullMethodName     = "/erebus.c2.ErebusC2/KillSession"
-	ErebusC2_ExecuteTask_FullMethodName     = "/erebus.c2.ErebusC2/ExecuteTask"
-	ErebusC2_GetTaskResult_FullMethodName   = "/erebus.c2.ErebusC2/GetTaskResult"
-	ErebusC2_ListTasks_FullMethodName       = "/erebus.c2.ErebusC2/ListTasks"
-	ErebusC2_Subscribe_FullMethodName       = "/erebus.c2.ErebusC2/Subscribe"
-	ErebusC2_GenerateImplant_FullMethodName = "/erebus.c2.ErebusC2/GenerateImplant"
-	ErebusC2_ListLoot_FullMethodName        = "/erebus.c2.ErebusC2/ListLoot"
-	ErebusC2_GetLoot_FullMethodName         = "/erebus.c2.ErebusC2/GetLoot"
+	ErebusC2_StartListener_FullMethodName        = "/erebus.c2.ErebusC2/StartListener"
+	ErebusC2_StopListener_FullMethodName         = "/erebus.c2.ErebusC2/StopListener"
+	ErebusC2_ListListeners_FullMethodName        = "/erebus.c2.ErebusC2/ListListeners"
+	ErebusC2_ListSessions_FullMethodName         = "/erebus.c2.ErebusC2/ListSessions"
+	ErebusC2_GetSession_FullMethodName           = "/erebus.c2.ErebusC2/GetSession"
+	ErebusC2_KillSession_FullMethodName          = "/erebus.c2.ErebusC2/KillSession"
+	ErebusC2_ExecuteTask_FullMethodName          = "/erebus.c2.ErebusC2/ExecuteTask"
+	ErebusC2_GetTaskResult_FullMethodName        = "/erebus.c2.ErebusC2/GetTaskResult"
+	ErebusC2_ListTasks_FullMethodName            = "/erebus.c2.ErebusC2/ListTasks"
+	ErebusC2_Subscribe_FullMethodName            = "/erebus.c2.ErebusC2/Subscribe"
+	ErebusC2_GenerateImplant_FullMethodName      = "/erebus.c2.ErebusC2/GenerateImplant"
+	ErebusC2_ListLoot_FullMethodName             = "/erebus.c2.ErebusC2/ListLoot"
+	ErebusC2_GetLoot_FullMethodName              = "/erebus.c2.ErebusC2/GetLoot"
+	ErebusC2_ListPendingApprovals_FullMethodName = "/erebus.c2.ErebusC2/ListPendingApprovals"
+	ErebusC2_Approve_FullMethodName              = "/erebus.c2.ErebusC2/Approve"
+	ErebusC2_Deny_FullMethodName                 = "/erebus.c2.ErebusC2/Deny"
 )
 
 // ErebusC2Client is the client API for ErebusC2 service.
@@ -57,6 +60,10 @@ type ErebusC2Client interface {
 	// Loot
 	ListLoot(ctx context.Context, in *ListLootRequest, opts ...grpc.CallOption) (*ListLootResponse, error)
 	GetLoot(ctx context.Context, in *GetLootRequest, opts ...grpc.CallOption) (*GetLootResponse, error)
+	// Approval Gates
+	ListPendingApprovals(ctx context.Context, in *ListPendingApprovalsRequest, opts ...grpc.CallOption) (*ListPendingApprovalsResponse, error)
+	Approve(ctx context.Context, in *ApproveRequest, opts ...grpc.CallOption) (*ApproveResponse, error)
+	Deny(ctx context.Context, in *DenyRequest, opts ...grpc.CallOption) (*DenyResponse, error)
 }
 
 type erebusC2Client struct {
@@ -206,6 +213,36 @@ func (c *erebusC2Client) GetLoot(ctx context.Context, in *GetLootRequest, opts .
 	return out, nil
 }
 
+func (c *erebusC2Client) ListPendingApprovals(ctx context.Context, in *ListPendingApprovalsRequest, opts ...grpc.CallOption) (*ListPendingApprovalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPendingApprovalsResponse)
+	err := c.cc.Invoke(ctx, ErebusC2_ListPendingApprovals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *erebusC2Client) Approve(ctx context.Context, in *ApproveRequest, opts ...grpc.CallOption) (*ApproveResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApproveResponse)
+	err := c.cc.Invoke(ctx, ErebusC2_Approve_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *erebusC2Client) Deny(ctx context.Context, in *DenyRequest, opts ...grpc.CallOption) (*DenyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DenyResponse)
+	err := c.cc.Invoke(ctx, ErebusC2_Deny_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ErebusC2Server is the server API for ErebusC2 service.
 // All implementations must embed UnimplementedErebusC2Server
 // for forward compatibility.
@@ -229,6 +266,10 @@ type ErebusC2Server interface {
 	// Loot
 	ListLoot(context.Context, *ListLootRequest) (*ListLootResponse, error)
 	GetLoot(context.Context, *GetLootRequest) (*GetLootResponse, error)
+	// Approval Gates
+	ListPendingApprovals(context.Context, *ListPendingApprovalsRequest) (*ListPendingApprovalsResponse, error)
+	Approve(context.Context, *ApproveRequest) (*ApproveResponse, error)
+	Deny(context.Context, *DenyRequest) (*DenyResponse, error)
 	mustEmbedUnimplementedErebusC2Server()
 }
 
@@ -277,6 +318,15 @@ func (UnimplementedErebusC2Server) ListLoot(context.Context, *ListLootRequest) (
 }
 func (UnimplementedErebusC2Server) GetLoot(context.Context, *GetLootRequest) (*GetLootResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLoot not implemented")
+}
+func (UnimplementedErebusC2Server) ListPendingApprovals(context.Context, *ListPendingApprovalsRequest) (*ListPendingApprovalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPendingApprovals not implemented")
+}
+func (UnimplementedErebusC2Server) Approve(context.Context, *ApproveRequest) (*ApproveResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Approve not implemented")
+}
+func (UnimplementedErebusC2Server) Deny(context.Context, *DenyRequest) (*DenyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Deny not implemented")
 }
 func (UnimplementedErebusC2Server) mustEmbedUnimplementedErebusC2Server() {}
 func (UnimplementedErebusC2Server) testEmbeddedByValue()                  {}
@@ -526,6 +576,60 @@ func _ErebusC2_GetLoot_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ErebusC2_ListPendingApprovals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPendingApprovalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ErebusC2Server).ListPendingApprovals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ErebusC2_ListPendingApprovals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ErebusC2Server).ListPendingApprovals(ctx, req.(*ListPendingApprovalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ErebusC2_Approve_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ErebusC2Server).Approve(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ErebusC2_Approve_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ErebusC2Server).Approve(ctx, req.(*ApproveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ErebusC2_Deny_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DenyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ErebusC2Server).Deny(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ErebusC2_Deny_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ErebusC2Server).Deny(ctx, req.(*DenyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ErebusC2_ServiceDesc is the grpc.ServiceDesc for ErebusC2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -580,6 +684,18 @@ var ErebusC2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLoot",
 			Handler:    _ErebusC2_GetLoot_Handler,
+		},
+		{
+			MethodName: "ListPendingApprovals",
+			Handler:    _ErebusC2_ListPendingApprovals_Handler,
+		},
+		{
+			MethodName: "Approve",
+			Handler:    _ErebusC2_Approve_Handler,
+		},
+		{
+			MethodName: "Deny",
+			Handler:    _ErebusC2_Deny_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -196,3 +196,25 @@ func (s *GRPCService) GetLoot(ctx context.Context, req *pb.GetLootRequest) (*pb.
 		},
 	}, nil
 }
+
+// --- Approval Gates ---
+
+func (s *GRPCService) ListPendingApprovals(ctx context.Context, req *pb.ListPendingApprovalsRequest) (*pb.ListPendingApprovalsResponse, error) {
+	return &pb.ListPendingApprovalsResponse{
+		Approvals: s.ts.Approval.ListPending(),
+	}, nil
+}
+
+func (s *GRPCService) Approve(ctx context.Context, req *pb.ApproveRequest) (*pb.ApproveResponse, error) {
+	if err := s.ts.Approval.Approve(req.ApprovalId); err != nil {
+		return &pb.ApproveResponse{Success: false}, err
+	}
+	return &pb.ApproveResponse{Success: true}, nil
+}
+
+func (s *GRPCService) Deny(ctx context.Context, req *pb.DenyRequest) (*pb.DenyResponse, error) {
+	if err := s.ts.Approval.Deny(req.ApprovalId); err != nil {
+		return &pb.DenyResponse{Success: false}, err
+	}
+	return &pb.DenyResponse{Success: true}, nil
+}

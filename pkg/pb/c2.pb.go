@@ -46,6 +46,13 @@ const (
 	TaskType_TASK_EXIT          TaskType = 19
 	TaskType_TASK_SLEEP         TaskType = 20
 	TaskType_TASK_MODULE        TaskType = 21
+	TaskType_TASK_LDAP_ENUM     TaskType = 22
+	TaskType_TASK_KERBEROAST    TaskType = 23
+	TaskType_TASK_ASREPROAST    TaskType = 24
+	TaskType_TASK_LATERAL_MOVE  TaskType = 25
+	TaskType_TASK_PE_LOAD_EXEC  TaskType = 26
+	TaskType_TASK_PERSIST       TaskType = 27
+	TaskType_TASK_PRIVESC       TaskType = 28
 )
 
 // Enum value maps for TaskType.
@@ -73,6 +80,13 @@ var (
 		19: "TASK_EXIT",
 		20: "TASK_SLEEP",
 		21: "TASK_MODULE",
+		22: "TASK_LDAP_ENUM",
+		23: "TASK_KERBEROAST",
+		24: "TASK_ASREPROAST",
+		25: "TASK_LATERAL_MOVE",
+		26: "TASK_PE_LOAD_EXEC",
+		27: "TASK_PERSIST",
+		28: "TASK_PRIVESC",
 	}
 	TaskType_value = map[string]int32{
 		"TASK_UNKNOWN":       0,
@@ -97,6 +111,13 @@ var (
 		"TASK_EXIT":          19,
 		"TASK_SLEEP":         20,
 		"TASK_MODULE":        21,
+		"TASK_LDAP_ENUM":     22,
+		"TASK_KERBEROAST":    23,
+		"TASK_ASREPROAST":    24,
+		"TASK_LATERAL_MOVE":  25,
+		"TASK_PE_LOAD_EXEC":  26,
+		"TASK_PERSIST":       27,
+		"TASK_PRIVESC":       28,
 	}
 )
 
@@ -808,7 +829,6 @@ func (x *ShellResult) GetExitCode() int32 {
 	return 0
 }
 
-// Phase 2+ task payloads (stubs)
 type FileDownloadTask struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RemotePath    string                 `protobuf:"bytes,1,opt,name=remote_path,json=remotePath,proto3" json:"remote_path,omitempty"`
@@ -1105,6 +1125,2634 @@ func (x *ModuleTask) GetConfig() []byte {
 	return nil
 }
 
+type ProcessListTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessListTask) Reset() {
+	*x = ProcessListTask{}
+	mi := &file_c2_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessListTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessListTask) ProtoMessage() {}
+
+func (x *ProcessListTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessListTask.ProtoReflect.Descriptor instead.
+func (*ProcessListTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{16}
+}
+
+type ProcessListResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Processes     []*ProcessInfo         `protobuf:"bytes,1,rep,name=processes,proto3" json:"processes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessListResult) Reset() {
+	*x = ProcessListResult{}
+	mi := &file_c2_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessListResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessListResult) ProtoMessage() {}
+
+func (x *ProcessListResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessListResult.ProtoReflect.Descriptor instead.
+func (*ProcessListResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ProcessListResult) GetProcesses() []*ProcessInfo {
+	if x != nil {
+		return x.Processes
+	}
+	return nil
+}
+
+type ProcessInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pid           uint32                 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	Ppid          uint32                 `protobuf:"varint,2,opt,name=ppid,proto3" json:"ppid,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	User          string                 `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
+	Arch          string                 `protobuf:"bytes,5,opt,name=arch,proto3" json:"arch,omitempty"`
+	MemoryBytes   uint64                 `protobuf:"varint,6,opt,name=memory_bytes,json=memoryBytes,proto3" json:"memory_bytes,omitempty"`
+	CommandLine   string                 `protobuf:"bytes,7,opt,name=command_line,json=commandLine,proto3" json:"command_line,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessInfo) Reset() {
+	*x = ProcessInfo{}
+	mi := &file_c2_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessInfo) ProtoMessage() {}
+
+func (x *ProcessInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessInfo.ProtoReflect.Descriptor instead.
+func (*ProcessInfo) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ProcessInfo) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *ProcessInfo) GetPpid() uint32 {
+	if x != nil {
+		return x.Ppid
+	}
+	return 0
+}
+
+func (x *ProcessInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetArch() string {
+	if x != nil {
+		return x.Arch
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetMemoryBytes() uint64 {
+	if x != nil {
+		return x.MemoryBytes
+	}
+	return 0
+}
+
+func (x *ProcessInfo) GetCommandLine() string {
+	if x != nil {
+		return x.CommandLine
+	}
+	return ""
+}
+
+type ProcessKillTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pid           uint32                 `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessKillTask) Reset() {
+	*x = ProcessKillTask{}
+	mi := &file_c2_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessKillTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessKillTask) ProtoMessage() {}
+
+func (x *ProcessKillTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessKillTask.ProtoReflect.Descriptor instead.
+func (*ProcessKillTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ProcessKillTask) GetPid() uint32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+type ProcessKillResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessKillResult) Reset() {
+	*x = ProcessKillResult{}
+	mi := &file_c2_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessKillResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessKillResult) ProtoMessage() {}
+
+func (x *ProcessKillResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessKillResult.ProtoReflect.Descriptor instead.
+func (*ProcessKillResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ProcessKillResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type NetIfconfigTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetIfconfigTask) Reset() {
+	*x = NetIfconfigTask{}
+	mi := &file_c2_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetIfconfigTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetIfconfigTask) ProtoMessage() {}
+
+func (x *NetIfconfigTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetIfconfigTask.ProtoReflect.Descriptor instead.
+func (*NetIfconfigTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{21}
+}
+
+type NetIfconfigResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Interfaces    []*NetInterface        `protobuf:"bytes,1,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetIfconfigResult) Reset() {
+	*x = NetIfconfigResult{}
+	mi := &file_c2_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetIfconfigResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetIfconfigResult) ProtoMessage() {}
+
+func (x *NetIfconfigResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetIfconfigResult.ProtoReflect.Descriptor instead.
+func (*NetIfconfigResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *NetIfconfigResult) GetInterfaces() []*NetInterface {
+	if x != nil {
+		return x.Interfaces
+	}
+	return nil
+}
+
+type NetInterface struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Addresses     []string               `protobuf:"bytes,2,rep,name=addresses,proto3" json:"addresses,omitempty"`
+	Mac           string                 `protobuf:"bytes,3,opt,name=mac,proto3" json:"mac,omitempty"`
+	Mtu           uint32                 `protobuf:"varint,4,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	Up            bool                   `protobuf:"varint,5,opt,name=up,proto3" json:"up,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetInterface) Reset() {
+	*x = NetInterface{}
+	mi := &file_c2_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetInterface) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetInterface) ProtoMessage() {}
+
+func (x *NetInterface) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetInterface.ProtoReflect.Descriptor instead.
+func (*NetInterface) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *NetInterface) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *NetInterface) GetAddresses() []string {
+	if x != nil {
+		return x.Addresses
+	}
+	return nil
+}
+
+func (x *NetInterface) GetMac() string {
+	if x != nil {
+		return x.Mac
+	}
+	return ""
+}
+
+func (x *NetInterface) GetMtu() uint32 {
+	if x != nil {
+		return x.Mtu
+	}
+	return 0
+}
+
+func (x *NetInterface) GetUp() bool {
+	if x != nil {
+		return x.Up
+	}
+	return false
+}
+
+type NetPortscanTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Target        string                 `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	Ports         []uint32               `protobuf:"varint,2,rep,packed,name=ports,proto3" json:"ports,omitempty"`
+	TimeoutMs     uint32                 `protobuf:"varint,3,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	Threads       uint32                 `protobuf:"varint,4,opt,name=threads,proto3" json:"threads,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetPortscanTask) Reset() {
+	*x = NetPortscanTask{}
+	mi := &file_c2_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetPortscanTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetPortscanTask) ProtoMessage() {}
+
+func (x *NetPortscanTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetPortscanTask.ProtoReflect.Descriptor instead.
+func (*NetPortscanTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *NetPortscanTask) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *NetPortscanTask) GetPorts() []uint32 {
+	if x != nil {
+		return x.Ports
+	}
+	return nil
+}
+
+func (x *NetPortscanTask) GetTimeoutMs() uint32 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *NetPortscanTask) GetThreads() uint32 {
+	if x != nil {
+		return x.Threads
+	}
+	return 0
+}
+
+type NetPortscanResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ports         []*PortResult          `protobuf:"bytes,1,rep,name=ports,proto3" json:"ports,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetPortscanResult) Reset() {
+	*x = NetPortscanResult{}
+	mi := &file_c2_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetPortscanResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetPortscanResult) ProtoMessage() {}
+
+func (x *NetPortscanResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetPortscanResult.ProtoReflect.Descriptor instead.
+func (*NetPortscanResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *NetPortscanResult) GetPorts() []*PortResult {
+	if x != nil {
+		return x.Ports
+	}
+	return nil
+}
+
+type PortResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Port          uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	Open          bool                   `protobuf:"varint,3,opt,name=open,proto3" json:"open,omitempty"`
+	Service       string                 `protobuf:"bytes,4,opt,name=service,proto3" json:"service,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortResult) Reset() {
+	*x = PortResult{}
+	mi := &file_c2_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortResult) ProtoMessage() {}
+
+func (x *PortResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortResult.ProtoReflect.Descriptor instead.
+func (*PortResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PortResult) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *PortResult) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *PortResult) GetOpen() bool {
+	if x != nil {
+		return x.Open
+	}
+	return false
+}
+
+func (x *PortResult) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+type LDAPEnumConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TargetDc      string                 `protobuf:"bytes,1,opt,name=target_dc,json=targetDc,proto3" json:"target_dc,omitempty"`
+	Domain        string                 `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
+	Username      string                 `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
+	NtlmHash      string                 `protobuf:"bytes,5,opt,name=ntlm_hash,json=ntlmHash,proto3" json:"ntlm_hash,omitempty"`
+	QueryType     string                 `protobuf:"bytes,6,opt,name=query_type,json=queryType,proto3" json:"query_type,omitempty"`
+	CustomFilter  string                 `protobuf:"bytes,7,opt,name=custom_filter,json=customFilter,proto3" json:"custom_filter,omitempty"`
+	Attributes    []string               `protobuf:"bytes,8,rep,name=attributes,proto3" json:"attributes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LDAPEnumConfig) Reset() {
+	*x = LDAPEnumConfig{}
+	mi := &file_c2_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LDAPEnumConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LDAPEnumConfig) ProtoMessage() {}
+
+func (x *LDAPEnumConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LDAPEnumConfig.ProtoReflect.Descriptor instead.
+func (*LDAPEnumConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *LDAPEnumConfig) GetTargetDc() string {
+	if x != nil {
+		return x.TargetDc
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetNtlmHash() string {
+	if x != nil {
+		return x.NtlmHash
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetQueryType() string {
+	if x != nil {
+		return x.QueryType
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetCustomFilter() string {
+	if x != nil {
+		return x.CustomFilter
+	}
+	return ""
+}
+
+func (x *LDAPEnumConfig) GetAttributes() []string {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+type LDAPEnumResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Domain        string                 `protobuf:"bytes,1,opt,name=domain,proto3" json:"domain,omitempty"`
+	Dc            string                 `protobuf:"bytes,2,opt,name=dc,proto3" json:"dc,omitempty"`
+	QueryType     string                 `protobuf:"bytes,3,opt,name=query_type,json=queryType,proto3" json:"query_type,omitempty"`
+	Entries       []*LDAPEntry           `protobuf:"bytes,4,rep,name=entries,proto3" json:"entries,omitempty"`
+	TotalResults  int32                  `protobuf:"varint,5,opt,name=total_results,json=totalResults,proto3" json:"total_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LDAPEnumResult) Reset() {
+	*x = LDAPEnumResult{}
+	mi := &file_c2_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LDAPEnumResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LDAPEnumResult) ProtoMessage() {}
+
+func (x *LDAPEnumResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LDAPEnumResult.ProtoReflect.Descriptor instead.
+func (*LDAPEnumResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *LDAPEnumResult) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *LDAPEnumResult) GetDc() string {
+	if x != nil {
+		return x.Dc
+	}
+	return ""
+}
+
+func (x *LDAPEnumResult) GetQueryType() string {
+	if x != nil {
+		return x.QueryType
+	}
+	return ""
+}
+
+func (x *LDAPEnumResult) GetEntries() []*LDAPEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *LDAPEnumResult) GetTotalResults() int32 {
+	if x != nil {
+		return x.TotalResults
+	}
+	return 0
+}
+
+type LDAPEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Dn            string                 `protobuf:"bytes,1,opt,name=dn,proto3" json:"dn,omitempty"`
+	Attributes    map[string]*LDAPValues `protobuf:"bytes,2,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LDAPEntry) Reset() {
+	*x = LDAPEntry{}
+	mi := &file_c2_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LDAPEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LDAPEntry) ProtoMessage() {}
+
+func (x *LDAPEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LDAPEntry.ProtoReflect.Descriptor instead.
+func (*LDAPEntry) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *LDAPEntry) GetDn() string {
+	if x != nil {
+		return x.Dn
+	}
+	return ""
+}
+
+func (x *LDAPEntry) GetAttributes() map[string]*LDAPValues {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+type LDAPValues struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Values        []string               `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LDAPValues) Reset() {
+	*x = LDAPValues{}
+	mi := &file_c2_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LDAPValues) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LDAPValues) ProtoMessage() {}
+
+func (x *LDAPValues) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LDAPValues.ProtoReflect.Descriptor instead.
+func (*LDAPValues) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *LDAPValues) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+type KerberoastConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TargetDc      string                 `protobuf:"bytes,1,opt,name=target_dc,json=targetDc,proto3" json:"target_dc,omitempty"`
+	Domain        string                 `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
+	Username      string                 `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
+	NtlmHash      string                 `protobuf:"bytes,5,opt,name=ntlm_hash,json=ntlmHash,proto3" json:"ntlm_hash,omitempty"`
+	TargetSpns    []string               `protobuf:"bytes,6,rep,name=target_spns,json=targetSpns,proto3" json:"target_spns,omitempty"`
+	Encryption    string                 `protobuf:"bytes,7,opt,name=encryption,proto3" json:"encryption,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KerberoastConfig) Reset() {
+	*x = KerberoastConfig{}
+	mi := &file_c2_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KerberoastConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KerberoastConfig) ProtoMessage() {}
+
+func (x *KerberoastConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KerberoastConfig.ProtoReflect.Descriptor instead.
+func (*KerberoastConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *KerberoastConfig) GetTargetDc() string {
+	if x != nil {
+		return x.TargetDc
+	}
+	return ""
+}
+
+func (x *KerberoastConfig) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *KerberoastConfig) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *KerberoastConfig) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *KerberoastConfig) GetNtlmHash() string {
+	if x != nil {
+		return x.NtlmHash
+	}
+	return ""
+}
+
+func (x *KerberoastConfig) GetTargetSpns() []string {
+	if x != nil {
+		return x.TargetSpns
+	}
+	return nil
+}
+
+func (x *KerberoastConfig) GetEncryption() string {
+	if x != nil {
+		return x.Encryption
+	}
+	return ""
+}
+
+type KerberoastResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hashes        []*KerberoastHash      `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KerberoastResult) Reset() {
+	*x = KerberoastResult{}
+	mi := &file_c2_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KerberoastResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KerberoastResult) ProtoMessage() {}
+
+func (x *KerberoastResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KerberoastResult.ProtoReflect.Descriptor instead.
+func (*KerberoastResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *KerberoastResult) GetHashes() []*KerberoastHash {
+	if x != nil {
+		return x.Hashes
+	}
+	return nil
+}
+
+type KerberoastHash struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Spn            string                 `protobuf:"bytes,1,opt,name=spn,proto3" json:"spn,omitempty"`
+	SamAccountName string                 `protobuf:"bytes,2,opt,name=sam_account_name,json=samAccountName,proto3" json:"sam_account_name,omitempty"`
+	Hash           string                 `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
+	EncryptionType string                 `protobuf:"bytes,4,opt,name=encryption_type,json=encryptionType,proto3" json:"encryption_type,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *KerberoastHash) Reset() {
+	*x = KerberoastHash{}
+	mi := &file_c2_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KerberoastHash) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KerberoastHash) ProtoMessage() {}
+
+func (x *KerberoastHash) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KerberoastHash.ProtoReflect.Descriptor instead.
+func (*KerberoastHash) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *KerberoastHash) GetSpn() string {
+	if x != nil {
+		return x.Spn
+	}
+	return ""
+}
+
+func (x *KerberoastHash) GetSamAccountName() string {
+	if x != nil {
+		return x.SamAccountName
+	}
+	return ""
+}
+
+func (x *KerberoastHash) GetHash() string {
+	if x != nil {
+		return x.Hash
+	}
+	return ""
+}
+
+func (x *KerberoastHash) GetEncryptionType() string {
+	if x != nil {
+		return x.EncryptionType
+	}
+	return ""
+}
+
+type ASREPRoastConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TargetDc      string                 `protobuf:"bytes,1,opt,name=target_dc,json=targetDc,proto3" json:"target_dc,omitempty"`
+	Domain        string                 `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
+	TargetUsers   []string               `protobuf:"bytes,3,rep,name=target_users,json=targetUsers,proto3" json:"target_users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ASREPRoastConfig) Reset() {
+	*x = ASREPRoastConfig{}
+	mi := &file_c2_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ASREPRoastConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ASREPRoastConfig) ProtoMessage() {}
+
+func (x *ASREPRoastConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ASREPRoastConfig.ProtoReflect.Descriptor instead.
+func (*ASREPRoastConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ASREPRoastConfig) GetTargetDc() string {
+	if x != nil {
+		return x.TargetDc
+	}
+	return ""
+}
+
+func (x *ASREPRoastConfig) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *ASREPRoastConfig) GetTargetUsers() []string {
+	if x != nil {
+		return x.TargetUsers
+	}
+	return nil
+}
+
+type ASREPRoastResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hashes        []*ASREPHash           `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ASREPRoastResult) Reset() {
+	*x = ASREPRoastResult{}
+	mi := &file_c2_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ASREPRoastResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ASREPRoastResult) ProtoMessage() {}
+
+func (x *ASREPRoastResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ASREPRoastResult.ProtoReflect.Descriptor instead.
+func (*ASREPRoastResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ASREPRoastResult) GetHashes() []*ASREPHash {
+	if x != nil {
+		return x.Hashes
+	}
+	return nil
+}
+
+type ASREPHash struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Hash          string                 `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ASREPHash) Reset() {
+	*x = ASREPHash{}
+	mi := &file_c2_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ASREPHash) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ASREPHash) ProtoMessage() {}
+
+func (x *ASREPHash) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ASREPHash.ProtoReflect.Descriptor instead.
+func (*ASREPHash) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ASREPHash) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *ASREPHash) GetHash() string {
+	if x != nil {
+		return x.Hash
+	}
+	return ""
+}
+
+type CredDumpConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	TargetPid     uint32                 `protobuf:"varint,2,opt,name=target_pid,json=targetPid,proto3" json:"target_pid,omitempty"`
+	OutputFormat  string                 `protobuf:"bytes,3,opt,name=output_format,json=outputFormat,proto3" json:"output_format,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CredDumpConfig) Reset() {
+	*x = CredDumpConfig{}
+	mi := &file_c2_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CredDumpConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CredDumpConfig) ProtoMessage() {}
+
+func (x *CredDumpConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CredDumpConfig.ProtoReflect.Descriptor instead.
+func (*CredDumpConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *CredDumpConfig) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *CredDumpConfig) GetTargetPid() uint32 {
+	if x != nil {
+		return x.TargetPid
+	}
+	return 0
+}
+
+func (x *CredDumpConfig) GetOutputFormat() string {
+	if x != nil {
+		return x.OutputFormat
+	}
+	return ""
+}
+
+type CredDumpResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	Credentials   []*Credential          `protobuf:"bytes,2,rep,name=credentials,proto3" json:"credentials,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CredDumpResult) Reset() {
+	*x = CredDumpResult{}
+	mi := &file_c2_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CredDumpResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CredDumpResult) ProtoMessage() {}
+
+func (x *CredDumpResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CredDumpResult.ProtoReflect.Descriptor instead.
+func (*CredDumpResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *CredDumpResult) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *CredDumpResult) GetCredentials() []*Credential {
+	if x != nil {
+		return x.Credentials
+	}
+	return nil
+}
+
+type Credential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Domain        string                 `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
+	Username      string                 `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
+	Value         string                 `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	Source        string                 `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Credential) Reset() {
+	*x = Credential{}
+	mi := &file_c2_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Credential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Credential) ProtoMessage() {}
+
+func (x *Credential) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Credential.ProtoReflect.Descriptor instead.
+func (*Credential) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *Credential) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Credential) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *Credential) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *Credential) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *Credential) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+type LateralMoveConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	Target        string                 `protobuf:"bytes,2,opt,name=target,proto3" json:"target,omitempty"`
+	Domain        string                 `protobuf:"bytes,3,opt,name=domain,proto3" json:"domain,omitempty"`
+	Username      string                 `protobuf:"bytes,4,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,5,opt,name=password,proto3" json:"password,omitempty"`
+	NtlmHash      string                 `protobuf:"bytes,6,opt,name=ntlm_hash,json=ntlmHash,proto3" json:"ntlm_hash,omitempty"`
+	Ticket        []byte                 `protobuf:"bytes,7,opt,name=ticket,proto3" json:"ticket,omitempty"`
+	Command       string                 `protobuf:"bytes,8,opt,name=command,proto3" json:"command,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,9,opt,name=payload,proto3" json:"payload,omitempty"`
+	ServiceName   string                 `protobuf:"bytes,10,opt,name=service_name,json=serviceName,proto3" json:"service_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LateralMoveConfig) Reset() {
+	*x = LateralMoveConfig{}
+	mi := &file_c2_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LateralMoveConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LateralMoveConfig) ProtoMessage() {}
+
+func (x *LateralMoveConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LateralMoveConfig.ProtoReflect.Descriptor instead.
+func (*LateralMoveConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *LateralMoveConfig) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetNtlmHash() string {
+	if x != nil {
+		return x.NtlmHash
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetTicket() []byte {
+	if x != nil {
+		return x.Ticket
+	}
+	return nil
+}
+
+func (x *LateralMoveConfig) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *LateralMoveConfig) GetServiceName() string {
+	if x != nil {
+		return x.ServiceName
+	}
+	return ""
+}
+
+type LateralMoveResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	Target        string                 `protobuf:"bytes,2,opt,name=target,proto3" json:"target,omitempty"`
+	Success       bool                   `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
+	Output        string                 `protobuf:"bytes,4,opt,name=output,proto3" json:"output,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LateralMoveResult) Reset() {
+	*x = LateralMoveResult{}
+	mi := &file_c2_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LateralMoveResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LateralMoveResult) ProtoMessage() {}
+
+func (x *LateralMoveResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LateralMoveResult.ProtoReflect.Descriptor instead.
+func (*LateralMoveResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *LateralMoveResult) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *LateralMoveResult) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *LateralMoveResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *LateralMoveResult) GetOutput() string {
+	if x != nil {
+		return x.Output
+	}
+	return ""
+}
+
+type InjectTask struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Method         string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	TargetPid      uint32                 `protobuf:"varint,2,opt,name=target_pid,json=targetPid,proto3" json:"target_pid,omitempty"`
+	Shellcode      []byte                 `protobuf:"bytes,3,opt,name=shellcode,proto3" json:"shellcode,omitempty"`
+	StartSuspended bool                   `protobuf:"varint,4,opt,name=start_suspended,json=startSuspended,proto3" json:"start_suspended,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *InjectTask) Reset() {
+	*x = InjectTask{}
+	mi := &file_c2_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InjectTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InjectTask) ProtoMessage() {}
+
+func (x *InjectTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InjectTask.ProtoReflect.Descriptor instead.
+func (*InjectTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *InjectTask) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *InjectTask) GetTargetPid() uint32 {
+	if x != nil {
+		return x.TargetPid
+	}
+	return 0
+}
+
+func (x *InjectTask) GetShellcode() []byte {
+	if x != nil {
+		return x.Shellcode
+	}
+	return nil
+}
+
+func (x *InjectTask) GetStartSuspended() bool {
+	if x != nil {
+		return x.StartSuspended
+	}
+	return false
+}
+
+type InjectResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	TargetPid     uint32                 `protobuf:"varint,2,opt,name=target_pid,json=targetPid,proto3" json:"target_pid,omitempty"`
+	ThreadId      uint32                 `protobuf:"varint,3,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InjectResult) Reset() {
+	*x = InjectResult{}
+	mi := &file_c2_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InjectResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InjectResult) ProtoMessage() {}
+
+func (x *InjectResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InjectResult.ProtoReflect.Descriptor instead.
+func (*InjectResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *InjectResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *InjectResult) GetTargetPid() uint32 {
+	if x != nil {
+		return x.TargetPid
+	}
+	return 0
+}
+
+func (x *InjectResult) GetThreadId() uint32 {
+	if x != nil {
+		return x.ThreadId
+	}
+	return 0
+}
+
+type PELoadTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PeData        []byte                 `protobuf:"bytes,1,opt,name=pe_data,json=peData,proto3" json:"pe_data,omitempty"`
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	Args          string                 `protobuf:"bytes,3,opt,name=args,proto3" json:"args,omitempty"`
+	TargetPid     uint32                 `protobuf:"varint,4,opt,name=target_pid,json=targetPid,proto3" json:"target_pid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PELoadTask) Reset() {
+	*x = PELoadTask{}
+	mi := &file_c2_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PELoadTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PELoadTask) ProtoMessage() {}
+
+func (x *PELoadTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PELoadTask.ProtoReflect.Descriptor instead.
+func (*PELoadTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *PELoadTask) GetPeData() []byte {
+	if x != nil {
+		return x.PeData
+	}
+	return nil
+}
+
+func (x *PELoadTask) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *PELoadTask) GetArgs() string {
+	if x != nil {
+		return x.Args
+	}
+	return ""
+}
+
+func (x *PELoadTask) GetTargetPid() uint32 {
+	if x != nil {
+		return x.TargetPid
+	}
+	return 0
+}
+
+type PELoadResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Output        []byte                 `protobuf:"bytes,2,opt,name=output,proto3" json:"output,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PELoadResult) Reset() {
+	*x = PELoadResult{}
+	mi := &file_c2_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PELoadResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PELoadResult) ProtoMessage() {}
+
+func (x *PELoadResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PELoadResult.ProtoReflect.Descriptor instead.
+func (*PELoadResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *PELoadResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *PELoadResult) GetOutput() []byte {
+	if x != nil {
+		return x.Output
+	}
+	return nil
+}
+
+type ScreenshotTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Monitor       uint32                 `protobuf:"varint,1,opt,name=monitor,proto3" json:"monitor,omitempty"`
+	Quality       uint32                 `protobuf:"varint,2,opt,name=quality,proto3" json:"quality,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScreenshotTask) Reset() {
+	*x = ScreenshotTask{}
+	mi := &file_c2_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScreenshotTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScreenshotTask) ProtoMessage() {}
+
+func (x *ScreenshotTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScreenshotTask.ProtoReflect.Descriptor instead.
+func (*ScreenshotTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *ScreenshotTask) GetMonitor() uint32 {
+	if x != nil {
+		return x.Monitor
+	}
+	return 0
+}
+
+func (x *ScreenshotTask) GetQuality() uint32 {
+	if x != nil {
+		return x.Quality
+	}
+	return 0
+}
+
+type ScreenshotResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImageData     []byte                 `protobuf:"bytes,1,opt,name=image_data,json=imageData,proto3" json:"image_data,omitempty"`
+	Format        string                 `protobuf:"bytes,2,opt,name=format,proto3" json:"format,omitempty"`
+	Width         uint32                 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
+	Height        uint32                 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScreenshotResult) Reset() {
+	*x = ScreenshotResult{}
+	mi := &file_c2_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScreenshotResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScreenshotResult) ProtoMessage() {}
+
+func (x *ScreenshotResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScreenshotResult.ProtoReflect.Descriptor instead.
+func (*ScreenshotResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *ScreenshotResult) GetImageData() []byte {
+	if x != nil {
+		return x.ImageData
+	}
+	return nil
+}
+
+func (x *ScreenshotResult) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *ScreenshotResult) GetWidth() uint32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *ScreenshotResult) GetHeight() uint32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+type KeylogStartTask struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	CaptureWindowTitles bool                   `protobuf:"varint,1,opt,name=capture_window_titles,json=captureWindowTitles,proto3" json:"capture_window_titles,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *KeylogStartTask) Reset() {
+	*x = KeylogStartTask{}
+	mi := &file_c2_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeylogStartTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeylogStartTask) ProtoMessage() {}
+
+func (x *KeylogStartTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeylogStartTask.ProtoReflect.Descriptor instead.
+func (*KeylogStartTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *KeylogStartTask) GetCaptureWindowTitles() bool {
+	if x != nil {
+		return x.CaptureWindowTitles
+	}
+	return false
+}
+
+type KeylogStopTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeylogStopTask) Reset() {
+	*x = KeylogStopTask{}
+	mi := &file_c2_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeylogStopTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeylogStopTask) ProtoMessage() {}
+
+func (x *KeylogStopTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeylogStopTask.ProtoReflect.Descriptor instead.
+func (*KeylogStopTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{49}
+}
+
+type KeylogDumpTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeylogDumpTask) Reset() {
+	*x = KeylogDumpTask{}
+	mi := &file_c2_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeylogDumpTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeylogDumpTask) ProtoMessage() {}
+
+func (x *KeylogDumpTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeylogDumpTask.ProtoReflect.Descriptor instead.
+func (*KeylogDumpTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{50}
+}
+
+type KeylogDumpResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entries       []*KeylogEntry         `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeylogDumpResult) Reset() {
+	*x = KeylogDumpResult{}
+	mi := &file_c2_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeylogDumpResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeylogDumpResult) ProtoMessage() {}
+
+func (x *KeylogDumpResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeylogDumpResult.ProtoReflect.Descriptor instead.
+func (*KeylogDumpResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *KeylogDumpResult) GetEntries() []*KeylogEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+type KeylogEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WindowTitle   string                 `protobuf:"bytes,1,opt,name=window_title,json=windowTitle,proto3" json:"window_title,omitempty"`
+	Keys          string                 `protobuf:"bytes,2,opt,name=keys,proto3" json:"keys,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeylogEntry) Reset() {
+	*x = KeylogEntry{}
+	mi := &file_c2_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeylogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeylogEntry) ProtoMessage() {}
+
+func (x *KeylogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeylogEntry.ProtoReflect.Descriptor instead.
+func (*KeylogEntry) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *KeylogEntry) GetWindowTitle() string {
+	if x != nil {
+		return x.WindowTitle
+	}
+	return ""
+}
+
+func (x *KeylogEntry) GetKeys() string {
+	if x != nil {
+		return x.Keys
+	}
+	return ""
+}
+
+func (x *KeylogEntry) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+type SocksStartTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Port          uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocksStartTask) Reset() {
+	*x = SocksStartTask{}
+	mi := &file_c2_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocksStartTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocksStartTask) ProtoMessage() {}
+
+func (x *SocksStartTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocksStartTask.ProtoReflect.Descriptor instead.
+func (*SocksStartTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *SocksStartTask) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+type SocksStartResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Port          uint32                 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocksStartResult) Reset() {
+	*x = SocksStartResult{}
+	mi := &file_c2_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocksStartResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocksStartResult) ProtoMessage() {}
+
+func (x *SocksStartResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocksStartResult.ProtoReflect.Descriptor instead.
+func (*SocksStartResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *SocksStartResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SocksStartResult) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+type SocksStopTask struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocksStopTask) Reset() {
+	*x = SocksStopTask{}
+	mi := &file_c2_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocksStopTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocksStopTask) ProtoMessage() {}
+
+func (x *SocksStopTask) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocksStopTask.ProtoReflect.Descriptor instead.
+func (*SocksStopTask) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{55}
+}
+
+type SocksStopResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocksStopResult) Reset() {
+	*x = SocksStopResult{}
+	mi := &file_c2_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocksStopResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocksStopResult) ProtoMessage() {}
+
+func (x *SocksStopResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocksStopResult.ProtoReflect.Descriptor instead.
+func (*SocksStopResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *SocksStopResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type PersistConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	PayloadPath   string                 `protobuf:"bytes,3,opt,name=payload_path,json=payloadPath,proto3" json:"payload_path,omitempty"`
+	Trigger       string                 `protobuf:"bytes,4,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PersistConfig) Reset() {
+	*x = PersistConfig{}
+	mi := &file_c2_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PersistConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PersistConfig) ProtoMessage() {}
+
+func (x *PersistConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PersistConfig.ProtoReflect.Descriptor instead.
+func (*PersistConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *PersistConfig) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *PersistConfig) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PersistConfig) GetPayloadPath() string {
+	if x != nil {
+		return x.PayloadPath
+	}
+	return ""
+}
+
+func (x *PersistConfig) GetTrigger() string {
+	if x != nil {
+		return x.Trigger
+	}
+	return ""
+}
+
+func (x *PersistConfig) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+type PersistResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	Details       string                 `protobuf:"bytes,3,opt,name=details,proto3" json:"details,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PersistResult) Reset() {
+	*x = PersistResult{}
+	mi := &file_c2_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PersistResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PersistResult) ProtoMessage() {}
+
+func (x *PersistResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PersistResult.ProtoReflect.Descriptor instead.
+func (*PersistResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *PersistResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *PersistResult) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *PersistResult) GetDetails() string {
+	if x != nil {
+		return x.Details
+	}
+	return ""
+}
+
+type PrivescConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	TargetPid     uint32                 `protobuf:"varint,2,opt,name=target_pid,json=targetPid,proto3" json:"target_pid,omitempty"`
+	Command       string                 `protobuf:"bytes,3,opt,name=command,proto3" json:"command,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrivescConfig) Reset() {
+	*x = PrivescConfig{}
+	mi := &file_c2_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrivescConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrivescConfig) ProtoMessage() {}
+
+func (x *PrivescConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrivescConfig.ProtoReflect.Descriptor instead.
+func (*PrivescConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *PrivescConfig) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *PrivescConfig) GetTargetPid() uint32 {
+	if x != nil {
+		return x.TargetPid
+	}
+	return 0
+}
+
+func (x *PrivescConfig) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+type PrivescResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	NewIntegrity  string                 `protobuf:"bytes,3,opt,name=new_integrity,json=newIntegrity,proto3" json:"new_integrity,omitempty"`
+	NewPid        uint32                 `protobuf:"varint,4,opt,name=new_pid,json=newPid,proto3" json:"new_pid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrivescResult) Reset() {
+	*x = PrivescResult{}
+	mi := &file_c2_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrivescResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrivescResult) ProtoMessage() {}
+
+func (x *PrivescResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrivescResult.ProtoReflect.Descriptor instead.
+func (*PrivescResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *PrivescResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *PrivescResult) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *PrivescResult) GetNewIntegrity() string {
+	if x != nil {
+		return x.NewIntegrity
+	}
+	return ""
+}
+
+func (x *PrivescResult) GetNewPid() uint32 {
+	if x != nil {
+		return x.NewPid
+	}
+	return 0
+}
+
 var File_c2_proto protoreflect.FileDescriptor
 
 const file_c2_proto_rawDesc = "" +
@@ -1187,7 +3835,205 @@ const file_c2_proto_rawDesc = "" +
 	"ModuleTask\x12\x1f\n" +
 	"\vmodule_name\x18\x01 \x01(\tR\n" +
 	"moduleName\x12\x16\n" +
-	"\x06config\x18\x02 \x01(\fR\x06config*\xcc\x03\n" +
+	"\x06config\x18\x02 \x01(\fR\x06config\"\x11\n" +
+	"\x0fProcessListTask\"I\n" +
+	"\x11ProcessListResult\x124\n" +
+	"\tprocesses\x18\x01 \x03(\v2\x16.erebus.c2.ProcessInfoR\tprocesses\"\xb5\x01\n" +
+	"\vProcessInfo\x12\x10\n" +
+	"\x03pid\x18\x01 \x01(\rR\x03pid\x12\x12\n" +
+	"\x04ppid\x18\x02 \x01(\rR\x04ppid\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04user\x18\x04 \x01(\tR\x04user\x12\x12\n" +
+	"\x04arch\x18\x05 \x01(\tR\x04arch\x12!\n" +
+	"\fmemory_bytes\x18\x06 \x01(\x04R\vmemoryBytes\x12!\n" +
+	"\fcommand_line\x18\a \x01(\tR\vcommandLine\"#\n" +
+	"\x0fProcessKillTask\x12\x10\n" +
+	"\x03pid\x18\x01 \x01(\rR\x03pid\"-\n" +
+	"\x11ProcessKillResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x11\n" +
+	"\x0fNetIfconfigTask\"L\n" +
+	"\x11NetIfconfigResult\x127\n" +
+	"\n" +
+	"interfaces\x18\x01 \x03(\v2\x17.erebus.c2.NetInterfaceR\n" +
+	"interfaces\"t\n" +
+	"\fNetInterface\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
+	"\taddresses\x18\x02 \x03(\tR\taddresses\x12\x10\n" +
+	"\x03mac\x18\x03 \x01(\tR\x03mac\x12\x10\n" +
+	"\x03mtu\x18\x04 \x01(\rR\x03mtu\x12\x0e\n" +
+	"\x02up\x18\x05 \x01(\bR\x02up\"x\n" +
+	"\x0fNetPortscanTask\x12\x16\n" +
+	"\x06target\x18\x01 \x01(\tR\x06target\x12\x14\n" +
+	"\x05ports\x18\x02 \x03(\rR\x05ports\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\x03 \x01(\rR\ttimeoutMs\x12\x18\n" +
+	"\athreads\x18\x04 \x01(\rR\athreads\"@\n" +
+	"\x11NetPortscanResult\x12+\n" +
+	"\x05ports\x18\x01 \x03(\v2\x15.erebus.c2.PortResultR\x05ports\"b\n" +
+	"\n" +
+	"PortResult\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\x12\x12\n" +
+	"\x04open\x18\x03 \x01(\bR\x04open\x12\x18\n" +
+	"\aservice\x18\x04 \x01(\tR\aservice\"\xfe\x01\n" +
+	"\x0eLDAPEnumConfig\x12\x1b\n" +
+	"\ttarget_dc\x18\x01 \x01(\tR\btargetDc\x12\x16\n" +
+	"\x06domain\x18\x02 \x01(\tR\x06domain\x12\x1a\n" +
+	"\busername\x18\x03 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x04 \x01(\tR\bpassword\x12\x1b\n" +
+	"\tntlm_hash\x18\x05 \x01(\tR\bntlmHash\x12\x1d\n" +
+	"\n" +
+	"query_type\x18\x06 \x01(\tR\tqueryType\x12#\n" +
+	"\rcustom_filter\x18\a \x01(\tR\fcustomFilter\x12\x1e\n" +
+	"\n" +
+	"attributes\x18\b \x03(\tR\n" +
+	"attributes\"\xac\x01\n" +
+	"\x0eLDAPEnumResult\x12\x16\n" +
+	"\x06domain\x18\x01 \x01(\tR\x06domain\x12\x0e\n" +
+	"\x02dc\x18\x02 \x01(\tR\x02dc\x12\x1d\n" +
+	"\n" +
+	"query_type\x18\x03 \x01(\tR\tqueryType\x12.\n" +
+	"\aentries\x18\x04 \x03(\v2\x14.erebus.c2.LDAPEntryR\aentries\x12#\n" +
+	"\rtotal_results\x18\x05 \x01(\x05R\ftotalResults\"\xb7\x01\n" +
+	"\tLDAPEntry\x12\x0e\n" +
+	"\x02dn\x18\x01 \x01(\tR\x02dn\x12D\n" +
+	"\n" +
+	"attributes\x18\x02 \x03(\v2$.erebus.c2.LDAPEntry.AttributesEntryR\n" +
+	"attributes\x1aT\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
+	"\x05value\x18\x02 \x01(\v2\x15.erebus.c2.LDAPValuesR\x05value:\x028\x01\"$\n" +
+	"\n" +
+	"LDAPValues\x12\x16\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\"\xdd\x01\n" +
+	"\x10KerberoastConfig\x12\x1b\n" +
+	"\ttarget_dc\x18\x01 \x01(\tR\btargetDc\x12\x16\n" +
+	"\x06domain\x18\x02 \x01(\tR\x06domain\x12\x1a\n" +
+	"\busername\x18\x03 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x04 \x01(\tR\bpassword\x12\x1b\n" +
+	"\tntlm_hash\x18\x05 \x01(\tR\bntlmHash\x12\x1f\n" +
+	"\vtarget_spns\x18\x06 \x03(\tR\n" +
+	"targetSpns\x12\x1e\n" +
+	"\n" +
+	"encryption\x18\a \x01(\tR\n" +
+	"encryption\"E\n" +
+	"\x10KerberoastResult\x121\n" +
+	"\x06hashes\x18\x01 \x03(\v2\x19.erebus.c2.KerberoastHashR\x06hashes\"\x89\x01\n" +
+	"\x0eKerberoastHash\x12\x10\n" +
+	"\x03spn\x18\x01 \x01(\tR\x03spn\x12(\n" +
+	"\x10sam_account_name\x18\x02 \x01(\tR\x0esamAccountName\x12\x12\n" +
+	"\x04hash\x18\x03 \x01(\tR\x04hash\x12'\n" +
+	"\x0fencryption_type\x18\x04 \x01(\tR\x0eencryptionType\"j\n" +
+	"\x10ASREPRoastConfig\x12\x1b\n" +
+	"\ttarget_dc\x18\x01 \x01(\tR\btargetDc\x12\x16\n" +
+	"\x06domain\x18\x02 \x01(\tR\x06domain\x12!\n" +
+	"\ftarget_users\x18\x03 \x03(\tR\vtargetUsers\"@\n" +
+	"\x10ASREPRoastResult\x12,\n" +
+	"\x06hashes\x18\x01 \x03(\v2\x14.erebus.c2.ASREPHashR\x06hashes\";\n" +
+	"\tASREPHash\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x12\n" +
+	"\x04hash\x18\x02 \x01(\tR\x04hash\"l\n" +
+	"\x0eCredDumpConfig\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x1d\n" +
+	"\n" +
+	"target_pid\x18\x02 \x01(\rR\ttargetPid\x12#\n" +
+	"\routput_format\x18\x03 \x01(\tR\foutputFormat\"a\n" +
+	"\x0eCredDumpResult\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x127\n" +
+	"\vcredentials\x18\x02 \x03(\v2\x15.erebus.c2.CredentialR\vcredentials\"\x82\x01\n" +
+	"\n" +
+	"Credential\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x16\n" +
+	"\x06domain\x18\x02 \x01(\tR\x06domain\x12\x1a\n" +
+	"\busername\x18\x03 \x01(\tR\busername\x12\x14\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\x12\x16\n" +
+	"\x06source\x18\x05 \x01(\tR\x06source\"\x9f\x02\n" +
+	"\x11LateralMoveConfig\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x16\n" +
+	"\x06target\x18\x02 \x01(\tR\x06target\x12\x16\n" +
+	"\x06domain\x18\x03 \x01(\tR\x06domain\x12\x1a\n" +
+	"\busername\x18\x04 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x05 \x01(\tR\bpassword\x12\x1b\n" +
+	"\tntlm_hash\x18\x06 \x01(\tR\bntlmHash\x12\x16\n" +
+	"\x06ticket\x18\a \x01(\fR\x06ticket\x12\x18\n" +
+	"\acommand\x18\b \x01(\tR\acommand\x12\x18\n" +
+	"\apayload\x18\t \x01(\fR\apayload\x12!\n" +
+	"\fservice_name\x18\n" +
+	" \x01(\tR\vserviceName\"u\n" +
+	"\x11LateralMoveResult\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x16\n" +
+	"\x06target\x18\x02 \x01(\tR\x06target\x12\x18\n" +
+	"\asuccess\x18\x03 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06output\x18\x04 \x01(\tR\x06output\"\x8a\x01\n" +
+	"\n" +
+	"InjectTask\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x1d\n" +
+	"\n" +
+	"target_pid\x18\x02 \x01(\rR\ttargetPid\x12\x1c\n" +
+	"\tshellcode\x18\x03 \x01(\fR\tshellcode\x12'\n" +
+	"\x0fstart_suspended\x18\x04 \x01(\bR\x0estartSuspended\"d\n" +
+	"\fInjectResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1d\n" +
+	"\n" +
+	"target_pid\x18\x02 \x01(\rR\ttargetPid\x12\x1b\n" +
+	"\tthread_id\x18\x03 \x01(\rR\bthreadId\"p\n" +
+	"\n" +
+	"PELoadTask\x12\x17\n" +
+	"\ape_data\x18\x01 \x01(\fR\x06peData\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12\x12\n" +
+	"\x04args\x18\x03 \x01(\tR\x04args\x12\x1d\n" +
+	"\n" +
+	"target_pid\x18\x04 \x01(\rR\ttargetPid\"@\n" +
+	"\fPELoadResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06output\x18\x02 \x01(\fR\x06output\"D\n" +
+	"\x0eScreenshotTask\x12\x18\n" +
+	"\amonitor\x18\x01 \x01(\rR\amonitor\x12\x18\n" +
+	"\aquality\x18\x02 \x01(\rR\aquality\"w\n" +
+	"\x10ScreenshotResult\x12\x1d\n" +
+	"\n" +
+	"image_data\x18\x01 \x01(\fR\timageData\x12\x16\n" +
+	"\x06format\x18\x02 \x01(\tR\x06format\x12\x14\n" +
+	"\x05width\x18\x03 \x01(\rR\x05width\x12\x16\n" +
+	"\x06height\x18\x04 \x01(\rR\x06height\"E\n" +
+	"\x0fKeylogStartTask\x122\n" +
+	"\x15capture_window_titles\x18\x01 \x01(\bR\x13captureWindowTitles\"\x10\n" +
+	"\x0eKeylogStopTask\"\x10\n" +
+	"\x0eKeylogDumpTask\"D\n" +
+	"\x10KeylogDumpResult\x120\n" +
+	"\aentries\x18\x01 \x03(\v2\x16.erebus.c2.KeylogEntryR\aentries\"b\n" +
+	"\vKeylogEntry\x12!\n" +
+	"\fwindow_title\x18\x01 \x01(\tR\vwindowTitle\x12\x12\n" +
+	"\x04keys\x18\x02 \x01(\tR\x04keys\x12\x1c\n" +
+	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp\"$\n" +
+	"\x0eSocksStartTask\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\rR\x04port\"@\n" +
+	"\x10SocksStartResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\"\x0f\n" +
+	"\rSocksStopTask\"+\n" +
+	"\x0fSocksStopResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x92\x01\n" +
+	"\rPersistConfig\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
+	"\fpayload_path\x18\x03 \x01(\tR\vpayloadPath\x12\x18\n" +
+	"\atrigger\x18\x04 \x01(\tR\atrigger\x12\x18\n" +
+	"\apayload\x18\x05 \x01(\fR\apayload\"[\n" +
+	"\rPersistResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12\x18\n" +
+	"\adetails\x18\x03 \x01(\tR\adetails\"`\n" +
+	"\rPrivescConfig\x12\x16\n" +
+	"\x06method\x18\x01 \x01(\tR\x06method\x12\x1d\n" +
+	"\n" +
+	"target_pid\x18\x02 \x01(\rR\ttargetPid\x12\x18\n" +
+	"\acommand\x18\x03 \x01(\tR\acommand\"\x7f\n" +
+	"\rPrivescResult\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12#\n" +
+	"\rnew_integrity\x18\x03 \x01(\tR\fnewIntegrity\x12\x17\n" +
+	"\anew_pid\x18\x04 \x01(\rR\x06newPid*\xdc\x04\n" +
 	"\bTaskType\x12\x10\n" +
 	"\fTASK_UNKNOWN\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -1213,7 +4059,14 @@ const file_c2_proto_rawDesc = "" +
 	"\tTASK_EXIT\x10\x13\x12\x0e\n" +
 	"\n" +
 	"TASK_SLEEP\x10\x14\x12\x0f\n" +
-	"\vTASK_MODULE\x10\x15B5Z3github.com/KKingZero/erebus-exploit-framwork/pkg/pbb\x06proto3"
+	"\vTASK_MODULE\x10\x15\x12\x12\n" +
+	"\x0eTASK_LDAP_ENUM\x10\x16\x12\x13\n" +
+	"\x0fTASK_KERBEROAST\x10\x17\x12\x13\n" +
+	"\x0fTASK_ASREPROAST\x10\x18\x12\x15\n" +
+	"\x11TASK_LATERAL_MOVE\x10\x19\x12\x15\n" +
+	"\x11TASK_PE_LOAD_EXEC\x10\x1a\x12\x10\n" +
+	"\fTASK_PERSIST\x10\x1b\x12\x10\n" +
+	"\fTASK_PRIVESC\x10\x1cB5Z3github.com/KKingZero/erebus-exploit-framwork/pkg/pbb\x06proto3"
 
 var (
 	file_c2_proto_rawDescOnce sync.Once
@@ -1228,7 +4081,7 @@ func file_c2_proto_rawDescGZIP() []byte {
 }
 
 var file_c2_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
 var file_c2_proto_goTypes = []any{
 	(TaskType)(0),                // 0: erebus.c2.TaskType
 	(*Register)(nil),             // 1: erebus.c2.Register
@@ -1247,18 +4100,74 @@ var file_c2_proto_goTypes = []any{
 	(*FileUploadResult)(nil),     // 14: erebus.c2.FileUploadResult
 	(*SleepTask)(nil),            // 15: erebus.c2.SleepTask
 	(*ModuleTask)(nil),           // 16: erebus.c2.ModuleTask
+	(*ProcessListTask)(nil),      // 17: erebus.c2.ProcessListTask
+	(*ProcessListResult)(nil),    // 18: erebus.c2.ProcessListResult
+	(*ProcessInfo)(nil),          // 19: erebus.c2.ProcessInfo
+	(*ProcessKillTask)(nil),      // 20: erebus.c2.ProcessKillTask
+	(*ProcessKillResult)(nil),    // 21: erebus.c2.ProcessKillResult
+	(*NetIfconfigTask)(nil),      // 22: erebus.c2.NetIfconfigTask
+	(*NetIfconfigResult)(nil),    // 23: erebus.c2.NetIfconfigResult
+	(*NetInterface)(nil),         // 24: erebus.c2.NetInterface
+	(*NetPortscanTask)(nil),      // 25: erebus.c2.NetPortscanTask
+	(*NetPortscanResult)(nil),    // 26: erebus.c2.NetPortscanResult
+	(*PortResult)(nil),           // 27: erebus.c2.PortResult
+	(*LDAPEnumConfig)(nil),       // 28: erebus.c2.LDAPEnumConfig
+	(*LDAPEnumResult)(nil),       // 29: erebus.c2.LDAPEnumResult
+	(*LDAPEntry)(nil),            // 30: erebus.c2.LDAPEntry
+	(*LDAPValues)(nil),           // 31: erebus.c2.LDAPValues
+	(*KerberoastConfig)(nil),     // 32: erebus.c2.KerberoastConfig
+	(*KerberoastResult)(nil),     // 33: erebus.c2.KerberoastResult
+	(*KerberoastHash)(nil),       // 34: erebus.c2.KerberoastHash
+	(*ASREPRoastConfig)(nil),     // 35: erebus.c2.ASREPRoastConfig
+	(*ASREPRoastResult)(nil),     // 36: erebus.c2.ASREPRoastResult
+	(*ASREPHash)(nil),            // 37: erebus.c2.ASREPHash
+	(*CredDumpConfig)(nil),       // 38: erebus.c2.CredDumpConfig
+	(*CredDumpResult)(nil),       // 39: erebus.c2.CredDumpResult
+	(*Credential)(nil),           // 40: erebus.c2.Credential
+	(*LateralMoveConfig)(nil),    // 41: erebus.c2.LateralMoveConfig
+	(*LateralMoveResult)(nil),    // 42: erebus.c2.LateralMoveResult
+	(*InjectTask)(nil),           // 43: erebus.c2.InjectTask
+	(*InjectResult)(nil),         // 44: erebus.c2.InjectResult
+	(*PELoadTask)(nil),           // 45: erebus.c2.PELoadTask
+	(*PELoadResult)(nil),         // 46: erebus.c2.PELoadResult
+	(*ScreenshotTask)(nil),       // 47: erebus.c2.ScreenshotTask
+	(*ScreenshotResult)(nil),     // 48: erebus.c2.ScreenshotResult
+	(*KeylogStartTask)(nil),      // 49: erebus.c2.KeylogStartTask
+	(*KeylogStopTask)(nil),       // 50: erebus.c2.KeylogStopTask
+	(*KeylogDumpTask)(nil),       // 51: erebus.c2.KeylogDumpTask
+	(*KeylogDumpResult)(nil),     // 52: erebus.c2.KeylogDumpResult
+	(*KeylogEntry)(nil),          // 53: erebus.c2.KeylogEntry
+	(*SocksStartTask)(nil),       // 54: erebus.c2.SocksStartTask
+	(*SocksStartResult)(nil),     // 55: erebus.c2.SocksStartResult
+	(*SocksStopTask)(nil),        // 56: erebus.c2.SocksStopTask
+	(*SocksStopResult)(nil),      // 57: erebus.c2.SocksStopResult
+	(*PersistConfig)(nil),        // 58: erebus.c2.PersistConfig
+	(*PersistResult)(nil),        // 59: erebus.c2.PersistResult
+	(*PrivescConfig)(nil),        // 60: erebus.c2.PrivescConfig
+	(*PrivescResult)(nil),        // 61: erebus.c2.PrivescResult
+	nil,                          // 62: erebus.c2.LDAPEntry.AttributesEntry
 }
 var file_c2_proto_depIdxs = []int32{
-	6, // 0: erebus.c2.Beacon.results:type_name -> erebus.c2.TaskResult
-	5, // 1: erebus.c2.BeaconResponse.tasks:type_name -> erebus.c2.Task
-	0, // 2: erebus.c2.Task.task_type:type_name -> erebus.c2.TaskType
-	6, // 3: erebus.c2.BeaconResultsPayload.results:type_name -> erebus.c2.TaskResult
-	5, // 4: erebus.c2.BeaconTasksPayload.tasks:type_name -> erebus.c2.Task
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	6,  // 0: erebus.c2.Beacon.results:type_name -> erebus.c2.TaskResult
+	5,  // 1: erebus.c2.BeaconResponse.tasks:type_name -> erebus.c2.Task
+	0,  // 2: erebus.c2.Task.task_type:type_name -> erebus.c2.TaskType
+	6,  // 3: erebus.c2.BeaconResultsPayload.results:type_name -> erebus.c2.TaskResult
+	5,  // 4: erebus.c2.BeaconTasksPayload.tasks:type_name -> erebus.c2.Task
+	19, // 5: erebus.c2.ProcessListResult.processes:type_name -> erebus.c2.ProcessInfo
+	24, // 6: erebus.c2.NetIfconfigResult.interfaces:type_name -> erebus.c2.NetInterface
+	27, // 7: erebus.c2.NetPortscanResult.ports:type_name -> erebus.c2.PortResult
+	30, // 8: erebus.c2.LDAPEnumResult.entries:type_name -> erebus.c2.LDAPEntry
+	62, // 9: erebus.c2.LDAPEntry.attributes:type_name -> erebus.c2.LDAPEntry.AttributesEntry
+	34, // 10: erebus.c2.KerberoastResult.hashes:type_name -> erebus.c2.KerberoastHash
+	37, // 11: erebus.c2.ASREPRoastResult.hashes:type_name -> erebus.c2.ASREPHash
+	40, // 12: erebus.c2.CredDumpResult.credentials:type_name -> erebus.c2.Credential
+	53, // 13: erebus.c2.KeylogDumpResult.entries:type_name -> erebus.c2.KeylogEntry
+	31, // 14: erebus.c2.LDAPEntry.AttributesEntry.value:type_name -> erebus.c2.LDAPValues
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_c2_proto_init() }
@@ -1272,7 +4181,7 @@ func file_c2_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_c2_proto_rawDesc), len(file_c2_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   62,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -294,34 +294,56 @@ Phase 3: Cloud Expansion
 
 ## Bug Fixes Roadmap (from Code Review)
 
-### Critical (must fix before any operational use)
+### Phase 1 Critical (fixed)
 
-| # | Issue | Fix |
+| # | Issue | Status |
 |---|---|---|
-| 1 | gRPC has zero authentication | Implement mTLS + API key auth (CRYPTO-1) |
-| 2 | gRPC reflection enabled | Disable by default, `--debug` flag only |
-| 3 | TLS validation disabled on implant | CA pinning via embedded cert (CRYPTO-3) |
-| 4 | AES encryption unused | Session key negotiation + AES-GCM payloads (CRYPTO-2) |
+| 1 | gRPC has zero authentication | Fixed — mTLS implemented (CRYPTO-1) |
+| 2 | gRPC reflection enabled | Fixed — disabled by default |
+| 3 | TLS validation disabled on implant | Fixed — CA pinning via embedded cert (CRYPTO-3) |
+| 4 | AES encryption unused | Fixed — session key negotiation + AES-GCM (CRYPTO-2) |
+| 5 | Plaintext secret in config | Fixed — encrypted config with passphrase (CRYPTO-4) |
+| 6 | Double beacon per loop cycle | Fixed — single send per cycle |
+| 7 | ImplantId/SessionId field mismatch | Fixed — field mapping corrected |
+| 8 | No session recovery on restart | Fixed — DB hydration on startup |
+| 9 | Windows integrity level hardcoded | Fixed — token integrity check via syscall |
 
-### High (fix in same sprint)
+### Phase 2 Code Review (fixed)
 
-| # | Issue | Fix |
+| # | Issue | Status |
 |---|---|---|
-| 5 | Plaintext secret in config | Encrypted config with passphrase (CRYPTO-4) |
-| 6 | Double beacon per loop cycle | Refactor beacon loop — single send per cycle |
-| 7 | ImplantId/SessionId field mismatch | Fix field mapping in `ListTasks` |
-| 8 | No session recovery on restart | Hydrate session manager from DB on startup |
-| 9 | Windows integrity level hardcoded | Implement Windows token integrity check via syscall |
+| 1 | TOCTOU in file download | Fixed — uses same fd for stat + read |
+| 2 | SOCKS race condition | Fixed — net.Listen inside mutex |
+| 3 | DNS chunk silent drop | Fixed — proper chunk size calculation |
+| 4 | PE loader missing IAT patching | Fixed — full IAT walk + patching |
+| 5 | Keylogger blocking GetMessageW | Fixed — MsgWaitForMultipleObjects + PeekMessageW |
+| 6 | Keylog buffer trim off-by-one | Fixed — correct slice logic |
+| 7 | PsExec always-true success | Fixed — based on payload presence |
+| 8 | No task data size limit | Fixed — 10MB cap |
+| 9 | No task default timeout | Fixed — 10 min default |
+| 10 | Operator CLI context leak | Fixed — proper cancel() defer |
+
+### Remaining (medium/low priority)
+
+| # | Issue | Priority |
+|---|---|---|
+| 1 | DNS listener register/beacon handler incomplete | Medium |
+| 2 | Browser cred DPAPI decryption placeholder | Medium |
+| 3 | Inject error handling for VirtualAllocEx failures | Low |
+| 4 | Screenshot handle cleanup order | Low |
+| 5 | WMI shells out to wmic.exe (detected by EDR) | Low |
 
 ---
 
 ## Open Questions (to revisit)
 
 - [ ] Should implant support interactive (non-beacon) mode for time-sensitive operations?
-- [ ] DNS listener priority vs. additional HTTPS profile variants?
 - [ ] Built-in credential cracking (hashcat integration) or external only?
 - [ ] Implant self-update mechanism (push new modules without full rebuild)?
 - [ ] Multi-teamserver federation for large engagements?
+- [ ] Malleable C2 profiles for traffic blending?
+- [ ] Sleep masking (encrypt implant memory during sleep)?
+- [ ] ETW/AMSI patching for CLR operations?
 
 ---
 
@@ -330,3 +352,4 @@ Phase 3: Cloud Expansion
 | Date | Change |
 |---|---|
 | 2026-03-08 | Initial architecture decisions documented. AD/Cloud focus defined. Bug fix roadmap established. |
+| 2026-03-09 | Phase 2 complete: AD attacks, evasion, infrastructure, operator CLI. 10 code review fixes applied. |
