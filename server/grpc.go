@@ -105,11 +105,20 @@ func (s *GRPCService) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (
 	if err != nil {
 		return nil, err
 	}
+
+	// Resolve the real implant ID from the session
+	implantID := req.SessionId // fallback
+	if sess, ok := s.ts.Sessions.Get(req.SessionId); ok {
+		implantID = sess.ImplantID
+	} else if row, err := s.ts.Store.GetSession(req.SessionId); err == nil {
+		implantID = row.ImplantID
+	}
+
 	var tasks []*pb.Task
 	for _, row := range rows {
 		tasks = append(tasks, &pb.Task{
 			TaskId:    row.TaskID,
-			ImplantId: req.SessionId,
+			ImplantId: implantID,
 			TaskType:  pb.TaskType(row.TaskType),
 			Data:      row.Data,
 			TimeoutMs: row.TimeoutMs,

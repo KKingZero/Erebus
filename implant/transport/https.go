@@ -3,6 +3,7 @@ package transport
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,15 +18,30 @@ type HTTPSTransport struct {
 	client  *http.Client
 }
 
-func NewHTTPSTransport(baseURL string) *HTTPSTransport {
+func NewHTTPSTransport(baseURL string, caCertPEM string) *HTTPSTransport {
+	tlsConfig := &tls.Config{}
+
+	if caCertPEM != "" {
+		// Pin to our CA certificate
+		certPool := x509.NewCertPool()
+		if certPool.AppendCertsFromPEM([]byte(caCertPEM)) {
+			tlsConfig.RootCAs = certPool
+			tlsConfig.InsecureSkipVerify = false
+		} else {
+			// Fallback if PEM parsing fails
+			tlsConfig.InsecureSkipVerify = true
+		}
+	} else {
+		// Dev mode: no CA cert embedded
+		tlsConfig.InsecureSkipVerify = true
+	}
+
 	return &HTTPSTransport{
 		baseURL: baseURL,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true, // Self-signed CA; pinning in Phase 2
-				},
+				TLSClientConfig: tlsConfig,
 			},
 		},
 	}

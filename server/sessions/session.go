@@ -23,6 +23,7 @@ type Session struct {
 	RegisteredAt   time.Time
 	LastCheckin     time.Time
 	Alive          bool
+	SessionKey     []byte // AES session key for encrypted comms
 
 	// Pending tasks for this session
 	taskQueue []*pb.Task

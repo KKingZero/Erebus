@@ -16,6 +16,7 @@ type SessionRow struct {
 	RegisteredAt   time.Time
 	LastCheckin     time.Time
 	Alive          bool
+	SessionKey     []byte
 }
 
 type TaskRow struct {

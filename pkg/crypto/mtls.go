@@ -106,6 +106,39 @@ func (ca *CertificateAuthority) GenerateServerCert(hosts []string) (tls.Certific
 	return tlsCert, certPEM, err
 }
 
+// GenerateClientCert generates a TLS client certificate signed by the CA for mTLS auth.
+func (ca *CertificateAuthority) GenerateClientCert(operatorName string) (tls.Certificate, []byte, []byte, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return tls.Certificate{}, nil, nil, err
+	}
+
+	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName:   operatorName,
+			Organization: []string{"Erebus Operator"},
+		},
+		NotBefore:   time.Now().Add(-1 * time.Hour),
+		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, ca.Cert, &key.PublicKey, ca.Key)
+	if err != nil {
+		return tls.Certificate{}, nil, nil, err
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	keyDER, _ := x509.MarshalECPrivateKey(key)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	return tlsCert, certPEM, keyPEM, err
+}
+
 // SavePEM writes PEM data to a file.
 func SavePEM(path string, data []byte) error {
 	return os.WriteFile(path, data, 0600)

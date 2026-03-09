@@ -53,22 +53,22 @@ func (s *Store) migrate() error {
 
 func (s *Store) CreateSession(row *SessionRow) error {
 	_, err := s.db.Exec(`INSERT INTO sessions
-		(session_id, implant_id, hostname, username, os, arch, pid, integrity_level, transport, remote_addr, registered_at, last_checkin, alive)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(session_id, implant_id, hostname, username, os, arch, pid, integrity_level, transport, remote_addr, registered_at, last_checkin, alive, session_key)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		row.SessionID, row.ImplantID, row.Hostname, row.Username, row.OS, row.Arch,
 		row.PID, row.IntegrityLevel, row.Transport, row.RemoteAddr,
-		row.RegisteredAt, row.LastCheckin, row.Alive)
+		row.RegisteredAt, row.LastCheckin, row.Alive, row.SessionKey)
 	return err
 }
 
 func (s *Store) GetSession(sessionID string) (*SessionRow, error) {
 	row := &SessionRow{}
 	err := s.db.QueryRow(`SELECT session_id, implant_id, hostname, username, os, arch, pid,
-		integrity_level, transport, remote_addr, registered_at, last_checkin, alive
+		integrity_level, transport, remote_addr, registered_at, last_checkin, alive, session_key
 		FROM sessions WHERE session_id = ?`, sessionID).Scan(
 		&row.SessionID, &row.ImplantID, &row.Hostname, &row.Username, &row.OS, &row.Arch,
 		&row.PID, &row.IntegrityLevel, &row.Transport, &row.RemoteAddr,
-		&row.RegisteredAt, &row.LastCheckin, &row.Alive)
+		&row.RegisteredAt, &row.LastCheckin, &row.Alive, &row.SessionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (s *Store) GetSession(sessionID string) (*SessionRow, error) {
 
 func (s *Store) ListSessions() ([]*SessionRow, error) {
 	rows, err := s.db.Query(`SELECT session_id, implant_id, hostname, username, os, arch, pid,
-		integrity_level, transport, remote_addr, registered_at, last_checkin, alive
+		integrity_level, transport, remote_addr, registered_at, last_checkin, alive, session_key
 		FROM sessions ORDER BY registered_at DESC`)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (s *Store) ListSessions() ([]*SessionRow, error) {
 		row := &SessionRow{}
 		if err := rows.Scan(&row.SessionID, &row.ImplantID, &row.Hostname, &row.Username,
 			&row.OS, &row.Arch, &row.PID, &row.IntegrityLevel, &row.Transport,
-			&row.RemoteAddr, &row.RegisteredAt, &row.LastCheckin, &row.Alive); err != nil {
+			&row.RemoteAddr, &row.RegisteredAt, &row.LastCheckin, &row.Alive, &row.SessionKey); err != nil {
 			return nil, err
 		}
 		sessions = append(sessions, row)

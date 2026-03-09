@@ -24,6 +24,54 @@ func NewManager(store *db.Store) *Manager {
 	}
 }
 
+// RecoverSessions loads alive sessions from the database into memory.
+func (m *Manager) RecoverSessions() error {
+	if m.store == nil {
+		return nil
+	}
+
+	rows, err := m.store.ListSessions()
+	if err != nil {
+		return fmt.Errorf("list sessions: %w", err)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var recovered int
+	for _, row := range rows {
+		if !row.Alive {
+			continue
+		}
+		sess := &Session{
+			SessionID:      row.SessionID,
+			ImplantID:      row.ImplantID,
+			Hostname:       row.Hostname,
+			Username:       row.Username,
+			OS:             row.OS,
+			Arch:           row.Arch,
+			PID:            row.PID,
+			IntegrityLevel: row.IntegrityLevel,
+			Transport:      row.Transport,
+			RemoteAddr:     row.RemoteAddr,
+			RegisteredAt:   row.RegisteredAt,
+			LastCheckin:     row.LastCheckin,
+			Alive:          true,
+		}
+		if row.SessionKey != nil {
+			sess.SessionKey = row.SessionKey
+		}
+		m.sessions[row.SessionID] = sess
+		m.byImplant[row.ImplantID] = row.SessionID
+		recovered++
+	}
+
+	if recovered > 0 {
+		fmt.Printf("[sessions] recovered %d sessions from database\n", recovered)
+	}
+	return nil
+}
+
 func (m *Manager) Register(sess *Session) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -60,6 +108,7 @@ func (m *Manager) Register(sess *Session) (string, error) {
 			RegisteredAt:   sess.RegisteredAt,
 			LastCheckin:     sess.LastCheckin,
 			Alive:          true,
+			SessionKey:     sess.SessionKey,
 		}); err != nil {
 			return "", fmt.Errorf("persist session: %w", err)
 		}

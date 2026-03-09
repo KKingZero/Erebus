@@ -1,6 +1,6 @@
 package db
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 var migrations = []string{
 	// Version 1: Initial schema
@@ -81,4 +81,7 @@ var migrations = []string{
 	);
 
 	INSERT OR REPLACE INTO schema_version (version) VALUES (1);`,
+
+	// Version 2: Add session_key column for AES session encryption
+	`ALTER TABLE sessions ADD COLUMN session_key BLOB;`,
 }

@@ -1,12 +1,15 @@
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	zcrypto "github.com/KKingZero/erebus-exploit-framwork/pkg/crypto"
@@ -16,6 +19,7 @@ import (
 	"github.com/KKingZero/erebus-exploit-framwork/server/sessions"
 	"github.com/KKingZero/erebus-exploit-framwork/server/tasks"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -82,6 +86,11 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 		done:       make(chan struct{}),
 	}
 
+	// Recover sessions from DB (Bug 8)
+	if err := sessMgr.RecoverSessions(); err != nil {
+		log.Printf("[server] warning: session recovery failed: %v", err)
+	}
+
 	return ts, nil
 }
 
@@ -143,9 +152,25 @@ func (ts *Teamserver) startGRPC() error {
 		return err
 	}
 
-	ts.grpcServer = grpc.NewServer()
+	// Build TLS config for mTLS
+	serverCert, _, err := ts.CA.GenerateServerCert([]string{extractHost(ts.Config.GRPCAddr)})
+	if err != nil {
+		return fmt.Errorf("generate gRPC server cert: %w", err)
+	}
+	certPool := x509.NewCertPool()
+	certPool.AddCert(ts.CA.Cert)
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	ts.grpcServer = grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
 	pb.RegisterErebusC2Server(ts.grpcServer, NewGRPCService(ts))
-	reflection.Register(ts.grpcServer)
+	if ts.Config.Debug {
+		reflection.Register(ts.grpcServer)
+	}
 
 	go func() {
 		log.Printf("[grpc] server listening on %s", ts.Config.GRPCAddr)
@@ -204,6 +229,20 @@ func loadOrCreateCA(dataDir string) (*zcrypto.CertificateAuthority, error) {
 
 	log.Printf("[server] generated new CA: %s", certPath)
 	return ca, nil
+}
+
+func extractHost(addr string) string {
+	host := addr
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		host = h
+	}
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	// Strip brackets from IPv6
+	host = strings.TrimPrefix(host, "[")
+	host = strings.TrimSuffix(host, "]")
+	return host
 }
 
 func parseProtocol(s string) pb.ListenerProtocol {
