@@ -187,9 +187,9 @@ func (s *Store) GetBuildBySecretHash(secretHash string) (*BuildRow, error) {
 // --- Loot ---
 
 func (s *Store) CreateLoot(row *LootRow) error {
-	_, err := s.db.Exec(`INSERT INTO loot (id, type, source, session_id, data, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		row.ID, row.Type, row.Source, row.SessionID, row.Data, row.CreatedAt)
+	_, err := s.db.Exec(`INSERT INTO loot (id, type, source, session_id, data, tags, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		row.ID, row.Type, row.Source, row.SessionID, row.Data, row.Tags, row.CreatedAt)
 	return err
 }
 
@@ -197,10 +197,10 @@ func (s *Store) ListLoot(sessionID string) ([]*LootRow, error) {
 	var query string
 	var args []interface{}
 	if sessionID != "" {
-		query = `SELECT id, type, source, session_id, data, created_at FROM loot WHERE session_id = ? ORDER BY created_at DESC`
+		query = `SELECT id, type, source, session_id, data, tags, created_at FROM loot WHERE session_id = ? ORDER BY created_at DESC`
 		args = []interface{}{sessionID}
 	} else {
-		query = `SELECT id, type, source, session_id, data, created_at FROM loot ORDER BY created_at DESC`
+		query = `SELECT id, type, source, session_id, data, tags, created_at FROM loot ORDER BY created_at DESC`
 	}
 
 	rows, err := s.db.Query(query, args...)
@@ -212,7 +212,7 @@ func (s *Store) ListLoot(sessionID string) ([]*LootRow, error) {
 	var items []*LootRow
 	for rows.Next() {
 		row := &LootRow{}
-		if err := rows.Scan(&row.ID, &row.Type, &row.Source, &row.SessionID, &row.Data, &row.CreatedAt); err != nil {
+		if err := rows.Scan(&row.ID, &row.Type, &row.Source, &row.SessionID, &row.Data, &row.Tags, &row.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, row)
@@ -222,10 +222,25 @@ func (s *Store) ListLoot(sessionID string) ([]*LootRow, error) {
 
 func (s *Store) GetLoot(id string) (*LootRow, error) {
 	row := &LootRow{}
-	err := s.db.QueryRow(`SELECT id, type, source, session_id, data, created_at FROM loot WHERE id = ?`, id).Scan(
-		&row.ID, &row.Type, &row.Source, &row.SessionID, &row.Data, &row.CreatedAt)
+	err := s.db.QueryRow(`SELECT id, type, source, session_id, data, tags, created_at FROM loot WHERE id = ?`, id).Scan(
+		&row.ID, &row.Type, &row.Source, &row.SessionID, &row.Data, &row.Tags, &row.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return row, nil
+}
+
+// --- Auto-Harvest ---
+
+func (s *Store) CreateAutoHarvestTask(row *AutoHarvestTaskRow) error {
+	_, err := s.db.Exec(`INSERT INTO autoharvest_tasks (id, session_id, task_id, task_type, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		row.ID, row.SessionID, row.TaskID, row.TaskType, row.Status, row.CreatedAt)
+	return err
+}
+
+func (s *Store) HasAutoHarvested(sessionID string) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM autoharvest_tasks WHERE session_id = ?`, sessionID).Scan(&count)
+	return count > 0, err
 }

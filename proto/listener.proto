@@ -27,6 +27,10 @@ message ListenerConfig {
 
   // Domain fronting
   string cdn_domain = 9;
+
+  // Reverse proxy support
+  bool            reverse_proxy   = 10;
+  repeated string trusted_proxies = 11;
 }
 
 message ListenerStatus {

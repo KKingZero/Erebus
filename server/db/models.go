@@ -62,5 +62,15 @@ type LootRow struct {
 	Source    string
 	SessionID string
 	Data      []byte
+	Tags      string // comma-separated tags (e.g. "auto-harvest,cloud")
+	CreatedAt time.Time
+}
+
+type AutoHarvestTaskRow struct {
+	ID        string
+	SessionID string
+	TaskID    string
+	TaskType  string
+	Status    string // "pending", "completed", "failed"
 	CreatedAt time.Time
 }

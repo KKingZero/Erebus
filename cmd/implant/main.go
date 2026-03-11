@@ -9,6 +9,7 @@ import (
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/creds"   // Register creds modules
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/lateral" // Register lateral modules
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/persist" // Register persist modules
+	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/cloud"   // Register cloud modules
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/privesc" // Register privesc modules
 )
 
@@ -18,6 +19,9 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	beacon := implant.New(cfg)
+	beacon, err := implant.New(cfg)
+	if err != nil {
+		log.Fatalf("init beacon: %v", err)
+	}
 	beacon.Run()
 }

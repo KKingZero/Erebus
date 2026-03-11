@@ -86,9 +86,12 @@ type ListenerConfig struct {
 	// DNS specific
 	Domain string `protobuf:"bytes,8,opt,name=domain,proto3" json:"domain,omitempty"`
 	// Domain fronting
-	CdnDomain     string `protobuf:"bytes,9,opt,name=cdn_domain,json=cdnDomain,proto3" json:"cdn_domain,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CdnDomain string `protobuf:"bytes,9,opt,name=cdn_domain,json=cdnDomain,proto3" json:"cdn_domain,omitempty"`
+	// Reverse proxy support
+	ReverseProxy   bool     `protobuf:"varint,10,opt,name=reverse_proxy,json=reverseProxy,proto3" json:"reverse_proxy,omitempty"`
+	TrustedProxies []string `protobuf:"bytes,11,rep,name=trusted_proxies,json=trustedProxies,proto3" json:"trusted_proxies,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListenerConfig) Reset() {
@@ -184,6 +187,20 @@ func (x *ListenerConfig) GetCdnDomain() string {
 	return ""
 }
 
+func (x *ListenerConfig) GetReverseProxy() bool {
+	if x != nil {
+		return x.ReverseProxy
+	}
+	return false
+}
+
+func (x *ListenerConfig) GetTrustedProxies() []string {
+	if x != nil {
+		return x.TrustedProxies
+	}
+	return nil
+}
+
 type ListenerStatus struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -272,7 +289,7 @@ var File_listener_proto protoreflect.FileDescriptor
 
 const file_listener_proto_rawDesc = "" +
 	"\n" +
-	"\x0elistener.proto\x12\terebus.c2\"\x84\x02\n" +
+	"\x0elistener.proto\x12\terebus.c2\"\xd2\x02\n" +
 	"\x0eListenerConfig\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +
@@ -283,7 +300,10 @@ const file_listener_proto_rawDesc = "" +
 	"\bkey_path\x18\a \x01(\tR\akeyPath\x12\x16\n" +
 	"\x06domain\x18\b \x01(\tR\x06domain\x12\x1d\n" +
 	"\n" +
-	"cdn_domain\x18\t \x01(\tR\tcdnDomain\"\xbe\x01\n" +
+	"cdn_domain\x18\t \x01(\tR\tcdnDomain\x12#\n" +
+	"\rreverse_proxy\x18\n" +
+	" \x01(\bR\freverseProxy\x12'\n" +
+	"\x0ftrusted_proxies\x18\v \x03(\tR\x0etrustedProxies\"\xbe\x01\n" +
 	"\x0eListenerStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +

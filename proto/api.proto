@@ -162,6 +162,8 @@ message GenerateImplantRequest {
   int64  sleep_ms   = 5;
   int32  jitter_pct = 6;
   bool   garble     = 7;
+  string cdn_domain = 8;
+  string format     = 9;  // "exe" (default), "shellcode", "dll"
 }
 
 message GenerateImplantResponse {
@@ -170,6 +172,7 @@ message GenerateImplantResponse {
   string build_id  = 3;
   bytes  binary    = 4;
   string filename  = 5;
+  string format    = 6;
 }
 
 // --- Loot ---

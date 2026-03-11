@@ -14,12 +14,18 @@ import (
 const encryptedPrefix = "EREBUS_ENC_V1:"
 
 type Config struct {
-	GRPCAddr      string           `yaml:"grpc_addr"`
-	DBPath        string           `yaml:"db_path"`
-	DataDir       string           `yaml:"data_dir"`
-	ImplantSecret string           `yaml:"implant_secret"` // Hex-encoded shared secret
-	Listeners     []ListenerConfig `yaml:"listeners"`
-	Debug         bool             `yaml:"debug,omitempty"`
+	GRPCAddr      string              `yaml:"grpc_addr"`
+	DBPath        string              `yaml:"db_path"`
+	DataDir       string              `yaml:"data_dir"`
+	ImplantSecret string              `yaml:"implant_secret"` // Hex-encoded shared secret
+	Listeners     []ListenerConfig    `yaml:"listeners"`
+	AutoHarvest   AutoHarvestYAML     `yaml:"auto_harvest"`
+	Debug         bool                `yaml:"debug,omitempty"`
+}
+
+type AutoHarvestYAML struct {
+	Enabled *bool    `yaml:"enabled,omitempty"` // pointer to distinguish unset from false
+	Tasks   []string `yaml:"tasks,omitempty"`
 }
 
 type ListenerConfig struct {

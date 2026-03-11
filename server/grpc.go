@@ -4,9 +4,38 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
+	"os"
+	"path/filepath"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
+	"github.com/KKingZero/erebus-exploit-framwork/server/builder"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 )
+
+// validOS and validArch are whitelists for build targets.
+var (
+	validOS   = map[string]bool{"windows": true, "linux": true, "darwin": true}
+	validArch = map[string]bool{"amd64": true, "arm64": true}
+	validTransport = map[string]bool{"https": true, "dns": true}
+)
+
+// operatorFromContext extracts the operator identity from the mTLS client certificate.
+func operatorFromContext(ctx context.Context) string {
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		return ""
+	}
+	tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo)
+	if !ok {
+		return ""
+	}
+	if len(tlsInfo.State.PeerCertificates) > 0 {
+		return tlsInfo.State.PeerCertificates[0].Subject.CommonName
+	}
+	return ""
+}
 
 // GRPCService implements the ErebusC2 gRPC service.
 type GRPCService struct {
@@ -150,12 +179,115 @@ func (s *GRPCService) Subscribe(req *pb.SubscribeRequest, stream pb.ErebusC2_Sub
 	}
 }
 
-// --- Builder (stub for Phase 1) ---
+// --- Builder ---
 
 func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImplantRequest) (*pb.GenerateImplantResponse, error) {
+	// H9: Validate inputs against whitelists
+	targetOS := req.Os
+	if targetOS == "" {
+		targetOS = "windows"
+	}
+	if !validOS[targetOS] {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unsupported OS: %s (available: windows, linux, darwin)", targetOS),
+		}, nil
+	}
+
+	targetArch := req.Arch
+	if targetArch == "" {
+		targetArch = "amd64"
+	}
+	if !validArch[targetArch] {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unsupported arch: %s (available: amd64, arm64)", targetArch),
+		}, nil
+	}
+
+	transport := req.Transport
+	if transport == "" {
+		transport = "https"
+	}
+	if !validTransport[transport] {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unsupported transport: %s (available: https, dns)", transport),
+		}, nil
+	}
+
+	// Validate callback URLs
+	for _, cb := range req.Callbacks {
+		if _, err := url.ParseRequestURI(cb); err != nil {
+			return &pb.GenerateImplantResponse{
+				Success: false,
+				Error:   fmt.Sprintf("invalid callback URL %q: %v", cb, err),
+			}, nil
+		}
+	}
+
+	format := builder.FormatEXE
+	switch req.Format {
+	case "shellcode":
+		format = builder.FormatShellcode
+	case "dll":
+		format = builder.FormatDLL
+	case "", "exe":
+		format = builder.FormatEXE
+	default:
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unsupported format: %s (available: exe, dll, shellcode)", req.Format),
+		}, nil
+	}
+
+	// M13: Resolve ProjectRoot from executable location instead of relying on CWD
+	projectRoot, err := os.Executable()
+	if err != nil {
+		projectRoot = "."
+	} else {
+		projectRoot = filepath.Dir(projectRoot)
+	}
+
+	// H11: Extract operator identity from mTLS context
+	operator := operatorFromContext(ctx)
+
+	buildReq := &builder.BuildRequest{
+		OS:            targetOS,
+		Arch:          targetArch,
+		Transport:     transport,
+		Callbacks:     req.Callbacks,
+		SleepMs:       req.SleepMs,
+		JitterPct:     req.JitterPct,
+		Garble:        req.Garble,
+		CDNDomain:     req.CdnDomain,
+		Format:        format,
+		Operator:      operator,
+		ImplantSecret: s.ts.Config.ImplantSecret,
+		ProjectRoot:   projectRoot,
+	}
+
+	result, err := builder.Build(buildReq)
+	if err != nil {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	// H5: Log warning if build recording fails
+	if s.ts.Store != nil {
+		if err := builder.RecordBuild(s.ts.Store, buildReq, result); err != nil {
+			log.Printf("[grpc] warning: failed to record build: %v", err)
+		}
+	}
+
 	return &pb.GenerateImplantResponse{
-		Success: false,
-		Error:   "implant generation not yet implemented — use Makefile for Phase 1",
+		Success:  true,
+		BuildId:  result.BuildID,
+		Binary:   result.Binary,
+		Filename: result.Filename,
+		Format:   string(result.Format),
 	}, nil
 }
 

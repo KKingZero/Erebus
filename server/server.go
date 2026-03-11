@@ -16,6 +16,7 @@ import (
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/server/db"
 	"github.com/KKingZero/erebus-exploit-framwork/server/approval"
+	"github.com/KKingZero/erebus-exploit-framwork/server/autoharvest"
 	"github.com/KKingZero/erebus-exploit-framwork/server/listeners"
 	"github.com/KKingZero/erebus-exploit-framwork/server/sessions"
 	"github.com/KKingZero/erebus-exploit-framwork/server/tasks"
@@ -25,14 +26,15 @@ import (
 )
 
 type Teamserver struct {
-	Config     *Config
-	Store      *db.Store
-	Sessions   *sessions.Manager
-	Dispatcher *tasks.Dispatcher
-	Listeners  *listeners.Manager
-	Events     *EventBus
-	Approval   *approval.Gate
-	CA         *zcrypto.CertificateAuthority
+	Config       *Config
+	Store        *db.Store
+	Sessions     *sessions.Manager
+	Dispatcher   *tasks.Dispatcher
+	Listeners    *listeners.Manager
+	Events       *EventBus
+	Approval     *approval.Gate
+	AutoHarvest  *autoharvest.AutoHarvester
+	CA           *zcrypto.CertificateAuthority
 
 	grpcServer *grpc.Server
 	secret     []byte
@@ -78,17 +80,29 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 
 	approvalGate := approval.NewGate(events.Publish)
 
+	// Configure auto-harvest
+	ahEnabled := true // enabled by default
+	if cfg.AutoHarvest.Enabled != nil {
+		ahEnabled = *cfg.AutoHarvest.Enabled
+	}
+	ahCfg := &autoharvest.AutoHarvestConfig{
+		Enabled: ahEnabled,
+		Tasks:   cfg.AutoHarvest.Tasks,
+	}
+	ah := autoharvest.New(ahCfg, dispatcher, store)
+
 	ts := &Teamserver{
-		Config:     cfg,
-		Store:      store,
-		Sessions:   sessMgr,
-		Dispatcher: dispatcher,
-		Listeners:  listeners.NewManager(),
-		Events:     events,
-		Approval:   approvalGate,
-		CA:         ca,
-		secret:     secret,
-		done:       make(chan struct{}),
+		Config:      cfg,
+		Store:       store,
+		Sessions:    sessMgr,
+		Dispatcher:  dispatcher,
+		Listeners:   listeners.NewManager(),
+		Events:      events,
+		Approval:    approvalGate,
+		AutoHarvest: ah,
+		CA:          ca,
+		secret:      secret,
+		done:        make(chan struct{}),
 	}
 
 	// Recover sessions from DB (Bug 8)
@@ -120,6 +134,10 @@ func (ts *Teamserver) Start() error {
 
 	// Start session reaper
 	go ts.sessionReaper()
+
+	// Start auto-harvester (subscribes to SESSION_NEW events)
+	ahCh, ahUnsub := ts.Events.Subscribe()
+	ts.AutoHarvest.Start(ahCh, ahUnsub, ts.Config.Debug)
 
 	log.Printf("[server] teamserver started (gRPC=%s)", ts.Config.GRPCAddr)
 	return nil
@@ -202,6 +220,9 @@ func (ts *Teamserver) startGRPC() error {
 func (ts *Teamserver) Stop() {
 	log.Println("[server] shutting down...")
 	close(ts.done)
+	if ts.AutoHarvest != nil {
+		ts.AutoHarvest.Stop()
+	}
 	ts.Listeners.StopAll()
 	if ts.grpcServer != nil {
 		ts.grpcServer.GracefulStop()

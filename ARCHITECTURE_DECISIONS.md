@@ -102,14 +102,15 @@ Phase 3: Cloud Expansion
 
 ---
 
-### CLOUD-1: All Three Cloud Providers, Balanced
+### CLOUD-1: Azure-First Cloud Strategy
 
-**Decision:** Support Azure, AWS, and GCP with balanced coverage.
+**Decision:** Azure/Entra ID gets deep coverage (CLI tokens, IMDS, Managed Identity, AAD Connect, PRT theft). AWS and GCP get lightweight credential harvesting (credential files, env vars, IMDS).
 
 **Rationale:**
-- Real enterprise environments are multi-cloud
-- Azure gets slight priority due to AD/Entra ID hybrid scenarios (Phase 2 focus)
-- Common abstraction layer for credential theft across all three providers
+- Azure/Entra ID is the primary hybrid identity pivot from on-prem AD
+- Deep Azure coverage aligns with AD-focused attack chains
+- AWS/GCP credential harvesting is opportunistic — file reads and env vars are low-risk recon
+- All cloud modules are compiled-in and auto-harvested on new sessions
 
 **Credential targets:**
 | Provider | Targets |
@@ -146,15 +147,16 @@ Phase 3: Cloud Expansion
 
 ---
 
-### EVASION-2: Implant Execution Model — Classic EXE
+### EVASION-2: Implant Execution Model — EXE, Shellcode, and DLL
 
-**Decision:** Primary delivery is standalone EXE. Shellcode/DLL/reflective loading deferred to Phase 2+.
+**Decision:** Three output formats supported: standalone EXE (default), shellcode (via go-donut), and reflective DLL (c-shared buildmode).
 
 **Rationale:**
-- Simplest to build, test, and debug during initial development
-- Go cross-compilation makes EXE generation trivial
-- Shellcode generation (donut, etc.) can wrap the EXE later without changing implant code
-- Phase 2 will add: shellcode output, DLL sideloading, reflective loader
+- EXE is simplest for testing and direct execution
+- Shellcode enables process injection, reflective loading, and custom loaders
+- DLL enables sideloading and rundll32 execution
+- go-donut (Binject/go-donut) converts PE→shellcode with AMSI/ETW bypass
+- GenerateImplant RPC supports all three formats
 
 ---
 
@@ -353,3 +355,4 @@ Phase 3: Cloud Expansion
 |---|---|
 | 2026-03-08 | Initial architecture decisions documented. AD/Cloud focus defined. Bug fix roadmap established. |
 | 2026-03-09 | Phase 2 complete: AD attacks, evasion, infrastructure, operator CLI. 10 code review fixes applied. |
+| 2026-03-10 | Phase 3: Redirector support (#2), Azure-first cloud modules (#7), auto-harvest (#8), shellcode/DLL output (#11). |

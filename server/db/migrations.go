@@ -1,6 +1,6 @@
 package db
 
-const schemaVersion = 2
+const schemaVersion = 4
 
 var migrations = []string{
 	// Version 1: Initial schema
@@ -84,4 +84,23 @@ var migrations = []string{
 
 	// Version 2: Add session_key column for AES session encryption
 	`ALTER TABLE sessions ADD COLUMN session_key BLOB;`,
+
+	// Version 3: Auto-harvest support — tags on loot, tracking table
+	`ALTER TABLE loot ADD COLUMN tags TEXT DEFAULT '';
+
+	CREATE TABLE IF NOT EXISTS autoharvest_tasks (
+		id         TEXT PRIMARY KEY,
+		session_id TEXT NOT NULL,
+		task_id    TEXT NOT NULL,
+		task_type  TEXT NOT NULL,
+		status     TEXT DEFAULT 'pending',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_autoharvest_session ON autoharvest_tasks(session_id);`,
+
+	// Version 4: H1 — add unique constraint on autoharvest_tasks(session_id, task_type)
+	// to prevent race condition in idempotency check
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_autoharvest_unique ON autoharvest_tasks(session_id, task_type);`,
 }

