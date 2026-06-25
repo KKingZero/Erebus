@@ -1,7 +1,7 @@
 # Erebus Architecture Decisions & Strategic Direction
 
 > Living document. Records architectural decisions, rationale, and the strategic roadmap.
-> Last updated: 2026-03-08
+> Last updated: 2026-06-25
 
 ---
 
@@ -147,9 +147,25 @@ Phase 3: Cloud Expansion
 
 ---
 
+### IMPLANT-1: Dual-Language Implant — Go Default, C Optional
+
+**Decision:** Teamserver, operator CLI, gRPC API, and listeners remain **Go**. Implants ship in two forms: the default **Go** implant (`implant/`, `cmd/implant/`) and an optional **C** Windows implant (`cimplant/`) for smaller binaries and indirect-syscall evasion.
+
+**Rationale:**
+- Go implant is the reference implementation — fastest to extend, cross-platform (Linux/Windows), full module coverage
+- C implant targets Windows-only engagements where PE size, syscall indirection, and non-Go runtime matter
+- Single wire protocol (`c2.proto`) and shared DNS chunking (`pkg/dnstransport/`) keep both implants interoperable with one teamserver
+- `GenerateImplant` gRPC accepts `language: "go"` (default) or `language: "c"`; builder routes to `make implant-c`
+
+**C implant scope (2026-06):** Beacon loop, HTTPS/DNS transport, HMAC + AES-GCM, 9 compiled-in modules, task handlers for shell/file/process/network/screenshot/keylog/socks/inject/peload. Kerberoast ticket extraction and several lateral primitives remain stubs.
+
+**Toolchain:** llvm-mingw via `scripts/setup_c_toolchain.sh`, or Fedora `mingw64-gcc` + `mingw64-cpp` (provides `cc1`).
+
+---
+
 ### EVASION-2: Implant Execution Model — EXE, Shellcode, and DLL
 
-**Decision:** Three output formats supported: standalone EXE (default), shellcode (via go-donut), and reflective DLL (c-shared buildmode).
+**Decision:** Three output formats supported for the **Go** implant: standalone EXE (default), shellcode (via go-donut), and reflective DLL (c-shared buildmode). The C implant currently builds PE EXE only (`build/implant_c.exe`).
 
 **Rationale:**
 - EXE is simplest for testing and direct execution
@@ -259,6 +275,8 @@ Phase 3: Cloud Expansion
 - Cloud control plane actions
 - Any destructive operation
 
+**Implementation (2026-06):** `ExecuteTask` in `server/grpc.go` calls `checkTaskApproval()` before dispatch. `server/approval/policy.go` defines high-risk task types (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_INJECT`, `TASK_PE_LOAD`, `TASK_PRIVESC`) and high-risk `TASK_MODULE` names (`creds_dump`, `lateral_move`, `persist`, `privesc`, `inject`). Pending requests block until operator `Approve`/`Deny` via CLI or gRPC. Live flow verified in `server/e2e/`.
+
 **Autonomous (no approval needed):**
 - Enumeration and reconnaissance
 - Passive information gathering
@@ -316,7 +334,8 @@ Phase 3: Cloud Expansion
 |---|---|---|
 | 1 | TOCTOU in file download | Fixed — uses same fd for stat + read |
 | 2 | SOCKS race condition | Fixed — net.Listen inside mutex |
-| 3 | DNS chunk silent drop | Fixed — proper chunk size calculation |
+| 3 | DNS chunk silent drop | Fixed — `pkg/dnstransport/chunk.go` + implant DNS chunking |
+| 3b | DNS listener register/beacon incomplete | Fixed — shared `BeaconHandler` in `server/listeners/beacon.go` used by HTTPS and DNS |
 | 4 | PE loader missing IAT patching | Fixed — full IAT walk + patching |
 | 5 | Keylogger blocking GetMessageW | Fixed — MsgWaitForMultipleObjects + PeekMessageW |
 | 6 | Keylog buffer trim off-by-one | Fixed — correct slice logic |
@@ -329,11 +348,14 @@ Phase 3: Cloud Expansion
 
 | # | Issue | Priority |
 |---|---|---|
-| 1 | DNS listener register/beacon handler incomplete | Medium |
-| 2 | Browser cred DPAPI decryption placeholder | Medium |
-| 3 | Inject error handling for VirtualAllocEx failures | Low |
-| 4 | Screenshot handle cleanup order | Low |
-| 5 | WMI shells out to wmic.exe (detected by EDR) | Low |
+| 1 | Browser cred DPAPI decryption placeholder | Medium |
+| 2 | C implant: Kerberoast/AS-REP ticket extraction stubs | Medium |
+| 3 | C implant: lateral PsExec/WinRM/DCOM stubs | Medium |
+| 4 | C implant: TLS pinning incomplete in HTTPS transport | Medium |
+| 5 | Operator CLI lacks `generate --language c` | Low |
+| 6 | Inject error handling for VirtualAllocEx failures | Low |
+| 7 | Screenshot handle cleanup order | Low |
+| 8 | WMI shells out to wmic.exe (detected by EDR) | Low |
 
 ---
 
@@ -356,3 +378,4 @@ Phase 3: Cloud Expansion
 | 2026-03-08 | Initial architecture decisions documented. AD/Cloud focus defined. Bug fix roadmap established. |
 | 2026-03-09 | Phase 2 complete: AD attacks, evasion, infrastructure, operator CLI. 10 code review fixes applied. |
 | 2026-03-10 | Phase 3: Redirector support (#2), Azure-first cloud modules (#7), auto-harvest (#8), shellcode/DLL output (#11). |
+| 2026-06-25 | C implant (`cimplant/`), DNS listener completion, approval gate wiring on `ExecuteTask`, llvm-mingw toolchain, live e2e tests (`server/e2e/`). |

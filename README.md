@@ -1,6 +1,6 @@
 # Erebus Exploitation Framework
 
-A custom command-and-control (C2) framework built in Go for AI-driven offensive security operations. Erebus uses a beacon-mode architecture with protobuf-based wire protocols, gRPC operator API, and mTLS-secured communications.
+A custom command-and-control (C2) framework for AI-driven offensive security operations. The **teamserver**, operator CLI, and listeners are Go; implants are available as **Go** (default) or an optional **C** Windows build (`cimplant/`). Erebus uses beacon-mode architecture with protobuf wire protocols, gRPC operator API, and mTLS-secured communications.
 
 > **For authorized security testing, red team engagements, and research purposes only.**
 
@@ -38,7 +38,7 @@ A custom command-and-control (C2) framework built in Go for AI-driven offensive 
 - **Operator CLI** — Interactive REPL with tab completion for direct operator control
 - **Task Queue** — Async task dispatch with optional blocking wait and 10-minute default timeout
 - **Event Streaming** — Real-time gRPC event stream (new sessions, task results, approvals)
-- **Approval Gates** — Risk-based approval workflow for high-impact operations
+- **Approval Gates** — Server-side gates on `ExecuteTask` for creds dump, lateral movement, persistence, injection, and high-risk `TASK_MODULE` targets (operator `approve`/`deny` via CLI or gRPC)
 
 ### Implant Capabilities
 
@@ -84,6 +84,7 @@ A custom command-and-control (C2) framework built in Go for AI-driven offensive 
 - Go 1.22+
 - `protoc` with `protoc-gen-go` and `protoc-gen-go-grpc` plugins
 - `make`
+- **C implant (optional):** Windows cross-compiler — Fedora: `mingw64-gcc` + `mingw64-cpp`; or run `scripts/setup_c_toolchain.sh` for llvm-mingw
 
 ### Build
 
@@ -99,6 +100,17 @@ make teamserver     # Build teamserver
 make implant        # Build implant (Linux)
 make implant-win    # Build implant (Windows)
 make operator       # Build operator CLI
+make implant-c      # Build C implant (Windows PE, requires mingw)
+```
+
+### Verify Build
+
+```bash
+# Unit tests + teamserver/implant builds (+ C implant if mingw available)
+bash scripts/smoke_test.sh
+
+# Live teamserver flow: register → beacon → shell task → approval gate
+go test ./server/e2e/... -v -count=1
 ```
 
 ### Run Teamserver
@@ -149,6 +161,28 @@ make implant \
   SLEEP_MS=30000
 ```
 
+### C Implant (Windows)
+
+The C implant mirrors the Go wire protocol (HTTPS/DNS, HMAC auth, AES-256-GCM session encryption) with indirect syscalls and compiled-in modules.
+
+```bash
+# One-time toolchain (llvm-mingw, ~150MB download)
+bash scripts/setup_c_toolchain.sh
+
+# Or on Fedora:
+# sudo dnf install mingw64-gcc mingw64-cpp
+
+make implant-c \
+  IMPLANT_ID=my-implant \
+  IMPLANT_SECRET=$(openssl rand -hex 32) \
+  CALLBACK_URL=https://your-c2:8443
+# Output: build/implant_c.exe
+```
+
+Generate via gRPC (`GenerateImplant` with `language: "c"`). The operator CLI does not yet expose a `generate --language c` flag — use gRPC or `make implant-c` directly.
+
+**C implant gaps (honest):** Kerberoast/AS-REP ticket extraction and several lateral primitives (PsExec, WinRM, DCOM) are stubs; WMI works. TLS pinning in `cimplant/src/transport/https.c` is not fully implemented. Full validation requires a Windows host or VM.
+
 ## Configuration
 
 Config file is auto-created at `~/.erebus/server.yaml`:
@@ -192,14 +226,28 @@ exit                  - Exit operator CLI
 help                  - Show help
 ```
 
+High-risk tasks (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_INJECT`, `TASK_PE_LOAD`, `TASK_PRIVESC`, and `TASK_MODULE` for `creds_dump`, `lateral_move`, `persist`, `privesc`, `inject`) block in `ExecuteTask` until an operator approves via `pending`/`approve` or the gRPC `Approve` RPC.
+
+## Testing
+
+| Script / test | What it covers |
+|---|---|
+| `scripts/smoke_test.sh` | Go unit tests (DNS chunks, approval, beacon handler), teamserver + implant builds, optional C PE build |
+| `go test ./server/e2e/...` | Live teamserver on ephemeral ports: implant register/beacon (HTTP client), shell task round-trip, creds-dump approval gate |
+
 ## Project Structure
 
 ```
 .
+├── cimplant/                # C Windows implant (beacon, transport, modules)
 ├── cmd/
 │   ├── teamserver/          # Teamserver entry point
-│   ├── implant/             # Implant entry point
+│   ├── implant/             # Go implant entry point
 │   └── operator/            # Operator CLI (REPL + commands)
+├── scripts/
+│   ├── smoke_test.sh        # Build + unit test smoke checks
+│   ├── setup_c_toolchain.sh # llvm-mingw downloader
+│   └── e2e_live.sh          # Wrapper for live e2e tests
 ├── server/
 │   ├── server.go            # Teamserver core
 │   ├── grpc.go              # gRPC service implementation
@@ -207,7 +255,9 @@ help                  - Show help
 │   ├── config.go            # Server configuration
 │   ├── approval/            # Approval gate for high-risk ops
 │   ├── db/                  # SQLite store, models, migrations
-│   ├── listeners/           # HTTPS + DNS listeners
+│   ├── builder/             # Go + C implant build pipeline
+│   ├── listeners/           # HTTPS + DNS listeners (shared beacon handler)
+│   ├── e2e/                 # Live teamserver integration tests
 │   ├── sessions/            # Session tracking + reaper
 │   ├── socks/               # Server-side SOCKS5 proxy
 │   └── tasks/               # Task queue + dispatcher
@@ -234,6 +284,7 @@ help                  - Show help
 │       └── privesc/         # Token theft, UAC bypass
 ├── pkg/
 │   ├── crypto/              # AES, mTLS, key generation
+│   ├── dnstransport/        # DNS chunk encode/decode (shared server + implant)
 │   ├── pb/                  # Generated protobuf code
 │   └── plugin/              # Module plugin interface + registry
 ├── proto/                   # Protobuf definitions
