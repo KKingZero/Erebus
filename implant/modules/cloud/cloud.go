@@ -44,7 +44,13 @@ func (m *CloudModule) Execute(ctx context.Context, config []byte) ([]byte, error
 	case "azure":
 		results = append(results, harvestAzure(ctx, method)...)
 	case "aws":
-		results = append(results, harvestAWS(ctx)...)
+		if method == "imds" {
+			if r := harvestIMDS(ctx); r != nil {
+				results = append(results, r)
+			}
+		} else {
+			results = append(results, harvestAWS(method)...)
+		}
 	case "gcp":
 		results = append(results, harvestGCP(ctx)...)
 	case "imds":
@@ -54,7 +60,7 @@ func (m *CloudModule) Execute(ctx context.Context, config []byte) ([]byte, error
 	case "all":
 		// L3: "all" should include IMDS detection too
 		results = append(results, harvestAzure(ctx, method)...)
-		results = append(results, harvestAWS(ctx)...)
+		results = append(results, harvestAWS(method)...)
 		results = append(results, harvestGCP(ctx)...)
 		if r := harvestIMDS(ctx); r != nil {
 			results = append(results, r)

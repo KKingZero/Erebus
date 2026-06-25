@@ -1553,7 +1553,10 @@ type GenerateImplantRequest struct {
 	JitterPct     int32                  `protobuf:"varint,6,opt,name=jitter_pct,json=jitterPct,proto3" json:"jitter_pct,omitempty"`
 	Garble        bool                   `protobuf:"varint,7,opt,name=garble,proto3" json:"garble,omitempty"`
 	CdnDomain     string                 `protobuf:"bytes,8,opt,name=cdn_domain,json=cdnDomain,proto3" json:"cdn_domain,omitempty"`
-	Format        string                 `protobuf:"bytes,9,opt,name=format,proto3" json:"format,omitempty"` // "exe" (default), "shellcode", "dll"
+	Format        string                 `protobuf:"bytes,9,opt,name=format,proto3" json:"format,omitempty"`                         // "exe" (default), "shellcode", "dll"
+	DnsDomain     string                 `protobuf:"bytes,10,opt,name=dns_domain,json=dnsDomain,proto3" json:"dns_domain,omitempty"` // DNS C2 zone (required when transport=dns)
+	DnsServer     string                 `protobuf:"bytes,11,opt,name=dns_server,json=dnsServer,proto3" json:"dns_server,omitempty"` // DNS resolver host:port
+	Language      string                 `protobuf:"bytes,12,opt,name=language,proto3" json:"language,omitempty"`                    // "go" (default), "c"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1647,6 +1650,27 @@ func (x *GenerateImplantRequest) GetCdnDomain() string {
 func (x *GenerateImplantRequest) GetFormat() string {
 	if x != nil {
 		return x.Format
+	}
+	return ""
+}
+
+func (x *GenerateImplantRequest) GetDnsDomain() string {
+	if x != nil {
+		return x.DnsDomain
+	}
+	return ""
+}
+
+func (x *GenerateImplantRequest) GetDnsServer() string {
+	if x != nil {
+		return x.DnsServer
+	}
+	return ""
+}
+
+func (x *GenerateImplantRequest) GetLanguage() string {
+	if x != nil {
+		return x.Language
 	}
 	return ""
 }
@@ -2098,7 +2122,7 @@ const file_api_proto_rawDesc = "" +
 	"\atask_id\x18\x04 \x01(\tR\x06taskId\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12\x12\n" +
 	"\x04data\x18\x06 \x01(\fR\x04data\"\x12\n" +
-	"\x10SubscribeRequest\"\x81\x02\n" +
+	"\x10SubscribeRequest\"\xdb\x02\n" +
 	"\x16GenerateImplantRequest\x12\x0e\n" +
 	"\x02os\x18\x01 \x01(\tR\x02os\x12\x12\n" +
 	"\x04arch\x18\x02 \x01(\tR\x04arch\x12\x1c\n" +
@@ -2110,7 +2134,13 @@ const file_api_proto_rawDesc = "" +
 	"\x06garble\x18\a \x01(\bR\x06garble\x12\x1d\n" +
 	"\n" +
 	"cdn_domain\x18\b \x01(\tR\tcdnDomain\x12\x16\n" +
-	"\x06format\x18\t \x01(\tR\x06format\"\xb0\x01\n" +
+	"\x06format\x18\t \x01(\tR\x06format\x12\x1d\n" +
+	"\n" +
+	"dns_domain\x18\n" +
+	" \x01(\tR\tdnsDomain\x12\x1d\n" +
+	"\n" +
+	"dns_server\x18\v \x01(\tR\tdnsServer\x12\x1a\n" +
+	"\blanguage\x18\f \x01(\tR\blanguage\"\xb0\x01\n" +
 	"\x17GenerateImplantResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x19\n" +

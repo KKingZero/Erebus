@@ -164,6 +164,9 @@ message GenerateImplantRequest {
   bool   garble     = 7;
   string cdn_domain = 8;
   string format     = 9;  // "exe" (default), "shellcode", "dll"
+  string dns_domain = 10; // DNS C2 zone (required when transport=dns)
+  string dns_server = 11; // DNS resolver host:port
+  string language   = 12; // "go" (default), "c"
 }
 
 message GenerateImplantResponse {

@@ -33,6 +33,7 @@ type ListenerConfig struct {
 	Protocol string `yaml:"protocol"`
 	Host     string `yaml:"host"`
 	Port     uint32 `yaml:"port"`
+	Domain   string `yaml:"domain,omitempty"` // required for DNS listeners
 }
 
 func DefaultConfig() *Config {

