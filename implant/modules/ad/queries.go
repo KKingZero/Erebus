@@ -4,7 +4,7 @@ package ad
 var queryFilters = map[string]string{
 	"kerberoastable":          "(&(servicePrincipalName=*)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
 	"asrep_roastable":         "(userAccountControl:1.2.840.113556.1.4.803:=4194304)",
-	"domain_admins":           "(&(objectCategory=person)(objectClass=user)(memberOf=CN=Domain Admins,CN=Users,DC=*))",
+
 	"computers":               "(objectCategory=computer)",
 	"dcs":                     "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))",
 	"gpos":                    "(objectClass=groupPolicyContainer)",

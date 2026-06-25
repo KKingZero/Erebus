@@ -35,4 +35,10 @@ func TestRequiresApprovalDirectTasks(t *testing.T) {
 	if p.RequiresApproval(pb.TaskType_TASK_SHELL) {
 		t.Fatal("shell should not require approval")
 	}
+	if !p.RequiresApproval(pb.TaskType_TASK_KERBEROAST) {
+		t.Fatal("kerberoast should require approval")
+	}
+	if !p.RequiresApproval(pb.TaskType_TASK_LDAP_ENUM) {
+		t.Fatal("ldap_enum should require approval")
+	}
 }

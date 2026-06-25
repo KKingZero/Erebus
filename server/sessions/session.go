@@ -82,6 +82,16 @@ func (s *Session) DrainTasks() []*pb.Task {
 	return tasks
 }
 
+// RequeueTasks prepends tasks back onto the queue (e.g. after a failed encrypt).
+func (s *Session) RequeueTasks(tasks []*pb.Task) {
+	if len(tasks) == 0 {
+		return
+	}
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	s.taskQueue = append(tasks, s.taskQueue...)
+}
+
 func (s *Session) ToProto() *pb.SessionInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

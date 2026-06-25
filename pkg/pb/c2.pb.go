@@ -2553,6 +2553,7 @@ type LateralMoveConfig struct {
 	Command       string                 `protobuf:"bytes,8,opt,name=command,proto3" json:"command,omitempty"`
 	Payload       []byte                 `protobuf:"bytes,9,opt,name=payload,proto3" json:"payload,omitempty"`
 	ServiceName   string                 `protobuf:"bytes,10,opt,name=service_name,json=serviceName,proto3" json:"service_name,omitempty"`
+	RemoteBinPath string                 `protobuf:"bytes,11,opt,name=remote_bin_path,json=remoteBinPath,proto3" json:"remote_bin_path,omitempty"` // optional PsExec service binary path (default: C:\Windows\<service>.exe)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2653,6 +2654,13 @@ func (x *LateralMoveConfig) GetPayload() []byte {
 func (x *LateralMoveConfig) GetServiceName() string {
 	if x != nil {
 		return x.ServiceName
+	}
+	return ""
+}
+
+func (x *LateralMoveConfig) GetRemoteBinPath() string {
+	if x != nil {
+		return x.RemoteBinPath
 	}
 	return ""
 }
@@ -4275,7 +4283,7 @@ const file_c2_proto_rawDesc = "" +
 	"\x06domain\x18\x02 \x01(\tR\x06domain\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\x12\x14\n" +
 	"\x05value\x18\x04 \x01(\tR\x05value\x12\x16\n" +
-	"\x06source\x18\x05 \x01(\tR\x06source\"\x9f\x02\n" +
+	"\x06source\x18\x05 \x01(\tR\x06source\"\xc7\x02\n" +
 	"\x11LateralMoveConfig\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x16\n" +
 	"\x06target\x18\x02 \x01(\tR\x06target\x12\x16\n" +
@@ -4287,7 +4295,8 @@ const file_c2_proto_rawDesc = "" +
 	"\acommand\x18\b \x01(\tR\acommand\x12\x18\n" +
 	"\apayload\x18\t \x01(\fR\apayload\x12!\n" +
 	"\fservice_name\x18\n" +
-	" \x01(\tR\vserviceName\"u\n" +
+	" \x01(\tR\vserviceName\x12&\n" +
+	"\x0fremote_bin_path\x18\v \x01(\tR\rremoteBinPath\"u\n" +
 	"\x11LateralMoveResult\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x16\n" +
 	"\x06target\x18\x02 \x01(\tR\x06target\x12\x18\n" +

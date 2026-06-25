@@ -24,6 +24,9 @@ func DefaultPolicy() *Policy {
 			pb.TaskType_TASK_PERSIST:      "critical",
 			pb.TaskType_TASK_PRIVESC:      "high",
 			pb.TaskType_TASK_PE_LOAD_EXEC: "high",
+			pb.TaskType_TASK_LDAP_ENUM:    "high",
+			pb.TaskType_TASK_KERBEROAST:   "high",
+			pb.TaskType_TASK_ASREPROAST:   "high",
 		},
 		HighRiskModules: map[string]string{
 			"creds_dump":   "critical",
@@ -31,6 +34,9 @@ func DefaultPolicy() *Policy {
 			"persist":      "critical",
 			"privesc":      "high",
 			"inject":       "high",
+			"ldap_enum":    "high",
+			"kerberoast":   "high",
+			"asreproast":   "high",
 		},
 	}
 }

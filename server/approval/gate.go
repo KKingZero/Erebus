@@ -1,6 +1,7 @@
 package approval
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/crypto"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 )
+
+const defaultApprovalTimeout = 30 * time.Minute
 
 // Gate manages pending approval requests for high-risk operations.
 type Gate struct {
@@ -42,8 +45,17 @@ func (g *Gate) RequiresModuleApproval(moduleName string) bool {
 	return g.policy.RequiresModuleApproval(moduleName)
 }
 
-// RequestApproval queues a task for approval and blocks until approved/denied.
-func (g *Gate) RequestApproval(sessionID string, taskType pb.TaskType, description string) (bool, error) {
+// RequestApproval queues a task for approval and blocks until approved/denied or ctx expires.
+func (g *Gate) RequestApproval(ctx context.Context, sessionID string, taskType pb.TaskType, description string) (bool, error) {
+	return g.requestApproval(ctx, sessionID, taskType, description, g.policy.RiskLevel(taskType))
+}
+
+// RequestModuleApproval queues a high-risk module for approval with the module risk level.
+func (g *Gate) RequestModuleApproval(ctx context.Context, sessionID, moduleName, description string) (bool, error) {
+	return g.requestApproval(ctx, sessionID, pb.TaskType_TASK_MODULE, description, g.policy.ModuleRiskLevel(moduleName))
+}
+
+func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType pb.TaskType, description, riskLevel string) (bool, error) {
 	id, err := crypto.RandomID(8)
 	if err != nil {
 		return false, err
@@ -54,7 +66,7 @@ func (g *Gate) RequestApproval(sessionID string, taskType pb.TaskType, descripti
 		SessionId:       sessionID,
 		TaskDescription: description,
 		TaskType:        taskType,
-		RiskLevel:       g.policy.RiskLevel(taskType),
+		RiskLevel:       riskLevel,
 		RequestedAt:     time.Now().Unix(),
 	}
 
@@ -67,7 +79,6 @@ func (g *Gate) RequestApproval(sessionID string, taskType pb.TaskType, descripti
 	}
 	g.mu.Unlock()
 
-	// Emit event
 	if g.onEvent != nil {
 		g.onEvent(&pb.Event{
 			Type:      pb.EventType_EVENT_APPROVAL_REQUIRED,
@@ -77,25 +88,42 @@ func (g *Gate) RequestApproval(sessionID string, taskType pb.TaskType, descripti
 		})
 	}
 
-	// Wait for operator decision
-	approved := <-resultCh
+	waitCtx := ctx
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(ctx, defaultApprovalTimeout)
+		defer cancel()
+	}
 
-	g.mu.Lock()
-	delete(g.pending, id)
-	g.mu.Unlock()
-
-	return approved, nil
+	select {
+	case approved := <-resultCh:
+		return approved, nil
+	case <-waitCtx.Done():
+		g.mu.Lock()
+		delete(g.pending, id)
+		g.mu.Unlock()
+		if g.onEvent != nil {
+			g.onEvent(&pb.Event{
+				Type:      pb.EventType_EVENT_LOG,
+				Timestamp: time.Now().Unix(),
+				SessionId: sessionID,
+				Message:   fmt.Sprintf("approval timed out [%s] %s: %s", riskLevel, taskType, description),
+			})
+		}
+		return false, waitCtx.Err()
+	}
 }
 
 // Approve approves a pending request.
 func (g *Gate) Approve(approvalID string) error {
-	g.mu.RLock()
+	g.mu.Lock()
 	pa, ok := g.pending[approvalID]
-	g.mu.RUnlock()
-
 	if !ok {
+		g.mu.Unlock()
 		return fmt.Errorf("approval request not found: %s", approvalID)
 	}
+	delete(g.pending, approvalID)
+	g.mu.Unlock()
 
 	pa.ResultCh <- true
 	return nil
@@ -103,13 +131,14 @@ func (g *Gate) Approve(approvalID string) error {
 
 // Deny denies a pending request.
 func (g *Gate) Deny(approvalID string) error {
-	g.mu.RLock()
+	g.mu.Lock()
 	pa, ok := g.pending[approvalID]
-	g.mu.RUnlock()
-
 	if !ok {
+		g.mu.Unlock()
 		return fmt.Errorf("approval request not found: %s", approvalID)
 	}
+	delete(g.pending, approvalID)
+	g.mu.Unlock()
 
 	pa.ResultCh <- false
 	return nil

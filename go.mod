@@ -28,6 +28,7 @@ require (
 	github.com/geoffgarside/ber v1.1.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

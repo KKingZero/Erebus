@@ -158,6 +158,34 @@ func TestLiveE2E(t *testing.T) {
 		t.Fatal("creds dump task timed out after approval")
 	}
 
+	// Verify creds dump result is real protobuf, not simulated JSON
+	tasks, err := grpcClient.ListTasks(ctx, &pb.ListTasksRequest{SessionId: sessionID})
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	var credsResult *pb.TaskResult
+	for _, task := range tasks.Tasks {
+		if task.TaskType != pb.TaskType_TASK_CREDS_DUMP {
+			continue
+		}
+		credsResp, err := grpcClient.GetTaskResult(ctx, &pb.GetTaskResultRequest{TaskId: task.TaskId})
+		if err != nil {
+			t.Fatalf("get creds result: %v", err)
+		}
+		credsResult = credsResp.Result
+		break
+	}
+	if credsResult == nil || !credsResult.Success {
+		t.Fatal("expected successful creds dump result")
+	}
+	if bytes.Contains(credsResult.Data, []byte(`"simulated":true`)) {
+		t.Fatalf("creds dump returned simulated payload: %s", credsResult.Data)
+	}
+	credResult := &pb.CredDumpResult{}
+	if err := proto.Unmarshal(credsResult.Data, credResult); err != nil {
+		t.Fatalf("unmarshal cred dump result: %v", err)
+	}
+
 	close(sim.done)
 }
 
@@ -376,6 +404,23 @@ func (s *implantSim) executeTask(task *pb.Task) *pb.TaskResult {
 		}
 	case pb.TaskType_TASK_EXIT:
 		return &pb.TaskResult{TaskId: task.TaskId, Success: true, ExecutionTimeMs: time.Since(start).Milliseconds()}
+	case pb.TaskType_TASK_CREDS_DUMP:
+		result := &pb.CredDumpResult{
+			Method: "lsass",
+			Credentials: []*pb.Credential{
+				{Type: "simulated", Source: "e2e", Value: "ok"},
+			},
+		}
+		data, err := proto.Marshal(result)
+		if err != nil {
+			return failResult(task.TaskId, err, start)
+		}
+		return &pb.TaskResult{
+			TaskId:          task.TaskId,
+			Success:         true,
+			Data:            data,
+			ExecutionTimeMs: time.Since(start).Milliseconds(),
+		}
 	default:
 		return &pb.TaskResult{
 			TaskId:          task.TaskId,

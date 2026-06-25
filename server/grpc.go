@@ -94,7 +94,7 @@ func (s *GRPCService) ListSessions(ctx context.Context, req *pb.ListSessionsRequ
 func (s *GRPCService) GetSession(ctx context.Context, req *pb.GetSessionRequest) (*pb.GetSessionResponse, error) {
 	sess, ok := s.ts.Sessions.Get(req.SessionId)
 	if !ok {
-		return nil, fmt.Errorf("session not found: %s", req.SessionId)
+		return nil, status.Errorf(codes.NotFound, "session not found: %s", req.SessionId)
 	}
 	return &pb.GetSessionResponse{Session: sess.ToProto()}, nil
 }
@@ -111,13 +111,13 @@ func (s *GRPCService) KillSession(ctx context.Context, req *pb.KillSessionReques
 
 // --- Tasks ---
 
-func (s *GRPCService) checkTaskApproval(sessionID string, taskType pb.TaskType, data []byte) error {
+func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, taskType pb.TaskType, data []byte) error {
 	if s.ts.Approval == nil {
 		return nil
 	}
 	if s.ts.Approval.RequiresApproval(taskType) {
 		desc := fmt.Sprintf("%s on session %s", taskType.String(), sessionID)
-		approved, err := s.ts.Approval.RequestApproval(sessionID, taskType, desc)
+		approved, err := s.ts.Approval.RequestApproval(ctx, sessionID, taskType, desc)
 		if err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ func (s *GRPCService) checkTaskApproval(sessionID string, taskType pb.TaskType, 
 		moduleName := approval.ModuleNameFromTaskData(data)
 		if moduleName != "" && s.ts.Approval.RequiresModuleApproval(moduleName) {
 			desc := fmt.Sprintf("module %s on session %s", moduleName, sessionID)
-			approved, err := s.ts.Approval.RequestApproval(sessionID, taskType, desc)
+			approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, moduleName, desc)
 			if err != nil {
 				return err
 			}
@@ -143,7 +143,7 @@ func (s *GRPCService) checkTaskApproval(sessionID string, taskType pb.TaskType, 
 }
 
 func (s *GRPCService) ExecuteTask(ctx context.Context, req *pb.ExecuteTaskRequest) (*pb.ExecuteTaskResponse, error) {
-	if err := s.checkTaskApproval(req.SessionId, req.TaskType, req.Data); err != nil {
+	if err := s.checkTaskApproval(ctx, req.SessionId, req.TaskType, req.Data); err != nil {
 		return nil, err
 	}
 	taskID, result, err := s.ts.Dispatcher.Dispatch(ctx, req.SessionId, req.TaskType, req.Data, req.TimeoutMs, req.Wait)

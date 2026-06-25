@@ -146,10 +146,11 @@ func (ts *Teamserver) Start() error {
 
 func (ts *Teamserver) CreateListener(cfg *pb.ListenerConfig) (listeners.Listener, error) {
 	handler := &listeners.BeaconHandler{
-		Sessions:   ts.Sessions,
-		Dispatcher: ts.Dispatcher,
-		Secret:     ts.secret,
-		OnEvent:    ts.Events.Publish,
+		Sessions:    ts.Sessions,
+		Dispatcher:  ts.Dispatcher,
+		Secret:      ts.secret,
+		OnEvent:     ts.Events.Publish,
+		ReplayCache: zcrypto.NewReplayCache(60 * time.Second),
 	}
 
 	switch cfg.Protocol {

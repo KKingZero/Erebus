@@ -28,7 +28,9 @@ func SocksActive() bool {
 func executeSocksStart(_ context.Context, data []byte) ([]byte, error) {
 	task := &pb.SocksStartTask{}
 	if len(data) > 0 {
-		proto.Unmarshal(data, task)
+		if err := proto.Unmarshal(data, task); err != nil {
+			return nil, fmt.Errorf("unmarshal socks start task: %w", err)
+		}
 	}
 
 	port := task.Port

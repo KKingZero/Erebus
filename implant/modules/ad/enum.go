@@ -66,13 +66,16 @@ func runLDAPEnum(_ context.Context, cfg *pb.LDAPEnumConfig) (*pb.LDAPEnumResult,
 		}
 	}
 
+	// Build base DN from domain
+	baseDN := domainToBaseDN(cfg.Domain)
+
 	// Build search filter
 	filter := cfg.CustomFilter
 	if filter == "" {
-		var ok bool
-		filter, ok = queryFilters[cfg.QueryType]
-		if !ok {
-			return nil, fmt.Errorf("unknown query type: %s (available: %s)", cfg.QueryType, availableQueryTypes())
+		var err error
+		filter, err = BuildLDAPFilter(cfg.QueryType, baseDN)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -84,9 +87,6 @@ func runLDAPEnum(_ context.Context, cfg *pb.LDAPEnumConfig) (*pb.LDAPEnumResult,
 	if len(attrs) == 0 {
 		attrs = []string{"*"}
 	}
-
-	// Build base DN from domain
-	baseDN := domainToBaseDN(cfg.Domain)
 
 	searchReq := ldaplib.NewSearchRequest(
 		baseDN,
@@ -124,6 +124,18 @@ func runLDAPEnum(_ context.Context, cfg *pb.LDAPEnumConfig) (*pb.LDAPEnumResult,
 	}
 
 	return result, nil
+}
+
+// BuildLDAPFilter returns the LDAP filter for a query type and domain base DN.
+func BuildLDAPFilter(queryType, baseDN string) (string, error) {
+	if queryType == "domain_admins" {
+		return fmt.Sprintf("(&(objectCategory=person)(objectClass=user)(memberOf=CN=Domain Admins,CN=Users,%s))", baseDN), nil
+	}
+	filter, ok := queryFilters[queryType]
+	if !ok {
+		return "", fmt.Errorf("unknown query type: %s (available: %s)", queryType, availableQueryTypes())
+	}
+	return filter, nil
 }
 
 func domainToBaseDN(domain string) string {

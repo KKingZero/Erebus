@@ -19,6 +19,11 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 	if err := zcrypto.VerifyHMAC(h.Secret, reg.ImplantId, reg.Timestamp, reg.Hmac, 30); err != nil {
 		return nil, ErrBeaconAuth
 	}
+	if h.ReplayCache != nil {
+		if err := h.ReplayCache.CheckAndRecord(reg.ImplantId, reg.Timestamp); err != nil {
+			return nil, ErrBeaconAuth
+		}
+	}
 
 	sess := sessions.NewSession(reg, protocol, remoteAddr)
 
@@ -47,8 +52,7 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 
 	encryptedKey, err := zcrypto.AESEncrypt(h.Secret, sessionKey)
 	if err != nil {
-		log.Printf("[%s] encrypt session key error: %v", protocol, err)
-		encryptedKey = nil
+		return nil, fmt.Errorf("encrypt session key: %w", err)
 	}
 
 	return &pb.RegisterResponse{
@@ -64,6 +68,11 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 	if err := zcrypto.VerifyHMAC(h.Secret, beacon.ImplantId, beacon.Timestamp, beacon.Hmac, 30); err != nil {
 		return nil, ErrBeaconAuth
 	}
+	if h.ReplayCache != nil {
+		if err := h.ReplayCache.CheckAndRecord(beacon.ImplantId, beacon.Timestamp); err != nil {
+			return nil, ErrBeaconAuth
+		}
+	}
 
 	sess, ok := h.Sessions.GetByImplant(beacon.ImplantId)
 	if !ok {
@@ -73,18 +82,21 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 	h.Sessions.UpdateCheckin(sess.SessionID)
 
 	var results []*pb.TaskResult
-	if sess.SessionKey != nil && len(beacon.EncryptedResults) > 0 {
-		plaintext, err := zcrypto.AESDecrypt(sess.SessionKey, beacon.EncryptedResults)
-		if err != nil {
-			log.Printf("[beacon] decrypt results error: %v", err)
-		} else {
-			payload := &pb.BeaconResultsPayload{}
-			if err := proto.Unmarshal(plaintext, payload); err != nil {
-				log.Printf("[beacon] unmarshal decrypted results error: %v", err)
+	if sess.SessionKey != nil {
+		if len(beacon.EncryptedResults) > 0 {
+			plaintext, err := zcrypto.AESDecrypt(sess.SessionKey, beacon.EncryptedResults)
+			if err != nil {
+				log.Printf("[beacon] decrypt results error: %v", err)
 			} else {
-				results = payload.Results
+				payload := &pb.BeaconResultsPayload{}
+				if err := proto.Unmarshal(plaintext, payload); err != nil {
+					log.Printf("[beacon] unmarshal decrypted results error: %v", err)
+				} else {
+					results = payload.Results
+				}
 			}
 		}
+		// Fail-closed: ignore plaintext results when session encryption is active.
 	} else {
 		results = beacon.Results
 	}
@@ -105,17 +117,17 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 		plaintext, err := proto.Marshal(payload)
 		if err != nil {
 			log.Printf("[beacon] marshal tasks payload error: %v", err)
-			resp.Tasks = pendingTasks
+			sess.RequeueTasks(pendingTasks)
 		} else {
 			encrypted, err := zcrypto.AESEncrypt(sess.SessionKey, plaintext)
 			if err != nil {
 				log.Printf("[beacon] encrypt tasks error: %v", err)
-				resp.Tasks = pendingTasks
+				sess.RequeueTasks(pendingTasks)
 			} else {
 				resp.EncryptedTasks = encrypted
 			}
 		}
-	} else {
+	} else if sess.SessionKey == nil {
 		resp.Tasks = pendingTasks
 	}
 

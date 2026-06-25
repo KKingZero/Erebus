@@ -16,16 +16,18 @@ func moveWinRM(ctx context.Context, cfg *pb.LateralMoveConfig) (*pb.LateralMoveR
 	if cfg.Command == "" {
 		return nil, fmt.Errorf("command required")
 	}
-
-	endpoint := winrm.NewEndpoint(cfg.Target, 5985, false, true, nil, nil, nil, 0)
-
-	username := cfg.Username
-	password := cfg.Password
-	if username == "" {
+	if cfg.Username == "" {
 		return nil, fmt.Errorf("username required for WinRM")
 	}
+	if cfg.NtlmHash != "" {
+		return nil, fmt.Errorf("winrm pass-the-hash not supported; use method=psexec with ntlm_hash or provide password for winrm")
+	}
+	if cfg.Password == "" {
+		return nil, fmt.Errorf("password required for WinRM")
+	}
 
-	client, err := winrm.NewClient(endpoint, username, password)
+	endpoint := winrm.NewEndpoint(cfg.Target, 5985, false, true, nil, nil, nil, 0)
+	client, err := winrm.NewClient(endpoint, formatDomainUser(cfg.Domain, cfg.Username), cfg.Password)
 	if err != nil {
 		return nil, fmt.Errorf("create WinRM client: %w", err)
 	}
