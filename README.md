@@ -228,6 +228,40 @@ help                  - Show help
 
 High-risk tasks (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_INJECT`, `TASK_PE_LOAD`, `TASK_PRIVESC`, and `TASK_MODULE` for `creds_dump`, `lateral_move`, `persist`, `privesc`, `inject`) block in `ExecuteTask` until an operator approves via `pending`/`approve` or the gRPC `Approve` RPC.
 
+## AI Agent
+
+The AI agent is a separate sidecar process that connects to the teamserver over gRPC (mTLS) and drives the attack chain via an OpenAI-compatible LLM.
+
+```bash
+make agent
+cp config/agent.yaml.example ~/.erebus/agent.yaml
+# Edit paths and set OPENAI_API_KEY (or llm.api_key in YAML)
+
+# Semi-autonomous engagement
+export OPENAI_API_KEY=sk-...
+./build/agent -config ~/.erebus/agent.yaml \
+  -session <session-id> \
+  -objective "enumerate AD and find kerberoastable accounts"
+
+# Wait for new implant, then run initial enumeration
+./build/agent -config ~/.erebus/agent.yaml -watch \
+  -objective "initial recon on new session"
+
+# JSON output (one object per step)
+./build/agent -json -config ~/.erebus/agent.yaml -session <id> -objective "..."
+
+# Smoke test without LLM
+./build/agent -config ~/.erebus/agent.yaml -session <id> -dry-run net_ifconfig
+```
+
+**Semi-autonomous behavior:** Low-risk tools (`run_shell`, `net_ifconfig`, `process_list`, `portscan`) run automatically. High-risk tools (`ldap_enum`, `kerberoast`, `creds_dump`, `lateral_move`, etc.) block until an operator approves in a second terminal:
+
+```
+./build/operator -cert ... -key ... -ca ...
+erebus> pending
+erebus> approve <approval-id>
+```
+
 ## Testing
 
 | Script / test | What it covers |
@@ -243,7 +277,8 @@ High-risk tasks (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_I
 ├── cmd/
 │   ├── teamserver/          # Teamserver entry point
 │   ├── implant/             # Go implant entry point
-│   └── operator/            # Operator CLI (REPL + commands)
+│   ├── operator/            # Operator CLI (REPL + commands)
+│   └── agent/               # AI agent sidecar (LLM + gRPC)
 ├── scripts/
 │   ├── smoke_test.sh        # Build + unit test smoke checks
 │   ├── setup_c_toolchain.sh # llvm-mingw downloader
@@ -261,6 +296,7 @@ High-risk tasks (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_I
 │   ├── sessions/            # Session tracking + reaper
 │   ├── socks/               # Server-side SOCKS5 proxy
 │   └── tasks/               # Task queue + dispatcher
+├── pkg/agent/               # AI agent library (catalog, loop, LLM tools)
 ├── implant/
 │   ├── implant.go           # Implant core (beacon loop)
 │   ├── config.go            # Build-time config (ldflags)

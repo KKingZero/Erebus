@@ -1,0 +1,11 @@
+server: "127.0.0.1:50051"
+cert: "~/.erebus/certs/operator.pem"
+key: "~/.erebus/certs/operator-key.pem"
+ca: "~/.erebus/certs/ca.pem"
+llm:
+  base_url: "https://api.openai.com/v1"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o"
+autonomy:
+  max_steps: 50
+  auto_approve: false
