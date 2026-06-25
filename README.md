@@ -7,26 +7,26 @@ A custom command-and-control (C2) framework for AI-driven offensive security ope
 ## Architecture
 
 ```
-┌──────────────┐         gRPC (mTLS)         ┌──────────────────┐
-│   Operator   │◄───────────────────────────►│    Teamserver    │
-│   CLI / AI   │                             │                  │
-└──────────────┘                             │  ┌────────────┐  │
-                                             │  │  Sessions   │  │
-                                             │  │  Manager    │  │
-┌──────────────┐   HTTPS/DNS (Protobuf)      │  ├────────────┤  │
-│   Implant    │◄───────────────────────────►│  │  Listener   │  │
-│   (Beacon)   │                             │  │  Manager    │  │
-└──────────────┘                             │  ├────────────┤  │
-                                             │  │  Task       │  │
-                                             │  │  Dispatcher │  │
-                                             │  ├────────────┤  │
-                                             │  │  Approval   │  │
-                                             │  │  Gate       │  │
-                                             │  ├────────────┤  │
-                                             │  │  SQLite DB  │  │
-                                             │  └────────────┘  │
-                                             └──────────────────┘
+┌──────────────┐         gRPC (mTLS)         ┌──────────────────────┐
+│   Operator   │◄───────────────────────────►│      Teamserver      │
+│   CLI / AI   │                             │                      │
+└──────────────┘                             │  ┌────────────────┐  │
+                                             │  │ Listener Mgr   │  │
+┌──────────────┐   HTTPS/DNS (Protobuf)      │  │  HTTPS / DNS   │  │
+│   Implant    │◄───────────────────────────►│  ├────────────────┤  │
+│  Go or C     │     /register, /beacon      │  │ Sessions Mgr   │  │
+│  (Beacon)    │                             │  ├────────────────┤  │
+└──────────────┘                             │  │ Approval Gate  │  │
+                                             │  │  (gRPC only)   │  │
+                                             │  ├────────────────┤  │
+                                             │  │Task Dispatcher │  │
+                                             │  ├────────────────┤  │
+                                             │  │   SQLite DB    │  │
+                                             │  └────────────────┘  │
+                                             └──────────────────────┘
 ```
+
+Implant traffic enters via **Listener Manager** → shared beacon handler → **Sessions Manager**. Operator `ExecuteTask` calls pass through **Approval Gate** before **Task Dispatcher** enqueues work for the next beacon.
 
 ## Features
 
