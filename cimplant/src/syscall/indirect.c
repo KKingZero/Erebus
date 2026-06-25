@@ -1,35 +1,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winternl.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "erebus/syscall.h"
-
-typedef LONG NTSTATUS;
-
-typedef struct _PEB_LDR_DATA {
-    BYTE       Reserved1[8];
-    PVOID      Reserved2[3];
-    LIST_ENTRY InMemoryOrderModuleList;
-} PEB_LDR_DATA, *PPEB_LDR_DATA;
-
-typedef struct _LDR_DATA_TABLE_ENTRY {
-    PVOID     Reserved1[2];
-    LIST_ENTRY InMemoryOrderLinks;
-    PVOID     Reserved2[2];
-    PVOID     DllBase;
-    BYTE      Reserved3[8];
-    UNICODE_STRING FullDllName;
-    UNICODE_STRING BaseDllName;
-} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
-
-typedef struct _PEB {
-    BYTE Reserved1[2];
-    BYTE BeingDebugged;
-    BYTE Reserved2[1];
-    PVOID Reserved3[2];
-    PPEB_LDR_DATA Ldr;
-} PEB, *PPEB;
 
 #define EREBUS_MAX_SYSCALLS 8
 
@@ -51,7 +26,7 @@ static PVOID erebus_get_ntdll(void) {
     PLIST_ENTRY head = &peb->Ldr->InMemoryOrderModuleList;
     for (PLIST_ENTRY cur = head->Flink; cur != head; cur = cur->Flink) {
         PLDR_DATA_TABLE_ENTRY entry = CONTAINING_RECORD(cur, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
-        if (entry->BaseDllName.Buffer && _wcsicmp(entry->BaseDllName.Buffer, L"ntdll.dll") == 0) {
+        if (entry->FullDllName.Buffer && wcsstr(entry->FullDllName.Buffer, L"ntdll.dll")) {
             return entry->DllBase;
         }
     }

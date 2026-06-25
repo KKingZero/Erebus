@@ -5,8 +5,6 @@
 
 typedef LONG NTSTATUS;
 
-typedef NTSTATUS (NTAPI *erebus_nt_fn)(...);
-
 int erebus_syscall_init(void);
 
 NTSTATUS erebus_NtAllocateVirtualMemory(

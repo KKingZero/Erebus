@@ -37,6 +37,11 @@ func (g *Gate) RequiresApproval(taskType pb.TaskType) bool {
 	return g.policy.RequiresApproval(taskType)
 }
 
+// RequiresModuleApproval checks if a TASK_MODULE target needs operator approval.
+func (g *Gate) RequiresModuleApproval(moduleName string) bool {
+	return g.policy.RequiresModuleApproval(moduleName)
+}
+
 // RequestApproval queues a task for approval and blocks until approved/denied.
 func (g *Gate) RequestApproval(sessionID string, taskType pb.TaskType, description string) (bool, error) {
 	id, err := crypto.RandomID(8)

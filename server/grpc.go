@@ -9,9 +9,12 @@ import (
 	"path/filepath"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
+	"github.com/KKingZero/erebus-exploit-framwork/server/approval"
 	"github.com/KKingZero/erebus-exploit-framwork/server/builder"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 // validOS and validArch are whitelists for build targets.
@@ -108,7 +111,41 @@ func (s *GRPCService) KillSession(ctx context.Context, req *pb.KillSessionReques
 
 // --- Tasks ---
 
+func (s *GRPCService) checkTaskApproval(sessionID string, taskType pb.TaskType, data []byte) error {
+	if s.ts.Approval == nil {
+		return nil
+	}
+	if s.ts.Approval.RequiresApproval(taskType) {
+		desc := fmt.Sprintf("%s on session %s", taskType.String(), sessionID)
+		approved, err := s.ts.Approval.RequestApproval(sessionID, taskType, desc)
+		if err != nil {
+			return err
+		}
+		if !approved {
+			return status.Errorf(codes.PermissionDenied, "task denied by operator")
+		}
+		return nil
+	}
+	if taskType == pb.TaskType_TASK_MODULE {
+		moduleName := approval.ModuleNameFromTaskData(data)
+		if moduleName != "" && s.ts.Approval.RequiresModuleApproval(moduleName) {
+			desc := fmt.Sprintf("module %s on session %s", moduleName, sessionID)
+			approved, err := s.ts.Approval.RequestApproval(sessionID, taskType, desc)
+			if err != nil {
+				return err
+			}
+			if !approved {
+				return status.Errorf(codes.PermissionDenied, "task denied by operator")
+			}
+		}
+	}
+	return nil
+}
+
 func (s *GRPCService) ExecuteTask(ctx context.Context, req *pb.ExecuteTaskRequest) (*pb.ExecuteTaskResponse, error) {
+	if err := s.checkTaskApproval(req.SessionId, req.TaskType, req.Data); err != nil {
+		return nil, err
+	}
 	taskID, result, err := s.ts.Dispatcher.Dispatch(ctx, req.SessionId, req.TaskType, req.Data, req.TimeoutMs, req.Wait)
 	if err != nil {
 		return nil, err

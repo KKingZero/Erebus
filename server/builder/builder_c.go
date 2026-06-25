@@ -129,7 +129,11 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		fmt.Sprintf("CA_CERT_PEM=%s", caCertB64),
 	)
 	cmd.Dir = cimplantDir
-	cmd.Env = append(os.Environ(), "CC=x86_64-w64-mingw32-gcc")
+	toolchainBin := filepath.Join(absRoot, ".toolchain", "llvm-mingw", "bin")
+	if _, err := os.Stat(filepath.Join(toolchainBin, "x86_64-w64-mingw32-gcc")); err != nil {
+		toolchainBin = filepath.Join(absRoot, ".toolchain", "mingw-root", "usr", "bin")
+	}
+	cmd.Env = append(os.Environ(), "CC=x86_64-w64-mingw32-gcc", "PATH="+toolchainBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

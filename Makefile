@@ -68,8 +68,15 @@ implant-shellcode: implant-win
 	@mkdir -p $(BUILD_DIR)
 	go run ./cmd/tools/pe2shellcode -i $(BUILD_DIR)/implant.exe -o $(BUILD_DIR)/implant.bin
 
+LLVM_MINGW_BIN ?= $(CURDIR)/.toolchain/llvm-mingw/bin
+MINGW_BIN      ?= $(CURDIR)/.toolchain/mingw-root/usr/bin
+ifneq ($(wildcard $(LLVM_MINGW_BIN)/x86_64-w64-mingw32-gcc),)
+  C_TOOLCHAIN_BIN := $(LLVM_MINGW_BIN)
+else
+  C_TOOLCHAIN_BIN := $(MINGW_BIN)
+endif
 implant-c:
-	$(MAKE) -C cimplant all \
+	PATH="$(C_TOOLCHAIN_BIN):$$PATH" $(MAKE) -C cimplant all \
 		IMPLANT_ID="$(IMPLANT_ID)" \
 		IMPLANT_SECRET="$(IMPLANT_SECRET)" \
 		CALLBACK_URL="$(CALLBACK_URL)" \

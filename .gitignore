@@ -1,4 +1,7 @@
 build/
+.toolchain/
+.gocache/
+.gotmp/
 *.exe
 *.db
 teamserver

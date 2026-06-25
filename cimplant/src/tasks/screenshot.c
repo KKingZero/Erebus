@@ -31,6 +31,7 @@ typedef struct bmp_info_header {
 int erebus_task_screenshot(const uint8_t *data, size_t data_len, uint8_t **out, size_t *out_len) {
     (void)data;
     (void)data_len;
+    int ok = 0;
 
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
@@ -70,7 +71,7 @@ int erebus_task_screenshot(const uint8_t *data, size_t data_len, uint8_t **out, 
     memcpy(img + sizeof(fh) + sizeof(ih), px, pixels);
     free(px);
 
-    int ok = erebus_pb_encode_screenshot_result(img, total, (uint32_t)sw, (uint32_t)sh, out, out_len);
+    ok = erebus_pb_encode_screenshot_result(img, total, (uint32_t)sw, (uint32_t)sh, out, out_len);
     free(img);
 
 cleanup:
