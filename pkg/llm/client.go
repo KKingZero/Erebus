@@ -48,7 +48,11 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userMessage string) (st
 		Role:    openai.ChatMessageRoleUser,
 		Content: userMessage,
 	})
+	return c.ChatMessages(ctx, messages)
+}
 
+// ChatMessages sends a full message history and returns assistant text.
+func (c *Client) ChatMessages(ctx context.Context, messages []openai.ChatCompletionMessage) (string, error) {
 	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model:    c.model,
 		Messages: messages,

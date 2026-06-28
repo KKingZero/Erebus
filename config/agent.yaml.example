@@ -3,13 +3,10 @@ cert: "~/.erebus/certs/operator.pem"
 key: "~/.erebus/certs/operator-key.pem"
 ca: "~/.erebus/certs/ca.pem"
 llm:
-  # Default: Ollama local (override with OpenAI below)
+  # Console `ai` uses ~/.erebus/llm.yaml (multi-provider). Override here for agent sidecar only.
   base_url: "http://localhost:11434/v1"
   api_key: "ollama"
   model: "llama3.2"
-  # base_url: "https://api.openai.com/v1"
-  # api_key: "${OPENAI_API_KEY}"
-  # model: "gpt-4o"
 autonomy:
   max_steps: 50
   auto_approve: false

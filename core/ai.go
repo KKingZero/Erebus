@@ -8,16 +8,8 @@ import (
 	"time"
 
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/agent"
-	"github.com/KKingZero/erebus-exploit-framwork/pkg/erebuscli"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/llm"
 )
-
-const aiSystemPrompt = `You are Erebus, an AI offensive security assistant for authorized penetration tests and red team exercises.
-
-You help operators plan AD and cloud attack paths, interpret recon results, and suggest next steps.
-Be concise, actionable, and note opsec considerations. If the user greets you or asks general questions, respond helpfully while staying in scope of authorized security testing.
-
-When the teamserver is not connected, provide planning guidance only — do not claim to have executed commands on targets.`
 
 func (c *Console) runAI(objective string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -39,10 +31,14 @@ func (c *Console) runAI(objective string) {
 
 	// Advisory mode: chat with Ollama / configured LLM.
 	client := llm.NewClient(llmCfg)
-	reply, err := client.Chat(ctx, aiSystemPrompt, objective)
+	reply, err := client.Chat(ctx, llm.ErebusSystemPrompt, objective)
 	if err != nil {
-		hint := ollamaHint(llmCfg, err)
-		emitError(c.mode, "ai", fmt.Sprintf("%v\n%s", err, hint))
+		hint := providerHint(llmCfg, err)
+		msg := err.Error()
+		if hint != "" {
+			msg = fmt.Sprintf("%v\n%s", err, hint)
+		}
+		emitError(c.mode, "ai", msg)
 		return
 	}
 
@@ -62,23 +58,9 @@ func (c *Console) runAI(objective string) {
 }
 
 func (c *Console) tryAgentLoop(ctx context.Context, objective string, llmCfg llm.Config) (bool, error) {
-	agentCfg, err := agent.LoadConfigOptional(agent.DefaultConfigPath)
-	if err != nil {
+	agentCfg, ok := agentAvailable(llmCfg)
+	if !ok {
 		return false, nil
-	}
-	cert, key, ca := erebuscli.DefaultCertPaths()
-	if !fileExists(cert) || !fileExists(key) || !fileExists(ca) {
-		return false, nil
-	}
-	agentCfg.Cert, agentCfg.Key, agentCfg.CA = cert, key, ca
-	if !erebuscli.GRPCReachable(agentCfg.Server) {
-		return false, nil
-	}
-
-	agentCfg.LLM = agent.LLMConfig{
-		BaseURL: llmCfg.BaseURL,
-		APIKey:  llmCfg.APIKey,
-		Model:   llmCfg.Model,
 	}
 
 	fmt.Fprintf(os.Stderr, "[erebus] teamserver detected — running autonomous agent (%s / %s)\n",
@@ -96,7 +78,7 @@ func (c *Console) tryAgentLoop(ctx context.Context, objective string, llmCfg llm
 		},
 	})
 
-	err = agent.Run(ctx, agentCfg, agent.RunOptions{
+	err := agent.Run(ctx, agentCfg, agent.RunOptions{
 		Objective: objective,
 		OnApproval: func(id, risk, desc string) {
 			fmt.Fprintf(os.Stderr, "[approval] id=%s risk=%s — run: erebus operator → pending → approve %s (%s)\n",
@@ -126,11 +108,15 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-func ollamaHint(cfg llm.Config, err error) string {
-	if cfg.Provider != "ollama" {
+func providerHint(cfg llm.Config, err error) string {
+	switch cfg.Provider {
+	case "ollama":
+		return "Hint: ensure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull " + cfg.Model + "`)."
+	case "openai", "anthropic", "bedrock", "kimi", "gemini":
+		return "Hint: set your API key with `ai key " + cfg.Provider + "` or env var. Run `ai providers` to see options."
+	default:
 		return ""
 	}
-	return "Hint: ensure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull " + cfg.Model + "`). Config: ~/.erebus/llm.yaml"
 }
 
 func truncateAI(s string, n int) string {

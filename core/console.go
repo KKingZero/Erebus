@@ -62,7 +62,7 @@ func (c *Console) startInteractive() {
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          c.prompt(),
-		HistoryFile:     "/tmp/erebus_history",
+		HistoryFile:     erebusHistoryPath(),
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",
 	})
@@ -82,6 +82,9 @@ func (c *Console) startInteractive() {
 			continue
 		}
 		c.handleCommand(input)
+		if commandMayContainSecret(input) {
+			scrubLastHistoryEntry(erebusHistoryPath())
+		}
 	}
 }
 
@@ -194,7 +197,11 @@ func (c *Console) cmdHelp() {
 		{"workspace <new|list>", "Manage engagements"},
 		{"loot", "Show captured loot"},
 		{"report generate", "Generate pentest report"},
-		{"ai \"<objective>\"", "AI planner (Ollama default; autonomous if teamserver up)"},
+		{"ai", "Open AI chat terminal (TUI)"},
+		{"ai <message>", "Open TUI with first message"},
+		{"ai providers", "List LLM providers (ollama, openai, anthropic, bedrock, kimi)"},
+		{"ai key <provider>", "Set API key (hidden prompt)"},
+		{"ai provider <name>", "Switch active LLM provider"},
 		{"clear", "Clear screen"},
 		{"exit", "Exit Erebus"},
 	}
@@ -447,10 +454,3 @@ func (c *Console) cmdReport(args []string) {
 	})
 }
 
-func (c *Console) cmdAI(args []string) {
-	if len(args) == 0 {
-		emitError(c.mode, "ai", "Usage: ai \"<objective>\"")
-		return
-	}
-	c.runAI(strings.Join(args, " "))
-}

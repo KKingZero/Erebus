@@ -7,6 +7,7 @@ Custom C2 framework for AI-driven offensive security operations.
 ```bash
 make proto        # Generate protobuf code
 make erebus       # Build unified erebus CLI (start + operator)
+make install      # Install erebus + Erebus to ~/.local/bin
 make teamserver   # Build teamserver
 make implant      # Build implant (Linux)
 make implant-win  # Build implant (Windows)

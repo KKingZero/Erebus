@@ -5,6 +5,8 @@ IMPLANT     = ./cmd/implant
 OPERATOR    = ./cmd/operator
 AGENT       = ./cmd/agent
 BUILD_DIR   = ./build
+PREFIX      ?= $(HOME)/.local
+BINDIR      ?= $(PREFIX)/bin
 
 # Implant build-time config (override via env or make args)
 IMPLANT_ID     ?= $(shell head -c 16 /dev/urandom | xxd -p)
@@ -37,9 +39,20 @@ LDFLAGS = -s -w \
 	-X '$(MODULE)/implant.dnsServer=$(DNS_SERVER)' \
 	-X '$(MODULE)/implant.cdnDomain=$(CDN_DOMAIN)'
 
-.PHONY: all proto erebus teamserver implant implant-win implant-dll implant-shellcode implant-c operator agent clean
+.PHONY: all proto erebus teamserver implant implant-win implant-dll implant-shellcode implant-c operator agent install uninstall clean
 
 all: proto erebus teamserver implant operator agent
+
+install: erebus
+	@mkdir -p $(BINDIR)
+	install -m 755 $(BUILD_DIR)/erebus $(BINDIR)/erebus
+	@ln -sf erebus $(BINDIR)/Erebus
+	@echo "Installed: $(BINDIR)/erebus and $(BINDIR)/Erebus"
+	@echo "Ensure $(BINDIR) is in your PATH (e.g. export PATH=\"$(BINDIR):\$$PATH\")"
+
+uninstall:
+	rm -f $(BINDIR)/erebus $(BINDIR)/Erebus
+	@echo "Removed $(BINDIR)/erebus and $(BINDIR)/Erebus"
 
 proto:
 	cd proto && bash generate.sh

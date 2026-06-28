@@ -1,13 +1,38 @@
-# LLM config for `erebus` console ai command and agent sidecar.
-# Defaults to Ollama at http://localhost:11434 if this file is missing.
+# LLM config for `erebus` console `ai` command and autonomous agent.
+# Copy to ~/.erebus/llm.yaml or configure via console:
+#   ai key openai sk-...
+#   ai provider anthropic
 
-provider: ollama
-base_url: "http://localhost:11434/v1"
-api_key: "ollama"
-model: "llama3.2"
+active: ollama
 
-# OpenAI example:
-# provider: openai
-# base_url: "https://api.openai.com/v1"
-# api_key: "${OPENAI_API_KEY}"
-# model: "gpt-4o"
+providers:
+  ollama:
+    api_key: "ollama"
+    model: "llama3.2"
+    base_url: "http://localhost:11434/v1"
+
+  openai:
+    api_key: ""          # or: ai key openai <key>  /  OPENAI_API_KEY env
+    model: "gpt-4o"
+    base_url: "https://api.openai.com/v1"
+
+  anthropic:
+    api_key: ""          # ANTHROPIC_API_KEY
+    model: "claude-sonnet-4-6"
+    base_url: "https://api.anthropic.com/v1"
+
+  bedrock:
+    api_key: ""          # AWS_BEARER_TOKEN_BEDROCK
+    model: "us.anthropic.claude-sonnet-4-6"
+    region: "us-east-1"
+    # base_url derived from region: https://bedrock-mantle.<region>.api.aws/v1
+
+  kimi:
+    api_key: ""          # MOONSHOT_API_KEY
+    model: "kimi-k2.6"   # also: kimi-k2.7-code, moonshot-v1-8k
+    base_url: "https://api.moonshot.ai/v1"
+
+  gemini:
+    api_key: ""          # GOOGLE_API_KEY
+    model: "gemini-2.0-flash"
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"

@@ -33,7 +33,7 @@ func (s *Store) Close() error {
 
 func (s *Store) migrate() error {
 	var version int
-	err := s.db.QueryRow("SELECT version FROM schema_version LIMIT 1").Scan(&version)
+	err := s.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&version)
 	if err != nil {
 		version = 0
 	}

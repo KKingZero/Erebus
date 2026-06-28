@@ -117,9 +117,11 @@ go test ./server/e2e/... -v -count=1
 ### Start Erebus (recommended)
 
 ```bash
-make erebus
-./build/erebus
+make install    # puts erebus + Erebus in ~/.local/bin
+erebus          # or: Erebus
 ```
+
+One-time build without install: `make erebus && ./build/erebus`
 
 With no arguments, `erebus` opens the interactive console (ASCII banner, `erebus ›` prompt).
 
