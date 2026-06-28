@@ -194,7 +194,7 @@ func (c *Console) cmdHelp() {
 		{"workspace <new|list>", "Manage engagements"},
 		{"loot", "Show captured loot"},
 		{"report generate", "Generate pentest report"},
-		{"ai \"<objective>\"", "AI attack planner"},
+		{"ai \"<objective>\"", "AI planner (Ollama default; autonomous if teamserver up)"},
 		{"clear", "Clear screen"},
 		{"exit", "Exit Erebus"},
 	}
@@ -452,14 +452,5 @@ func (c *Console) cmdAI(args []string) {
 		emitError(c.mode, "ai", "Usage: ai \"<objective>\"")
 		return
 	}
-	objective := strings.Join(args, " ")
-	emit(c.mode, Response{
-		Status:  "ok",
-		Command: "ai",
-		Message: fmt.Sprintf("> AI planning attack for: %s\n> AI engine coming soon...", objective),
-		Data: map[string]string{
-			"objective": objective,
-			"status":    "pending",
-		},
-	})
+	c.runAI(strings.Join(args, " "))
 }

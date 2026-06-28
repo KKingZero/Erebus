@@ -1,0 +1,13 @@
+# LLM config for `erebus` console ai command and agent sidecar.
+# Defaults to Ollama at http://localhost:11434 if this file is missing.
+
+provider: ollama
+base_url: "http://localhost:11434/v1"
+api_key: "ollama"
+model: "llama3.2"
+
+# OpenAI example:
+# provider: openai
+# base_url: "https://api.openai.com/v1"
+# api_key: "${OPENAI_API_KEY}"
+# model: "gpt-4o"

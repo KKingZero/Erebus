@@ -70,21 +70,11 @@ func main() {
 	if *objective == "" {
 		log.Fatal("-objective is required (or use -dry-run for smoke test)")
 	}
-	if cfg.LLM.APIKey == "" {
-		log.Fatal("llm.api_key must be set in config or via ${OPENAI_API_KEY}")
-	}
 
-	if sid == "" {
-		resp, err := client.ListSessions(ctx, &pb.ListSessionsRequest{})
-		if err == nil && len(resp.Sessions) == 1 {
-			sid = resp.Sessions[0].SessionId
-			fmt.Fprintf(os.Stderr, "[agent] auto-selected session %s\n", sid)
-		}
-	}
-
-	llm := agent.NewLLM(cfg.LLM)
-	exec := &agent.Executor{
-		Client: client,
+	err = agent.Run(ctx, cfg, agent.RunOptions{
+		Objective: *objective,
+		SessionID: sid,
+		JSONMode:  *jsonMode,
 		OnApproval: func(id, risk, desc string) {
 			msg := fmt.Sprintf("[APPROVAL REQUIRED] id=%s risk=%s desc=%s — run: operator → pending → approve %s",
 				id, risk, desc, id)
@@ -94,34 +84,23 @@ func main() {
 				fmt.Fprintln(os.Stderr, msg)
 			}
 		},
-	}
-
-	state := agent.NewState(*objective, sid, cfg.Autonomy.MaxSteps)
-	loop := &agent.Loop{
-		LLM:      llm,
-		Executor: exec,
-		State:    state,
-		JSONMode: *jsonMode,
-	}
-	if *jsonMode {
-		loop.Emit = agent.EmitJSON
-	} else {
-		loop.Emit = func(out agent.StepOutput) {
-			if out.Done {
-				fmt.Printf("\n[done] %s\n", out.Message)
+		OnStep: func(out agent.StepOutput) {
+			if *jsonMode {
+				agent.EmitJSON(out)
 				return
 			}
-			if out.Error != "" {
+			if out.Done {
+				fmt.Printf("\n[done] %s\n", out.Message)
+			} else if out.Error != "" {
 				fmt.Printf("[step %d] %s FAILED: %s\n", out.Step, out.Tool, out.Error)
 			} else if out.Tool != "" {
 				fmt.Printf("[step %d] %s (%s): %s\n", out.Step, out.Tool, out.Risk, truncate(out.Result, 200))
 			} else if out.Message != "" {
 				fmt.Printf("[step %d] %s\n", out.Step, out.Message)
 			}
-		}
-	}
-
-	if err := loop.Run(ctx); err != nil {
+		},
+	})
+	if err != nil {
 		log.Fatalf("agent: %v", err)
 	}
 }

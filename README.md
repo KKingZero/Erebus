@@ -246,17 +246,31 @@ help                  - Show help
 
 High-risk tasks (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_INJECT`, `TASK_PE_LOAD`, `TASK_PRIVESC`, and `TASK_MODULE` for `creds_dump`, `lateral_move`, `persist`, `privesc`, `inject`) block in `ExecuteTask` until an operator approves via `pending`/`approve` or the gRPC `Approve` RPC.
 
+## AI (Ollama + console)
+
+The console `ai` command talks to a local **Ollama** instance by default (`http://localhost:11434/v1`, model `llama3.2`). If the teamserver is running and operator certs exist, `ai` upgrades to the full autonomous agent.
+
+```bash
+ollama serve
+ollama pull llama3.2
+
+cp config/llm.yaml.example ~/.erebus/llm.yaml   # optional overrides
+./build/erebus
+erebus › ai "enumerate kerberoastable users in corp.local"
+```
+
+Set `OPENAI_API_KEY` to use OpenAI instead of Ollama (see `config/llm.yaml.example`).
+
 ## AI Agent
 
-The AI agent is a separate sidecar process that connects to the teamserver over gRPC (mTLS) and drives the attack chain via an OpenAI-compatible LLM.
+The AI agent sidecar connects to the teamserver over gRPC (mTLS) and drives the attack chain via an OpenAI-compatible LLM (Ollama by default).
 
 ```bash
 make agent
 cp config/agent.yaml.example ~/.erebus/agent.yaml
-# Edit paths and set OPENAI_API_KEY (or llm.api_key in YAML)
+# Defaults to Ollama; set OPENAI_API_KEY for OpenAI
 
 # Semi-autonomous engagement
-export OPENAI_API_KEY=sk-...
 ./build/agent -config ~/.erebus/agent.yaml \
   -session <session-id> \
   -objective "enumerate AD and find kerberoastable accounts"
