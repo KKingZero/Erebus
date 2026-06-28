@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -11,16 +12,14 @@ import (
 )
 
 func main() {
+	// Default: interactive startup UI (banner + erebus › prompt)
 	if len(os.Args) < 2 {
-		if err := erebuscli.Start(); err != nil {
-			fmt.Fprintf(os.Stderr, "erebus: %v\n", err)
-			os.Exit(1)
-		}
+		runConsole([]string{})
 		return
 	}
 
 	switch os.Args[1] {
-	case "start":
+	case "serve":
 		if err := erebuscli.Start(); err != nil {
 			fmt.Fprintf(os.Stderr, "erebus: %v\n", err)
 			os.Exit(1)
@@ -34,10 +33,22 @@ func main() {
 	case "help", "-h", "--help":
 		printUsage()
 	default:
+		// Support erebus -json without subcommand
+		if os.Args[1] == "-json" {
+			runConsole(os.Args[1:])
+			return
+		}
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
 		printUsage()
 		os.Exit(1)
 	}
+}
+
+func runConsole(args []string) {
+	fs := flag.NewFlagSet("console", flag.ExitOnError)
+	jsonMode := fs.Bool("json", false, "Enable JSON output mode for AI/programmatic control")
+	_ = fs.Parse(args)
+	core.NewConsole(*jsonMode).Start()
 }
 
 func runTeamserver(args []string) {
@@ -100,29 +111,17 @@ func runOperator(args []string) {
 	}
 }
 
-func runConsole(args []string) {
-	jsonMode := false
-	for _, a := range args {
-		if a == "-json" {
-			jsonMode = true
-		}
-	}
-	core.NewConsole(jsonMode).Start()
-}
-
 func printUsage() {
-	fmt.Fprintf(os.Stderr, `Erebus Exploitation Framework
+	fmt.Fprintf(os.Stderr, `Erebus Exploitation Framework v%s
 
 Usage:
-  erebus              Start teamserver (if needed) and open operator console
-  erebus start        Same as erebus
-  erebus teamserver   Run teamserver only
-  erebus operator     Connect to teamserver REPL
-  erebus console      Legacy module console (erc >)
-  erebus help         Show this help
-
-Also available as separate binaries: build/teamserver, build/operator, build/agent
+  erebus              Interactive console (startup UI)
+  erebus -json         JSON console mode
+  erebus serve         Start teamserver + operator C2 session
+  erebus teamserver    Run teamserver only
+  erebus operator      Connect to teamserver REPL
+  erebus help          Show this help
 
 Data directory: %s
-`, erebuscli.DataDir())
+`, core.Version, erebuscli.DataDir())
 }

@@ -10,6 +10,9 @@ import (
 	"github.com/chzyer/readline"
 )
 
+// Version is the Erebus framework version shown at startup.
+const Version = "0.1.0"
+
 const banner = `
 888888 88""Yb 888888 88""Yb 88   88 .dP"Y8
 88__   88__dP 88__   88__dP 88   88 Ybo."
@@ -19,6 +22,9 @@ const banner = `
     Exploitation Framework - Powered by AI
              by Zypheron Team
 `
+
+const promptDefault = "erebus › "
+const promptModuleFmt = "erebus (%s) › "
 
 type Console struct {
 	currentModule string
@@ -44,10 +50,15 @@ func (c *Console) Start() {
 	c.startInteractive()
 }
 
+func printStartupBanner() {
+	fmt.Print(banner)
+	fmt.Println("Type 'help' for available commands")
+	fmt.Println()
+}
+
 // startInteractive runs the human-friendly readline REPL
 func (c *Console) startInteractive() {
-	fmt.Println(banner)
-	fmt.Println("  Type 'help' for available commands\n")
+	printStartupBanner()
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          c.prompt(),
@@ -75,14 +86,13 @@ func (c *Console) startInteractive() {
 }
 
 // startJSON runs a line-oriented JSON mode for AI/programmatic control.
-// Reads one command per line from stdin, emits one JSON object per line to stdout.
 func (c *Console) startJSON() {
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "init",
 		Message: "Erebus console ready",
 		Data: map[string]interface{}{
-			"version": "0.1.0",
+			"version": Version,
 			"mode":    "json",
 		},
 	})
@@ -99,9 +109,9 @@ func (c *Console) startJSON() {
 
 func (c *Console) prompt() string {
 	if c.currentModule != "" {
-		return fmt.Sprintf("erc (%s) > ", c.currentModule)
+		return fmt.Sprintf(promptModuleFmt, c.currentModule)
 	}
-	return "erc > "
+	return promptDefault
 }
 
 func (c *Console) handleCommand(input string) {
@@ -115,7 +125,7 @@ func (c *Console) handleCommand(input string) {
 	case "clear":
 		if c.mode == OutputHuman {
 			fmt.Print("\033[H\033[2J")
-			fmt.Println(banner)
+			printStartupBanner()
 		}
 	case "use":
 		c.cmdUse(args)
@@ -221,7 +231,6 @@ func (c *Console) cmdHelp() {
 		},
 	})
 }
-
 
 func (c *Console) cmdUse(args []string) {
 	if len(args) == 0 {

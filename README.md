@@ -121,12 +121,13 @@ make erebus
 ./build/erebus
 ```
 
-With no arguments, `erebus` starts the teamserver (if not already running), ensures operator mTLS certs at `~/.erebus/certs/`, and opens the operator REPL.
+With no arguments, `erebus` opens the interactive console (ASCII banner, `erebus ›` prompt).
 
 ```bash
-./build/erebus start      # same as above
+./build/erebus serve      # start teamserver + operator C2 session
 ./build/erebus teamserver # teamserver only
 ./build/erebus operator   # connect to existing teamserver
+./build/erebus -json      # JSON console mode
 ./build/erebus help
 ```
 
