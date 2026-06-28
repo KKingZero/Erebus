@@ -10,9 +10,8 @@ mkdir -p "$TMPDIR" "$GOCACHE"
 echo "==> Go tests"
 go test ./pkg/suggestions/... ./pkg/agent/... ./pkg/dnstransport/... ./server/approval/... ./server/listeners/... -count=1
 
-echo "==> Build teamserver + agent"
-make teamserver
-make agent
+echo "==> Build erebus + teamserver + agent"
+make erebus teamserver agent
 
 echo "==> Build Go implant (linux amd64)"
 GOOS=linux GOARCH=amd64 go build -o build/implant_linux ./cmd/implant

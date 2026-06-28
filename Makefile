@@ -1,4 +1,5 @@
 MODULE      = github.com/KKingZero/erebus-exploit-framwork
+EREBUS      = ./cmd/erebus
 TEAMSERVER  = ./cmd/teamserver
 IMPLANT     = ./cmd/implant
 OPERATOR    = ./cmd/operator
@@ -36,12 +37,16 @@ LDFLAGS = -s -w \
 	-X '$(MODULE)/implant.dnsServer=$(DNS_SERVER)' \
 	-X '$(MODULE)/implant.cdnDomain=$(CDN_DOMAIN)'
 
-.PHONY: all proto teamserver implant implant-win implant-dll implant-shellcode implant-c operator agent clean
+.PHONY: all proto erebus teamserver implant implant-win implant-dll implant-shellcode implant-c operator agent clean
 
-all: proto teamserver implant operator agent
+all: proto erebus teamserver implant operator agent
 
 proto:
 	cd proto && bash generate.sh
+
+erebus:
+	@mkdir -p $(BUILD_DIR)
+	go build -o $(BUILD_DIR)/erebus $(EREBUS)
 
 teamserver:
 	@mkdir -p $(BUILD_DIR)

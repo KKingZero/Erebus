@@ -1,16 +1,11 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
-	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/operatorcli"
 )
 
 func main() {
@@ -25,45 +20,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn, err := connectGRPC(*server, *certFile, *keyFile, *caFile)
-	if err != nil {
-		log.Fatalf("connect: %v", err)
+	if err := operatorcli.RunREPL(operatorcli.Options{
+		Server:   *server,
+		CertFile: *certFile,
+		KeyFile:  *keyFile,
+		CAFile:   *caFile,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "operator: %v\n", err)
+		os.Exit(1)
 	}
-	defer conn.Close()
-
-	client := pb.NewErebusC2Client(conn)
-
-	repl := NewREPL(client)
-	repl.Run()
-}
-
-func connectGRPC(addr, certFile, keyFile, caFile string) (*grpc.ClientConn, error) {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("load client cert: %w", err)
-	}
-
-	caCert, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, fmt.Errorf("read CA cert: %w", err)
-	}
-
-	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM(caCert) {
-		return nil, fmt.Errorf("failed to parse CA cert")
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      certPool,
-		MinVersion:   tls.VersionTLS12,
-	}
-
-	creds := credentials.NewTLS(tlsConfig)
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
-	if err != nil {
-		return nil, fmt.Errorf("dial gRPC: %w", err)
-	}
-
-	return conn, nil
 }

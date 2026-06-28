@@ -96,6 +96,7 @@ make proto
 make all
 
 # Or build individually:
+make erebus         # Build unified start command
 make teamserver     # Build teamserver
 make implant        # Build implant (Linux)
 make implant-win    # Build implant (Windows)
@@ -111,6 +112,22 @@ bash scripts/smoke_test.sh
 
 # Live teamserver flow: register → beacon → shell task → approval gate
 go test ./server/e2e/... -v -count=1
+```
+
+### Start Erebus (recommended)
+
+```bash
+make erebus
+./build/erebus
+```
+
+With no arguments, `erebus` starts the teamserver (if not already running), ensures operator mTLS certs at `~/.erebus/certs/`, and opens the operator REPL.
+
+```bash
+./build/erebus start      # same as above
+./build/erebus teamserver # teamserver only
+./build/erebus operator   # connect to existing teamserver
+./build/erebus help
 ```
 
 ### Run Teamserver
