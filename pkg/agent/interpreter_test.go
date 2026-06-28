@@ -28,6 +28,7 @@ func TestInterpretLDAPResult(t *testing.T) {
 		Dc:           "dc01",
 		QueryType:    "kerberoastable",
 		TotalResults: 5,
+		NextSuggestedActions: []string{"kerberoast domain=corp.local"},
 	})
 	summary := InterpretResult(pb.TaskType_TASK_LDAP_ENUM, &pb.TaskResult{
 		Success: true,
@@ -35,5 +36,8 @@ func TestInterpretLDAPResult(t *testing.T) {
 	})
 	if !strings.Contains(summary, "5 entries") {
 		t.Fatalf("unexpected summary: %s", summary)
+	}
+	if !strings.Contains(summary, "next_suggested_actions") {
+		t.Fatalf("expected suggested actions: %s", summary)
 	}
 }

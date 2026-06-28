@@ -197,7 +197,8 @@ message NetPortscanTask {
 }
 
 message NetPortscanResult {
-  repeated PortResult ports = 1;
+  repeated PortResult ports                  = 1;
+  repeated string         next_suggested_actions = 2;
 }
 
 message PortResult {
@@ -221,11 +222,12 @@ message LDAPEnumConfig {
 }
 
 message LDAPEnumResult {
-  string              domain        = 1;
-  string              dc            = 2;
-  string              query_type    = 3;
-  repeated LDAPEntry  entries       = 4;
-  int32               total_results = 5;
+  string              domain                 = 1;
+  string              dc                     = 2;
+  string              query_type             = 3;
+  repeated LDAPEntry  entries                = 4;
+  int32               total_results          = 5;
+  repeated string     next_suggested_actions = 6;
 }
 
 message LDAPEntry {
@@ -250,7 +252,8 @@ message KerberoastConfig {
 }
 
 message KerberoastResult {
-  repeated KerberoastHash hashes = 1;
+  repeated KerberoastHash hashes                 = 1;
+  repeated string           next_suggested_actions = 2;
 }
 
 message KerberoastHash {
@@ -267,7 +270,8 @@ message ASREPRoastConfig {
 }
 
 message ASREPRoastResult {
-  repeated ASREPHash hashes = 1;
+  repeated ASREPHash hashes                 = 1;
+  repeated string    next_suggested_actions = 2;
 }
 
 message ASREPHash {
@@ -284,8 +288,9 @@ message CredDumpConfig {
 }
 
 message CredDumpResult {
-  string              method      = 1;
-  repeated Credential credentials = 2;
+  string              method                 = 1;
+  repeated Credential credentials            = 2;
+  repeated string     next_suggested_actions = 3;
 }
 
 message Credential {
@@ -438,12 +443,13 @@ message CloudHarvestConfig {
 }
 
 message CloudHarvestResult {
-  string               provider    = 1;
-  string               method      = 2;
-  repeated CloudToken  tokens      = 3;
-  repeated CloudCredential credentials = 4;
-  string               metadata    = 5;  // JSON metadata from IMDS
-  string               error       = 6;
+  string               provider                 = 1;
+  string               method                   = 2;
+  repeated CloudToken  tokens                   = 3;
+  repeated CloudCredential credentials          = 4;
+  string               metadata                 = 5;  // JSON metadata from IMDS
+  string               error                    = 6;
+  repeated string      next_suggested_actions   = 7;
 }
 
 message CloudToken {

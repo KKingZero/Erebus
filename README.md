@@ -254,7 +254,11 @@ export OPENAI_API_KEY=sk-...
 ./build/agent -config ~/.erebus/agent.yaml -session <id> -dry-run net_ifconfig
 ```
 
-**Semi-autonomous behavior:** Low-risk tools (`run_shell`, `net_ifconfig`, `process_list`, `portscan`) run automatically. High-risk tools (`ldap_enum`, `kerberoast`, `creds_dump`, `lateral_move`, etc.) block until an operator approves in a second terminal:
+**Agent tools:** `list_sessions`, `get_session`, `list_loot`, `run_shell`, `net_ifconfig`, `process_list`, `process_kill`, `portscan`, `file_download`, `file_upload`, `cloud_harvest`, `screenshot`, `socks_start`, `socks_stop`, `ldap_enum`, `kerberoast`, `asreproast`, `creds_dump`, `lateral_move`, `persist`, `privesc`, `mission_complete`.
+
+Chainable module results (LDAP, kerberoast, creds dump, portscan, cloud) include `next_suggested_actions` in protobuf — the interpreter surfaces these to the LLM as follow-on steps.
+
+**Semi-autonomous behavior:** Low-risk tools (`run_shell`, `net_ifconfig`, `process_list`, `portscan`, `cloud_harvest`, `file_download`, etc.) run automatically. High-risk tools (`ldap_enum`, `kerberoast`, `creds_dump`, `lateral_move`, etc.) block until an operator approves in a second terminal:
 
 ```
 ./build/operator -cert ... -key ... -ca ...
@@ -266,8 +270,8 @@ erebus> approve <approval-id>
 
 | Script / test | What it covers |
 |---|---|
-| `scripts/smoke_test.sh` | Go unit tests (DNS chunks, approval, beacon handler), teamserver + implant builds, optional C PE build |
-| `go test ./server/e2e/...` | Live teamserver on ephemeral ports: implant register/beacon (HTTP client), shell task round-trip, creds-dump approval gate |
+| `scripts/smoke_test.sh` | Unit tests (suggestions, agent, DNS chunks, approval, beacon handler), teamserver + agent + implant builds, optional C PE build |
+| `go test ./server/e2e/...` | Live teamserver: implant register/beacon, shell task, creds-dump approval gate, agent executor (shell, LDAP suggestions, file download, approval flow) |
 
 ## Project Structure
 

@@ -8,6 +8,7 @@ import (
 	ldaplib "github.com/go-ldap/ldap/v3"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/plugin"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/suggestions"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -123,6 +124,7 @@ func runLDAPEnum(_ context.Context, cfg *pb.LDAPEnumConfig) (*pb.LDAPEnumResult,
 		result.Entries = append(result.Entries, ldapEntry)
 	}
 
+	result.NextSuggestedActions = suggestions.ForLDAPEnum(result)
 	return result, nil
 }
 

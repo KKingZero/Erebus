@@ -72,6 +72,7 @@ func TestLiveE2E(t *testing.T) {
 
 	sim := &implantSim{
 		t:          t,
+		ts:         ts,
 		secret:     secret,
 		implantID:  implantID,
 		httpClient: httpClient,
@@ -249,6 +250,7 @@ func newHTTPSClient(tlsConfig *tls.Config) *http.Client {
 
 type implantSim struct {
 	t              *testing.T
+	ts             *server.Teamserver
 	secret         []byte
 	implantID      string
 	sessionID      string
@@ -410,6 +412,41 @@ func (s *implantSim) executeTask(task *pb.Task) *pb.TaskResult {
 			Credentials: []*pb.Credential{
 				{Type: "simulated", Source: "e2e", Value: "ok"},
 			},
+		}
+		data, err := proto.Marshal(result)
+		if err != nil {
+			return failResult(task.TaskId, err, start)
+		}
+		return &pb.TaskResult{
+			TaskId:          task.TaskId,
+			Success:         true,
+			Data:            data,
+			ExecutionTimeMs: time.Since(start).Milliseconds(),
+		}
+	case pb.TaskType_TASK_LDAP_ENUM:
+		result := &pb.LDAPEnumResult{
+			Domain:       "corp.local",
+			Dc:           "dc01.corp.local",
+			QueryType:    "kerberoastable",
+			TotalResults: 2,
+			NextSuggestedActions: []string{
+				"kerberoast domain=corp.local target_dc=dc01.corp.local (requires domain creds)",
+			},
+		}
+		data, err := proto.Marshal(result)
+		if err != nil {
+			return failResult(task.TaskId, err, start)
+		}
+		return &pb.TaskResult{
+			TaskId:          task.TaskId,
+			Success:         true,
+			Data:            data,
+			ExecutionTimeMs: time.Since(start).Milliseconds(),
+		}
+	case pb.TaskType_TASK_FILE_DOWNLOAD:
+		result := &pb.FileDownloadResult{
+			Filename: "e2e-test-file",
+			Data:     []byte("e2e-download-ok"),
 		}
 		data, err := proto.Marshal(result)
 		if err != nil {

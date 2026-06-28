@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/suggestions"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -115,5 +116,6 @@ func executeNetPortscan(ctx context.Context, data []byte) ([]byte, error) {
 	wg.Wait()
 
 	result := &pb.NetPortscanResult{Ports: results}
+	result.NextSuggestedActions = suggestions.ForPortscan(result)
 	return proto.Marshal(result)
 }

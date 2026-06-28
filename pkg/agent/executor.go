@@ -87,7 +87,7 @@ func (e *Executor) RunTool(ctx context.Context, name, argsJSON string, defaultSe
 	}
 
 	done := make(chan struct{})
-	if RequiresApproval(tool.TaskType) {
+	if RequiresApproval(tool) {
 		e.watchApproval(ctx, sessionID, done)
 	}
 	result, err := e.Client.Execute(ctx, sessionID, tool.TaskType, data, 120000)

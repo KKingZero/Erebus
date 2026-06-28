@@ -16,6 +16,7 @@ import (
 	"github.com/jcmturner/gokrb5/v8/messages"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/plugin"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/suggestions"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -75,7 +76,9 @@ func runASREPRoast(_ context.Context, cfg *pb.ASREPRoastConfig) (*pb.ASREPRoastR
 	}
 
 	if len(users) == 0 {
-		return &pb.ASREPRoastResult{}, nil
+		result := &pb.ASREPRoastResult{}
+		result.NextSuggestedActions = suggestions.ForASREPRoast(result)
+		return result, nil
 	}
 
 	krbConf := buildKrbConfig(cfg.Domain, dc)
@@ -105,7 +108,9 @@ func runASREPRoast(_ context.Context, cfg *pb.ASREPRoastConfig) (*pb.ASREPRoastR
 		cl.Destroy()
 	}
 
-	return &pb.ASREPRoastResult{Hashes: hashes}, nil
+	result := &pb.ASREPRoastResult{Hashes: hashes}
+	result.NextSuggestedActions = suggestions.ForASREPRoast(result)
+	return result, nil
 }
 
 func rawASREPRoast(dc, username, domain string, krbConf *config.Config) (string, error) {

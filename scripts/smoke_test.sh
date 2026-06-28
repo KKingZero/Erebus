@@ -8,10 +8,11 @@ export GOCACHE="${ROOT}/.gocache"
 mkdir -p "$TMPDIR" "$GOCACHE"
 
 echo "==> Go tests"
-go test ./pkg/dnstransport/... ./server/approval/... ./server/listeners/... -count=1
+go test ./pkg/suggestions/... ./pkg/agent/... ./pkg/dnstransport/... ./server/approval/... ./server/listeners/... -count=1
 
-echo "==> Build teamserver"
+echo "==> Build teamserver + agent"
 make teamserver
+make agent
 
 echo "==> Build Go implant (linux amd64)"
 GOOS=linux GOARCH=amd64 go build -o build/implant_linux ./cmd/implant

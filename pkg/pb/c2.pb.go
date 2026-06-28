@@ -1610,10 +1610,11 @@ func (x *NetPortscanTask) GetThreads() uint32 {
 }
 
 type NetPortscanResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ports         []*PortResult          `protobuf:"bytes,1,rep,name=ports,proto3" json:"ports,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Ports                []*PortResult          `protobuf:"bytes,1,rep,name=ports,proto3" json:"ports,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,2,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *NetPortscanResult) Reset() {
@@ -1649,6 +1650,13 @@ func (*NetPortscanResult) Descriptor() ([]byte, []int) {
 func (x *NetPortscanResult) GetPorts() []*PortResult {
 	if x != nil {
 		return x.Ports
+	}
+	return nil
+}
+
+func (x *NetPortscanResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
 	}
 	return nil
 }
@@ -1822,14 +1830,15 @@ func (x *LDAPEnumConfig) GetAttributes() []string {
 }
 
 type LDAPEnumResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Domain        string                 `protobuf:"bytes,1,opt,name=domain,proto3" json:"domain,omitempty"`
-	Dc            string                 `protobuf:"bytes,2,opt,name=dc,proto3" json:"dc,omitempty"`
-	QueryType     string                 `protobuf:"bytes,3,opt,name=query_type,json=queryType,proto3" json:"query_type,omitempty"`
-	Entries       []*LDAPEntry           `protobuf:"bytes,4,rep,name=entries,proto3" json:"entries,omitempty"`
-	TotalResults  int32                  `protobuf:"varint,5,opt,name=total_results,json=totalResults,proto3" json:"total_results,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Domain               string                 `protobuf:"bytes,1,opt,name=domain,proto3" json:"domain,omitempty"`
+	Dc                   string                 `protobuf:"bytes,2,opt,name=dc,proto3" json:"dc,omitempty"`
+	QueryType            string                 `protobuf:"bytes,3,opt,name=query_type,json=queryType,proto3" json:"query_type,omitempty"`
+	Entries              []*LDAPEntry           `protobuf:"bytes,4,rep,name=entries,proto3" json:"entries,omitempty"`
+	TotalResults         int32                  `protobuf:"varint,5,opt,name=total_results,json=totalResults,proto3" json:"total_results,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,6,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *LDAPEnumResult) Reset() {
@@ -1895,6 +1904,13 @@ func (x *LDAPEnumResult) GetTotalResults() int32 {
 		return x.TotalResults
 	}
 	return 0
+}
+
+func (x *LDAPEnumResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
+	}
+	return nil
 }
 
 type LDAPEntry struct {
@@ -2086,10 +2102,11 @@ func (x *KerberoastConfig) GetEncryption() string {
 }
 
 type KerberoastResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Hashes        []*KerberoastHash      `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Hashes               []*KerberoastHash      `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,2,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *KerberoastResult) Reset() {
@@ -2125,6 +2142,13 @@ func (*KerberoastResult) Descriptor() ([]byte, []int) {
 func (x *KerberoastResult) GetHashes() []*KerberoastHash {
 	if x != nil {
 		return x.Hashes
+	}
+	return nil
+}
+
+func (x *KerberoastResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
 	}
 	return nil
 }
@@ -2258,10 +2282,11 @@ func (x *ASREPRoastConfig) GetTargetUsers() []string {
 }
 
 type ASREPRoastResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Hashes        []*ASREPHash           `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Hashes               []*ASREPHash           `protobuf:"bytes,1,rep,name=hashes,proto3" json:"hashes,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,2,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ASREPRoastResult) Reset() {
@@ -2297,6 +2322,13 @@ func (*ASREPRoastResult) Descriptor() ([]byte, []int) {
 func (x *ASREPRoastResult) GetHashes() []*ASREPHash {
 	if x != nil {
 		return x.Hashes
+	}
+	return nil
+}
+
+func (x *ASREPRoastResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
 	}
 	return nil
 }
@@ -2414,11 +2446,12 @@ func (x *CredDumpConfig) GetOutputFormat() string {
 }
 
 type CredDumpResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
-	Credentials   []*Credential          `protobuf:"bytes,2,rep,name=credentials,proto3" json:"credentials,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Method               string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
+	Credentials          []*Credential          `protobuf:"bytes,2,rep,name=credentials,proto3" json:"credentials,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,3,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CredDumpResult) Reset() {
@@ -2461,6 +2494,13 @@ func (x *CredDumpResult) GetMethod() string {
 func (x *CredDumpResult) GetCredentials() []*Credential {
 	if x != nil {
 		return x.Credentials
+	}
+	return nil
+}
+
+func (x *CredDumpResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
 	}
 	return nil
 }
@@ -3814,15 +3854,16 @@ func (x *CloudHarvestConfig) GetMethod() string {
 }
 
 type CloudHarvestResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Provider      string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
-	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
-	Tokens        []*CloudToken          `protobuf:"bytes,3,rep,name=tokens,proto3" json:"tokens,omitempty"`
-	Credentials   []*CloudCredential     `protobuf:"bytes,4,rep,name=credentials,proto3" json:"credentials,omitempty"`
-	Metadata      string                 `protobuf:"bytes,5,opt,name=metadata,proto3" json:"metadata,omitempty"` // JSON metadata from IMDS
-	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Provider             string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
+	Method               string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	Tokens               []*CloudToken          `protobuf:"bytes,3,rep,name=tokens,proto3" json:"tokens,omitempty"`
+	Credentials          []*CloudCredential     `protobuf:"bytes,4,rep,name=credentials,proto3" json:"credentials,omitempty"`
+	Metadata             string                 `protobuf:"bytes,5,opt,name=metadata,proto3" json:"metadata,omitempty"` // JSON metadata from IMDS
+	Error                string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,7,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CloudHarvestResult) Reset() {
@@ -3895,6 +3936,13 @@ func (x *CloudHarvestResult) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *CloudHarvestResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
+	}
+	return nil
 }
 
 type CloudToken struct {
@@ -4203,9 +4251,10 @@ const file_c2_proto_rawDesc = "" +
 	"\x05ports\x18\x02 \x03(\rR\x05ports\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\x03 \x01(\rR\ttimeoutMs\x12\x18\n" +
-	"\athreads\x18\x04 \x01(\rR\athreads\"@\n" +
+	"\athreads\x18\x04 \x01(\rR\athreads\"v\n" +
 	"\x11NetPortscanResult\x12+\n" +
-	"\x05ports\x18\x01 \x03(\v2\x15.erebus.c2.PortResultR\x05ports\"b\n" +
+	"\x05ports\x18\x01 \x03(\v2\x15.erebus.c2.PortResultR\x05ports\x124\n" +
+	"\x16next_suggested_actions\x18\x02 \x03(\tR\x14nextSuggestedActions\"b\n" +
 	"\n" +
 	"PortResult\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
@@ -4223,14 +4272,15 @@ const file_c2_proto_rawDesc = "" +
 	"\rcustom_filter\x18\a \x01(\tR\fcustomFilter\x12\x1e\n" +
 	"\n" +
 	"attributes\x18\b \x03(\tR\n" +
-	"attributes\"\xac\x01\n" +
+	"attributes\"\xe2\x01\n" +
 	"\x0eLDAPEnumResult\x12\x16\n" +
 	"\x06domain\x18\x01 \x01(\tR\x06domain\x12\x0e\n" +
 	"\x02dc\x18\x02 \x01(\tR\x02dc\x12\x1d\n" +
 	"\n" +
 	"query_type\x18\x03 \x01(\tR\tqueryType\x12.\n" +
 	"\aentries\x18\x04 \x03(\v2\x14.erebus.c2.LDAPEntryR\aentries\x12#\n" +
-	"\rtotal_results\x18\x05 \x01(\x05R\ftotalResults\"\xb7\x01\n" +
+	"\rtotal_results\x18\x05 \x01(\x05R\ftotalResults\x124\n" +
+	"\x16next_suggested_actions\x18\x06 \x03(\tR\x14nextSuggestedActions\"\xb7\x01\n" +
 	"\tLDAPEntry\x12\x0e\n" +
 	"\x02dn\x18\x01 \x01(\tR\x02dn\x12D\n" +
 	"\n" +
@@ -4252,9 +4302,10 @@ const file_c2_proto_rawDesc = "" +
 	"targetSpns\x12\x1e\n" +
 	"\n" +
 	"encryption\x18\a \x01(\tR\n" +
-	"encryption\"E\n" +
+	"encryption\"{\n" +
 	"\x10KerberoastResult\x121\n" +
-	"\x06hashes\x18\x01 \x03(\v2\x19.erebus.c2.KerberoastHashR\x06hashes\"\x89\x01\n" +
+	"\x06hashes\x18\x01 \x03(\v2\x19.erebus.c2.KerberoastHashR\x06hashes\x124\n" +
+	"\x16next_suggested_actions\x18\x02 \x03(\tR\x14nextSuggestedActions\"\x89\x01\n" +
 	"\x0eKerberoastHash\x12\x10\n" +
 	"\x03spn\x18\x01 \x01(\tR\x03spn\x12(\n" +
 	"\x10sam_account_name\x18\x02 \x01(\tR\x0esamAccountName\x12\x12\n" +
@@ -4263,9 +4314,10 @@ const file_c2_proto_rawDesc = "" +
 	"\x10ASREPRoastConfig\x12\x1b\n" +
 	"\ttarget_dc\x18\x01 \x01(\tR\btargetDc\x12\x16\n" +
 	"\x06domain\x18\x02 \x01(\tR\x06domain\x12!\n" +
-	"\ftarget_users\x18\x03 \x03(\tR\vtargetUsers\"@\n" +
+	"\ftarget_users\x18\x03 \x03(\tR\vtargetUsers\"v\n" +
 	"\x10ASREPRoastResult\x12,\n" +
-	"\x06hashes\x18\x01 \x03(\v2\x14.erebus.c2.ASREPHashR\x06hashes\";\n" +
+	"\x06hashes\x18\x01 \x03(\v2\x14.erebus.c2.ASREPHashR\x06hashes\x124\n" +
+	"\x16next_suggested_actions\x18\x02 \x03(\tR\x14nextSuggestedActions\";\n" +
 	"\tASREPHash\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\tR\x04hash\"l\n" +
@@ -4273,10 +4325,11 @@ const file_c2_proto_rawDesc = "" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x1d\n" +
 	"\n" +
 	"target_pid\x18\x02 \x01(\rR\ttargetPid\x12#\n" +
-	"\routput_format\x18\x03 \x01(\tR\foutputFormat\"a\n" +
+	"\routput_format\x18\x03 \x01(\tR\foutputFormat\"\x97\x01\n" +
 	"\x0eCredDumpResult\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x127\n" +
-	"\vcredentials\x18\x02 \x03(\v2\x15.erebus.c2.CredentialR\vcredentials\"\x82\x01\n" +
+	"\vcredentials\x18\x02 \x03(\v2\x15.erebus.c2.CredentialR\vcredentials\x124\n" +
+	"\x16next_suggested_actions\x18\x03 \x03(\tR\x14nextSuggestedActions\"\x82\x01\n" +
 	"\n" +
 	"Credential\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x16\n" +
@@ -4373,14 +4426,15 @@ const file_c2_proto_rawDesc = "" +
 	"\anew_pid\x18\x04 \x01(\rR\x06newPid\"H\n" +
 	"\x12CloudHarvestConfig\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x16\n" +
-	"\x06method\x18\x02 \x01(\tR\x06method\"\xe7\x01\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\"\x9d\x02\n" +
 	"\x12CloudHarvestResult\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12-\n" +
 	"\x06tokens\x18\x03 \x03(\v2\x15.erebus.c2.CloudTokenR\x06tokens\x12<\n" +
 	"\vcredentials\x18\x04 \x03(\v2\x1a.erebus.c2.CloudCredentialR\vcredentials\x12\x1a\n" +
 	"\bmetadata\x18\x05 \x01(\tR\bmetadata\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05error\"\x9c\x02\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\x124\n" +
+	"\x16next_suggested_actions\x18\a \x03(\tR\x14nextSuggestedActions\"\x9c\x02\n" +
 	"\n" +
 	"CloudToken\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x1d\n" +

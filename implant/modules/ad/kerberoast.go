@@ -11,6 +11,7 @@ import (
 	"github.com/jcmturner/gokrb5/v8/config"
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/plugin"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/suggestions"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -119,7 +120,9 @@ func runKerberoast(_ context.Context, cfg *pb.KerberoastConfig) (*pb.KerberoastR
 		})
 	}
 
-	return &pb.KerberoastResult{Hashes: hashes}, nil
+	result := &pb.KerberoastResult{Hashes: hashes}
+	result.NextSuggestedActions = suggestions.ForKerberoast(result)
+	return result, nil
 }
 
 func formatHashcatHash(spn, domain, samName string, etype int32, cipher string) string {

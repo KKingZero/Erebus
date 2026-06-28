@@ -6,6 +6,7 @@ import (
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/plugin"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/suggestions"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -85,6 +86,7 @@ func (m *CloudModule) Execute(ctx context.Context, config []byte) ([]byte, error
 		}
 	}
 
+	merged.NextSuggestedActions = suggestions.ForCloudHarvest(merged)
 	return proto.Marshal(merged)
 }
 

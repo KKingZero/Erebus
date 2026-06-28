@@ -310,6 +310,8 @@ Phase 3: Cloud Expansion
 - `raw_output` preserved for operator manual review
 - Consistent envelope means the AI agent uses one parser for all modules
 
+**Status (2026-06):** `next_suggested_actions` implemented on Go implant result protos (`LDAPEnumResult`, `KerberoastResult`, `ASREPRoastResult`, `CredDumpResult`, `NetPortscanResult`, `CloudHarvestResult`) via `pkg/suggestions/`; full JSON envelope deferred.
+
 ---
 
 ## Bug Fixes Roadmap (from Code Review)

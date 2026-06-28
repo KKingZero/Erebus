@@ -6,6 +6,7 @@ import (
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/plugin"
+	"github.com/KKingZero/erebus-exploit-framwork/pkg/suggestions"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -42,5 +43,6 @@ func (m *CredDumpModule) Execute(ctx context.Context, config []byte) ([]byte, er
 		return nil, err
 	}
 
+	result.NextSuggestedActions = suggestions.ForCredDump(result)
 	return proto.Marshal(result)
 }
