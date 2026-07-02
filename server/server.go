@@ -36,9 +36,10 @@ type Teamserver struct {
 	AutoHarvest  *autoharvest.AutoHarvester
 	CA           *zcrypto.CertificateAuthority
 
-	grpcServer *grpc.Server
-	secret     []byte
-	done       chan struct{}
+	grpcServer  *grpc.Server
+	secret      []byte
+	replayCache *zcrypto.ReplayCache
+	done        chan struct{}
 }
 
 func NewTeamserver(cfg *Config) (*Teamserver, error) {
@@ -80,8 +81,8 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 
 	approvalGate := approval.NewGate(events.Publish)
 
-	// Configure auto-harvest
-	ahEnabled := true // enabled by default
+	// Configure auto-harvest (opt-in via config)
+	ahEnabled := false
 	if cfg.AutoHarvest.Enabled != nil {
 		ahEnabled = *cfg.AutoHarvest.Enabled
 	}
@@ -102,6 +103,7 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 		AutoHarvest: ah,
 		CA:          ca,
 		secret:      secret,
+		replayCache: zcrypto.NewReplayCache(60 * time.Second),
 		done:        make(chan struct{}),
 	}
 
@@ -150,7 +152,7 @@ func (ts *Teamserver) CreateListener(cfg *pb.ListenerConfig) (listeners.Listener
 		Dispatcher:  ts.Dispatcher,
 		Secret:      ts.secret,
 		OnEvent:     ts.Events.Publish,
-		ReplayCache: zcrypto.NewReplayCache(60 * time.Second),
+		ReplayCache: ts.replayCache,
 	}
 
 	switch cfg.Protocol {

@@ -112,10 +112,13 @@ func TestLiveE2E(t *testing.T) {
 		t.Fatalf("unexpected stdout: %q", shellResult.Stdout)
 	}
 
-	// Step 4: approval gate for creds dump
+	// Step 4: approval gate for creds dump (dual-control: requester != approver)
+	requesterClient, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "e2e-requester")
+	approverClient, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "e2e-approver")
+
 	approvalDone := make(chan error, 1)
 	go func() {
-		_, err := grpcClient.ExecuteTask(ctx, &pb.ExecuteTaskRequest{
+		_, err := requesterClient.ExecuteTask(ctx, &pb.ExecuteTaskRequest{
 			SessionId: sessionID,
 			TaskType:  pb.TaskType_TASK_CREDS_DUMP,
 			Wait:      true,
@@ -127,7 +130,7 @@ func TestLiveE2E(t *testing.T) {
 	var approvalID string
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		pending, err := grpcClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
+		pending, err := approverClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
 		if err != nil {
 			t.Fatalf("list pending: %v", err)
 		}
@@ -146,7 +149,7 @@ func TestLiveE2E(t *testing.T) {
 		t.Fatal("expected pending creds_dump approval")
 	}
 
-	if _, err := grpcClient.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
+	if _, err := approverClient.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
 		t.Fatalf("approve: %v", err)
 	}
 
@@ -215,8 +218,12 @@ func waitForTCP(t *testing.T, addr string, timeout time.Duration) {
 }
 
 func newGRPCClient(t *testing.T, ts *server.Teamserver, addr string) (pb.ErebusC2Client, *tls.Config) {
+	return newGRPCClientNamed(t, ts, addr, "e2e-operator")
+}
+
+func newGRPCClientNamed(t *testing.T, ts *server.Teamserver, addr, cn string) (pb.ErebusC2Client, *tls.Config) {
 	t.Helper()
-	_, certPEM, keyPEM, err := ts.CA.GenerateClientCert("e2e-operator")
+	_, certPEM, keyPEM, err := ts.CA.GenerateClientCert(cn)
 	if err != nil {
 		t.Fatal(err)
 	}

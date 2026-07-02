@@ -17,6 +17,9 @@ type Options struct {
 	CertFile string
 	KeyFile  string
 	CAFile   string
+	// Approver seat (CN approver) for approve/deny/pending; required for dual-control.
+	ApproverCertFile string
+	ApproverKeyFile  string
 }
 
 // Connect dials the teamserver gRPC API with mTLS.
@@ -35,7 +38,19 @@ func RunREPL(opts Options) error {
 		return err
 	}
 	defer conn.Close()
-	NewREPL(client).Run()
+
+	var approverClient pb.ErebusC2Client
+	var approverConn *grpc.ClientConn
+	if opts.ApproverCertFile != "" && opts.ApproverKeyFile != "" {
+		approverConn, err = dialGRPC(opts.Server, opts.ApproverCertFile, opts.ApproverKeyFile, opts.CAFile)
+		if err != nil {
+			return fmt.Errorf("connect approver seat: %w", err)
+		}
+		defer approverConn.Close()
+		approverClient = pb.NewErebusC2Client(approverConn)
+	}
+
+	NewREPL(client, approverClient).Run()
 	return nil
 }
 

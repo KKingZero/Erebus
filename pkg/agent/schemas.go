@@ -56,7 +56,7 @@ func ToolSchemas() map[string]map[string]any {
 			"type": "object",
 			"properties": map[string]any{
 				"session_id":   map[string]any{"type": "string"},
-				"remote_path":  map[string]any{"type": "string"},
+				"remote_path":  map[string]any{"type": "string", "description": "Relative path from implant cwd (no absolute paths or ..)"},
 			},
 			"required": []string{"session_id", "remote_path"},
 		},
@@ -65,7 +65,7 @@ func ToolSchemas() map[string]map[string]any {
 			"properties": map[string]any{
 				"session_id":   map[string]any{"type": "string"},
 				"local_path":   map[string]any{"type": "string", "description": "Path on operator host"},
-				"remote_path":  map[string]any{"type": "string"},
+				"remote_path":  map[string]any{"type": "string", "description": "Relative path from implant cwd (no absolute paths or ..)"},
 			},
 			"required": []string{"session_id", "local_path", "remote_path"},
 		},

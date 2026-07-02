@@ -14,12 +14,20 @@ import (
 type CommandHandler func(args []string) error
 
 type Commands struct {
-	client    pb.ErebusC2Client
-	sessionID string // active session
+	client         pb.ErebusC2Client
+	approverClient pb.ErebusC2Client
+	sessionID      string // active session
 }
 
-func NewCommands(client pb.ErebusC2Client) *Commands {
-	return &Commands{client: client}
+func NewCommands(client pb.ErebusC2Client, approverClient pb.ErebusC2Client) *Commands {
+	return &Commands{client: client, approverClient: approverClient}
+}
+
+func (c *Commands) approvalClient() pb.ErebusC2Client {
+	if c.approverClient != nil {
+		return c.approverClient
+	}
+	return c.client
 }
 
 func (c *Commands) Handlers() map[string]CommandHandler {
@@ -397,7 +405,7 @@ func (c *Commands) cmdApprove(args []string) error {
 	}
 	ctx, cancel := c.ctx()
 	defer cancel()
-	resp, err := c.client.Approve(ctx, &pb.ApproveRequest{ApprovalId: args[0]})
+	resp, err := c.approvalClient().Approve(ctx, &pb.ApproveRequest{ApprovalId: args[0]})
 	if err != nil {
 		return err
 	}
@@ -417,7 +425,7 @@ func (c *Commands) cmdDeny(args []string) error {
 	}
 	ctx, cancel := c.ctx()
 	defer cancel()
-	resp, err := c.client.Deny(ctx, &pb.DenyRequest{ApprovalId: args[0], Reason: reason})
+	resp, err := c.approvalClient().Deny(ctx, &pb.DenyRequest{ApprovalId: args[0], Reason: reason})
 	if err != nil {
 		return err
 	}
@@ -430,7 +438,7 @@ func (c *Commands) cmdDeny(args []string) error {
 func (c *Commands) cmdPending(_ []string) error {
 	ctx, cancel := c.ctx()
 	defer cancel()
-	resp, err := c.client.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
+	resp, err := c.approvalClient().ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
 	if err != nil {
 		return err
 	}

@@ -76,7 +76,10 @@ func runTeamserver(args []string) {
 
 func runOperator(args []string) {
 	serverAddr := "127.0.0.1:50051"
-	cert, key, ca := erebuscli.DefaultCertPaths()
+	defCert, defKey, defCA := erebuscli.DefaultCertPaths()
+	defApCert, defApKey := erebuscli.DefaultApproverCertPaths()
+	cert, key, ca := defCert, defKey, defCA
+	apCert, apKey := defApCert, defApKey
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -100,11 +103,33 @@ func runOperator(args []string) {
 				ca = args[i+1]
 				i++
 			}
+		case "-approver-cert":
+			if i+1 < len(args) {
+				apCert = args[i+1]
+				i++
+			}
+		case "-approver-key":
+			if i+1 < len(args) {
+				apKey = args[i+1]
+				i++
+			}
+		}
+	}
+
+	if cert == defCert && key == defKey && ca == defCA && apCert == defApCert && apKey == defApKey {
+		if seats, err := erebuscli.EnsureSeatCerts(erebuscli.DataDir()); err == nil {
+			cert, key, ca = seats.OperatorCert, seats.OperatorKey, seats.CA
+			apCert, apKey = seats.ApproverCert, seats.ApproverKey
 		}
 	}
 
 	if err := operatorcli.RunREPL(operatorcli.Options{
-		Server: serverAddr, CertFile: cert, KeyFile: key, CAFile: ca,
+		Server:           serverAddr,
+		CertFile:         cert,
+		KeyFile:          key,
+		CAFile:           ca,
+		ApproverCertFile: apCert,
+		ApproverKeyFile:  apKey,
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "erebus operator: %v\n", err)
 		os.Exit(1)

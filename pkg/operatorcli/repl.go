@@ -15,8 +15,8 @@ type REPL struct {
 	rl   *readline.Instance
 }
 
-func NewREPL(client pb.ErebusC2Client) *REPL {
-	cmds := NewCommands(client)
+func NewREPL(client pb.ErebusC2Client, approverClient pb.ErebusC2Client) *REPL {
+	cmds := NewCommands(client, approverClient)
 
 	// Build completer from command names
 	handlers := cmds.Handlers()

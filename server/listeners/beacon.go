@@ -33,21 +33,25 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 	}
 	sess.SessionKey = sessionKey
 
-	sessionID, err := h.Sessions.Register(sess)
+	sessionID, isReconnect, err := h.Sessions.RegisterOrReconnect(sess)
 	if err != nil {
 		return nil, fmt.Errorf("register session: %w", err)
 	}
 
-	log.Printf("[%s] new session: %s (implant=%s, host=%s, user=%s)",
-		protocol, sessionID, reg.ImplantId, reg.Hostname, reg.Username)
-
-	if h.OnEvent != nil {
-		h.OnEvent(&pb.Event{
-			Type:      pb.EventType_EVENT_SESSION_NEW,
-			Timestamp: time.Now().Unix(),
-			SessionId: sessionID,
-			Message:   fmt.Sprintf("New session from %s@%s", reg.Username, reg.Hostname),
-		})
+	if isReconnect {
+		log.Printf("[%s] session reconnected: %s (implant=%s, host=%s, user=%s)",
+			protocol, sessionID, reg.ImplantId, reg.Hostname, reg.Username)
+	} else {
+		log.Printf("[%s] new session: %s (implant=%s, host=%s, user=%s)",
+			protocol, sessionID, reg.ImplantId, reg.Hostname, reg.Username)
+		if h.OnEvent != nil {
+			h.OnEvent(&pb.Event{
+				Type:      pb.EventType_EVENT_SESSION_NEW,
+				Timestamp: time.Now().Unix(),
+				SessionId: sessionID,
+				Message:   fmt.Sprintf("New session from %s@%s", reg.Username, reg.Hostname),
+			})
+		}
 	}
 
 	encryptedKey, err := zcrypto.AESEncrypt(h.Secret, sessionKey)

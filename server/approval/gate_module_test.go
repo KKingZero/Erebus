@@ -10,7 +10,7 @@ func TestRequestModuleApprovalRiskLevel(t *testing.T) {
 	g := NewGate(nil)
 	done := make(chan string, 1)
 	go func() {
-		_, _ = g.RequestModuleApproval(context.Background(), "sess-1", "creds_dump", "dump creds")
+		_, _ = g.RequestModuleApproval(context.Background(), "sess-1", "creds_dump", "dump creds", "requester-a")
 		done <- ""
 	}()
 
@@ -22,6 +22,6 @@ func TestRequestModuleApprovalRiskLevel(t *testing.T) {
 	if pending[0].RiskLevel != "critical" {
 		t.Fatalf("expected critical risk, got %q", pending[0].RiskLevel)
 	}
-	_ = g.Approve(pending[0].Id)
+	_ = g.Approve(pending[0].Id, "approver-b")
 	<-done
 }

@@ -117,7 +117,8 @@ func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, t
 	}
 	if s.ts.Approval.RequiresApproval(taskType) {
 		desc := fmt.Sprintf("%s on session %s", taskType.String(), sessionID)
-		approved, err := s.ts.Approval.RequestApproval(ctx, sessionID, taskType, desc)
+		requester := operatorFromContext(ctx)
+		approved, err := s.ts.Approval.RequestApproval(ctx, sessionID, taskType, desc, requester)
 		if err != nil {
 			return err
 		}
@@ -130,7 +131,8 @@ func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, t
 		moduleName := approval.ModuleNameFromTaskData(data)
 		if moduleName != "" && s.ts.Approval.RequiresModuleApproval(moduleName) {
 			desc := fmt.Sprintf("module %s on session %s", moduleName, sessionID)
-			approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, moduleName, desc)
+			requester := operatorFromContext(ctx)
+			approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, moduleName, desc, requester)
 			if err != nil {
 				return err
 			}
@@ -403,14 +405,16 @@ func (s *GRPCService) ListPendingApprovals(ctx context.Context, req *pb.ListPend
 }
 
 func (s *GRPCService) Approve(ctx context.Context, req *pb.ApproveRequest) (*pb.ApproveResponse, error) {
-	if err := s.ts.Approval.Approve(req.ApprovalId); err != nil {
+	approver := operatorFromContext(ctx)
+	if err := s.ts.Approval.Approve(req.ApprovalId, approver); err != nil {
 		return &pb.ApproveResponse{Success: false}, err
 	}
 	return &pb.ApproveResponse{Success: true}, nil
 }
 
 func (s *GRPCService) Deny(ctx context.Context, req *pb.DenyRequest) (*pb.DenyResponse, error) {
-	if err := s.ts.Approval.Deny(req.ApprovalId); err != nil {
+	denier := operatorFromContext(ctx)
+	if err := s.ts.Approval.Deny(req.ApprovalId, denier, req.Reason); err != nil {
 		return &pb.DenyResponse{Success: false}, err
 	}
 	return &pb.DenyResponse{Success: true}, nil

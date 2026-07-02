@@ -72,26 +72,42 @@ func (m *Manager) RecoverSessions() error {
 	return nil
 }
 
-func (m *Manager) Register(sess *Session) (string, error) {
+// RegisterOrReconnect creates a new session or rotates the session key on reconnect.
+func (m *Manager) RegisterOrReconnect(sess *Session) (sessionID string, isReconnect bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Check if implant already has a session
 	if existingID, ok := m.byImplant[sess.ImplantID]; ok {
 		if existing, ok2 := m.sessions[existingID]; ok2 && existing.IsAlive() {
 			existing.UpdateCheckin()
-			return existingID, nil
+			existing.SessionKey = sess.SessionKey
+			existing.Hostname = sess.Hostname
+			existing.Username = sess.Username
+			existing.PID = sess.PID
+			existing.RemoteAddr = sess.RemoteAddr
+			existing.IntegrityLevel = sess.IntegrityLevel
+			if m.store != nil {
+				if err := m.store.UpdateSessionKey(existingID, sess.SessionKey); err != nil {
+					return "", false, fmt.Errorf("update session key: %w", err)
+				}
+				if err := m.store.UpdateSessionMetadata(existingID, sess.Hostname, sess.Username, int(sess.PID), sess.RemoteAddr); err != nil {
+					return "", false, fmt.Errorf("update session metadata: %w", err)
+				}
+			}
+			return existingID, true, nil
 		}
 	}
 
-	sessionID, err := crypto.RandomID(16)
+	m.pruneImplantSessions(sess.ImplantID)
+
+	newID, err := crypto.RandomID(16)
 	if err != nil {
-		return "", fmt.Errorf("generate session ID: %w", err)
+		return "", false, fmt.Errorf("generate session ID: %w", err)
 	}
 
-	sess.SessionID = sessionID
-	m.sessions[sessionID] = sess
-	m.byImplant[sess.ImplantID] = sessionID
+	sess.SessionID = newID
+	m.sessions[newID] = sess
+	m.byImplant[sess.ImplantID] = newID
 
 	if m.store != nil {
 		if err := m.store.CreateSession(&db.SessionRow{
@@ -110,11 +126,20 @@ func (m *Manager) Register(sess *Session) (string, error) {
 			Alive:          true,
 			SessionKey:     sess.SessionKey,
 		}); err != nil {
-			return "", fmt.Errorf("persist session: %w", err)
+			return "", false, fmt.Errorf("persist session: %w", err)
 		}
 	}
 
-	return sessionID, nil
+	return newID, false, nil
+}
+
+// pruneImplantSessions removes stale in-memory sessions for an implant before a new registration.
+func (m *Manager) pruneImplantSessions(implantID string) {
+	for sid, s := range m.sessions {
+		if s.ImplantID == implantID {
+			delete(m.sessions, sid)
+		}
+	}
 }
 
 func (m *Manager) Get(sessionID string) (*Session, bool) {

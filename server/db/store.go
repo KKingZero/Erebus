@@ -103,6 +103,17 @@ func (s *Store) UpdateSessionCheckin(sessionID string) error {
 	return err
 }
 
+func (s *Store) UpdateSessionKey(sessionID string, sessionKey []byte) error {
+	_, err := s.db.Exec(`UPDATE sessions SET session_key = ? WHERE session_id = ?`, sessionKey, sessionID)
+	return err
+}
+
+func (s *Store) UpdateSessionMetadata(sessionID, hostname, username string, pid int, remoteAddr string) error {
+	_, err := s.db.Exec(`UPDATE sessions SET hostname = ?, username = ?, pid = ?, remote_addr = ?, last_checkin = ?, alive = 1 WHERE session_id = ?`,
+		hostname, username, pid, remoteAddr, time.Now(), sessionID)
+	return err
+}
+
 func (s *Store) KillSession(sessionID string) error {
 	_, err := s.db.Exec(`UPDATE sessions SET alive = 0 WHERE session_id = ?`, sessionID)
 	return err

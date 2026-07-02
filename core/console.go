@@ -2,11 +2,13 @@ package core
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+	"time"
 
+	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/chzyer/readline"
 )
 
@@ -32,6 +34,8 @@ type Console struct {
 	session       string
 	running       bool
 	mode          OutputMode
+	team          TeamClient
+	teamBanner    bool
 }
 
 func NewConsole(jsonMode bool) *Console {
@@ -160,17 +164,7 @@ func (c *Console) handleCommand(input string) {
 		})
 		c.running = false
 	default:
-		if c.mode == OutputJSON {
-			emitError(c.mode, cmd, fmt.Sprintf("Unknown command: %s", cmd))
-			return
-		}
-		command := exec.Command(parts[0], parts[1:]...)
-		command.Stdout = os.Stdout
-		command.Stderr = os.Stderr
-		command.Stdin = os.Stdin
-		if err := command.Run(); err != nil {
-			fmt.Printf("> Unknown command: %s\n", parts[0])
-		}
+		emitError(c.mode, cmd, fmt.Sprintf("Unknown command: %s", cmd))
 	}
 }
 
@@ -281,7 +275,7 @@ func (c *Console) cmdSearch(args []string) {
 	emit(c.mode, Response{
 		Status:  "info",
 		Command: "search",
-		Message: fmt.Sprintf("> Searching for: %s\n> Module registry coming soon...", query),
+		Message: fmt.Sprintf("> Module search is not available in the startup console.\n> Use `erebus serve` operator REPL or `ai` for module discovery.\n> Query: %s", query),
 		Data: map[string]interface{}{
 			"query":   query,
 			"results": []interface{}{},
@@ -290,29 +284,86 @@ func (c *Console) cmdSearch(args []string) {
 }
 
 func (c *Console) cmdSessions(args []string) {
+	client, addr, err := c.team.connect()
+	if err != nil {
+		emit(c.mode, Response{
+			Status:  "info",
+			Command: "sessions",
+			Message: fmt.Sprintf("> Teamserver unavailable (%v)\n> Start with: erebus serve", err),
+			Data: map[string]interface{}{
+				"sessions": []interface{}{},
+				"count":    0,
+			},
+		})
+		return
+	}
+	c.maybeTeamBanner(addr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
 	if len(args) > 0 && args[0] == "-i" {
 		id := ""
 		if len(args) > 1 {
 			id = args[1]
 		}
+		if id == "" {
+			emitError(c.mode, "sessions", "Usage: sessions -i <session-id>")
+			return
+		}
+		resp, err := client.GetSession(ctx, &pb.GetSessionRequest{SessionId: id})
+		if err != nil {
+			emitError(c.mode, "sessions", err.Error())
+			return
+		}
+		s := resp.Session
+		msg := fmt.Sprintf("> Session %s\n  Host: %s@%s\n  OS: %s/%s  Transport: %s\n  Alive: %v  Last checkin: %d",
+			s.SessionId, s.Username, s.Hostname, s.Os, s.Arch, s.Transport, s.Alive, s.LastCheckin)
 		emit(c.mode, Response{
-			Status:  "info",
+			Status:  "ok",
 			Command: "sessions",
-			Message: "> Session interaction coming soon...",
+			Message: msg,
+			Data:    map[string]interface{}{"session": s},
+		})
+		return
+	}
+
+	resp, err := client.ListSessions(ctx, &pb.ListSessionsRequest{})
+	if err != nil {
+		emitError(c.mode, "sessions", err.Error())
+		return
+	}
+	if len(resp.Sessions) == 0 {
+		emit(c.mode, Response{
+			Status:  "ok",
+			Command: "sessions",
+			Message: "> No active sessions",
 			Data: map[string]interface{}{
-				"action":     "interact",
-				"session_id": id,
+				"sessions": []interface{}{},
+				"count":    0,
 			},
 		})
 		return
 	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("> %d session(s)\n", len(resp.Sessions)))
+	b.WriteString(fmt.Sprintf("  %-36s %-15s %-12s %-8s %-10s %-6s\n", "SESSION", "HOSTNAME", "USER", "OS", "TRANSPORT", "ALIVE"))
+	for _, s := range resp.Sessions {
+		alive := "yes"
+		if !s.Alive {
+			alive = "no"
+		}
+		b.WriteString(fmt.Sprintf("  %-36s %-15s %-12s %-8s %-10s %-6s\n",
+			s.SessionId, s.Hostname, s.Username, s.Os, s.Transport, alive))
+	}
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "sessions",
-		Message: "> No active sessions",
+		Message: b.String(),
 		Data: map[string]interface{}{
-			"sessions": []interface{}{},
-			"count":    0,
+			"sessions": resp.Sessions,
+			"count":    len(resp.Sessions),
 		},
 	})
 }
@@ -418,22 +469,62 @@ func (c *Console) cmdRun() {
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "run",
-		Message: fmt.Sprintf("> Executing: %s\n> Module execution engine coming soon...", c.currentModule),
+		Message: fmt.Sprintf("> Module execution is not available in the startup console.\n> Use `erebus serve` operator REPL or `ai` to run %s.", c.currentModule),
 		Data: map[string]string{
 			"module": c.currentModule,
-			"status": "pending",
+			"status": "unavailable",
 		},
 	})
 }
 
 func (c *Console) cmdLoot() {
+	client, addr, err := c.team.connect()
+	if err != nil {
+		emit(c.mode, Response{
+			Status:  "info",
+			Command: "loot",
+			Message: fmt.Sprintf("> Teamserver unavailable (%v)\n> Start with: erebus serve", err),
+			Data: map[string]interface{}{
+				"items": []interface{}{},
+				"count": 0,
+			},
+		})
+		return
+	}
+	c.maybeTeamBanner(addr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	resp, err := client.ListLoot(ctx, &pb.ListLootRequest{})
+	if err != nil {
+		emitError(c.mode, "loot", err.Error())
+		return
+	}
+	if len(resp.Items) == 0 {
+		emit(c.mode, Response{
+			Status:  "ok",
+			Command: "loot",
+			Message: "> Loot database empty — run some modules first",
+			Data: map[string]interface{}{
+				"items": []interface{}{},
+				"count": 0,
+			},
+		})
+		return
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("> %d loot item(s)\n", len(resp.Items)))
+	for _, item := range resp.Items {
+		b.WriteString(fmt.Sprintf("  [%s] %s from %s (%d bytes)\n", item.Type, item.Id, item.Source, len(item.Data)))
+	}
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "loot",
-		Message: "> Loot database empty — run some modules first",
+		Message: b.String(),
 		Data: map[string]interface{}{
-			"items": []interface{}{},
-			"count": 0,
+			"items": resp.Items,
+			"count": len(resp.Items),
 		},
 	})
 }
@@ -446,11 +537,19 @@ func (c *Console) cmdReport(args []string) {
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "report",
-		Message: "> Generating report...\n> Report engine coming soon...",
+		Message: "> Report generation is not available yet.\n> Use operator REPL loot/tasks output or export from Zypheron.",
 		Data: map[string]string{
 			"action": "generate",
-			"status": "pending",
+			"status": "unavailable",
 		},
 	})
+}
+
+func (c *Console) maybeTeamBanner(addr string) {
+	if c.teamBanner || c.mode == OutputJSON {
+		return
+	}
+	c.teamBanner = true
+	fmt.Fprintf(os.Stderr, "[erebus] connected to teamserver at %s\n", addr)
 }
 

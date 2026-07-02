@@ -14,16 +14,17 @@ const defaultApprovalTimeout = 30 * time.Minute
 
 // Gate manages pending approval requests for high-risk operations.
 type Gate struct {
-	mu       sync.RWMutex
-	pending  map[string]*PendingApproval
-	onEvent  func(event *pb.Event)
-	policy   *Policy
+	mu      sync.RWMutex
+	pending map[string]*PendingApproval
+	onEvent func(event *pb.Event)
+	policy  *Policy
 }
 
 // PendingApproval tracks a queued approval request.
 type PendingApproval struct {
-	Request  *pb.ApprovalRequest
-	ResultCh chan bool
+	Request     *pb.ApprovalRequest
+	ResultCh    chan bool
+	RequestedBy string
 }
 
 // NewGate creates a new approval gate with default policy.
@@ -46,16 +47,16 @@ func (g *Gate) RequiresModuleApproval(moduleName string) bool {
 }
 
 // RequestApproval queues a task for approval and blocks until approved/denied or ctx expires.
-func (g *Gate) RequestApproval(ctx context.Context, sessionID string, taskType pb.TaskType, description string) (bool, error) {
-	return g.requestApproval(ctx, sessionID, taskType, description, g.policy.RiskLevel(taskType))
+func (g *Gate) RequestApproval(ctx context.Context, sessionID string, taskType pb.TaskType, description, requesterCN string) (bool, error) {
+	return g.requestApproval(ctx, sessionID, taskType, description, g.policy.RiskLevel(taskType), requesterCN)
 }
 
 // RequestModuleApproval queues a high-risk module for approval with the module risk level.
-func (g *Gate) RequestModuleApproval(ctx context.Context, sessionID, moduleName, description string) (bool, error) {
-	return g.requestApproval(ctx, sessionID, pb.TaskType_TASK_MODULE, description, g.policy.ModuleRiskLevel(moduleName))
+func (g *Gate) RequestModuleApproval(ctx context.Context, sessionID, moduleName, description, requesterCN string) (bool, error) {
+	return g.requestApproval(ctx, sessionID, pb.TaskType_TASK_MODULE, description, g.policy.ModuleRiskLevel(moduleName), requesterCN)
 }
 
-func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType pb.TaskType, description, riskLevel string) (bool, error) {
+func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType pb.TaskType, description, riskLevel, requesterCN string) (bool, error) {
 	id, err := crypto.RandomID(8)
 	if err != nil {
 		return false, err
@@ -74,8 +75,9 @@ func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType p
 
 	g.mu.Lock()
 	g.pending[id] = &PendingApproval{
-		Request:  req,
-		ResultCh: resultCh,
+		Request:     req,
+		ResultCh:    resultCh,
+		RequestedBy: requesterCN,
 	}
 	g.mu.Unlock()
 
@@ -114,13 +116,27 @@ func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType p
 	}
 }
 
+func (g *Gate) checkDualControl(requestedBy, actorCN string) error {
+	if requestedBy == "" || actorCN == "" {
+		return nil
+	}
+	if requestedBy == actorCN {
+		return fmt.Errorf("dual-control: approver cannot be the same operator as requester (%s)", actorCN)
+	}
+	return nil
+}
+
 // Approve approves a pending request.
-func (g *Gate) Approve(approvalID string) error {
+func (g *Gate) Approve(approvalID, approverCN string) error {
 	g.mu.Lock()
 	pa, ok := g.pending[approvalID]
 	if !ok {
 		g.mu.Unlock()
 		return fmt.Errorf("approval request not found: %s", approvalID)
+	}
+	if err := g.checkDualControl(pa.RequestedBy, approverCN); err != nil {
+		g.mu.Unlock()
+		return err
 	}
 	delete(g.pending, approvalID)
 	g.mu.Unlock()
@@ -130,12 +146,16 @@ func (g *Gate) Approve(approvalID string) error {
 }
 
 // Deny denies a pending request.
-func (g *Gate) Deny(approvalID string) error {
+func (g *Gate) Deny(approvalID, denierCN, reason string) error {
 	g.mu.Lock()
 	pa, ok := g.pending[approvalID]
 	if !ok {
 		g.mu.Unlock()
 		return fmt.Errorf("approval request not found: %s", approvalID)
+	}
+	if err := g.checkDualControl(pa.RequestedBy, denierCN); err != nil {
+		g.mu.Unlock()
+		return err
 	}
 	delete(g.pending, approvalID)
 	g.mu.Unlock()

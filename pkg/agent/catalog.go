@@ -117,7 +117,7 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name:         "file_download",
-			Description:  "Download a file from the implant (remote_path)",
+			Description:  "Download a file from the implant (remote_path relative to implant cwd; no absolute paths or ..)",
 			Risk:         "low",
 			TaskType:     pb.TaskType_TASK_FILE_DOWNLOAD,
 			NeedsSession: true,
@@ -131,7 +131,7 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name:         "file_upload",
-			Description:  "Upload a file to the implant (local_path on operator host, remote_path on implant)",
+			Description:  "Upload a file to the implant (local_path on operator host; remote_path relative to implant cwd)",
 			Risk:         "low",
 			TaskType:     pb.TaskType_TASK_FILE_UPLOAD,
 			NeedsSession: true,

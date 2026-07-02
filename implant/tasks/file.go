@@ -18,8 +18,13 @@ func executeFileDownload(_ context.Context, data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("unmarshal file download task: %w", err)
 	}
 
+	resolved, err := resolveJailedPath(task.RemotePath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Open file first, then stat on the same fd to avoid TOCTOU race
-	f, err := os.Open(task.RemotePath)
+	f, err := os.Open(resolved)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", task.RemotePath, err)
 	}
@@ -57,7 +62,12 @@ func executeFileUpload(_ context.Context, data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("unmarshal file upload task: %w", err)
 	}
 
-	if err := os.WriteFile(task.RemotePath, task.Data, 0600); err != nil {
+	resolved, err := resolveJailedPath(task.RemotePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.WriteFile(resolved, task.Data, 0600); err != nil {
 		return nil, fmt.Errorf("write %s: %w", task.RemotePath, err)
 	}
 

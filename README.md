@@ -248,6 +248,22 @@ help                  - Show help
 
 High-risk tasks (`TASK_CREDS_DUMP`, `TASK_LATERAL_MOVE`, `TASK_PERSIST`, `TASK_INJECT`, `TASK_PE_LOAD`, `TASK_PRIVESC`, and `TASK_MODULE` for `creds_dump`, `lateral_move`, `persist`, `privesc`, `inject`) block in `ExecuteTask` until an operator approves via `pending`/`approve` or the gRPC `Approve` RPC.
 
+**Dual-control:** The requester and approver must use different mTLS client certificates (different CN). On first `erebus serve`, the teamserver generates `~/.erebus/certs/operator.pem` (CN `operator`) for task execution and `~/.erebus/certs/approver.pem` (CN `approver`) for `pending`/`approve`/`deny`. The operator REPL uses both automatically. For two-terminal workflows, run task commands with the operator cert and approvals with the approver cert:
+
+```bash
+# Terminal 1 — request high-risk task (operator seat)
+erebus operator -cert ~/.erebus/certs/operator.pem -key ~/.erebus/certs/operator-key.pem -ca ~/.erebus/certs/ca.pem
+erebus> use <session-id>
+erebus> shell ...
+
+# Terminal 2 — approve (approver seat)
+erebus operator -cert ~/.erebus/certs/approver.pem -key ~/.erebus/certs/approver-key.pem -ca ~/.erebus/certs/ca.pem
+erebus> pending
+erebus> approve <approval-id>
+```
+
+**File operations:** Implant `upload`/`download` paths are relative to the implant working directory. Absolute paths and `..` traversal are rejected server-side in the implant path jail.
+
 ## AI (Ollama + console)
 
 The console `ai` command talks to a local **Ollama** instance by default (`http://localhost:11434/v1`, model `llama3.2`). If the teamserver is running and operator certs exist, `ai` upgrades to the full autonomous agent.
@@ -292,13 +308,7 @@ cp config/agent.yaml.example ~/.erebus/agent.yaml
 
 Chainable module results (LDAP, kerberoast, creds dump, portscan, cloud) include `next_suggested_actions` in protobuf — the interpreter surfaces these to the LLM as follow-on steps.
 
-**Semi-autonomous behavior:** Low-risk tools (`run_shell`, `net_ifconfig`, `process_list`, `portscan`, `cloud_harvest`, `file_download`, etc.) run automatically. High-risk tools (`ldap_enum`, `kerberoast`, `creds_dump`, `lateral_move`, etc.) block until an operator approves in a second terminal:
-
-```
-./build/operator -cert ... -key ... -ca ...
-erebus> pending
-erebus> approve <approval-id>
-```
+**Semi-autonomous behavior:** Low-risk tools (`run_shell`, `net_ifconfig`, `process_list`, `portscan`, `cloud_harvest`, `file_download`, etc.) run automatically. High-risk tools (`ldap_enum`, `kerberoast`, `creds_dump`, `lateral_move`, etc.) block until a **different operator** approves in a second terminal using the approver cert (see dual-control above).
 
 ## Testing
 

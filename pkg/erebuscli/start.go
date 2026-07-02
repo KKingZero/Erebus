@@ -47,17 +47,19 @@ func Start() error {
 		log.Printf("[erebus] teamserver already running at %s", cfg.GRPCAddr)
 	}
 
-	cert, key, ca, err := EnsureOperatorCerts(cfg.DataDir)
+	seats, err := EnsureSeatCerts(cfg.DataDir)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "[erebus] connecting operator to %s\n", cfg.GRPCAddr)
+	fmt.Fprintf(os.Stderr, "[erebus] connecting operator to %s (approver seat for pending/approve/deny)\n", cfg.GRPCAddr)
 	return operatorcli.RunREPL(operatorcli.Options{
-		Server:   cfg.GRPCAddr,
-		CertFile: cert,
-		KeyFile:  key,
-		CAFile:   ca,
+		Server:           cfg.GRPCAddr,
+		CertFile:         seats.OperatorCert,
+		KeyFile:          seats.OperatorKey,
+		CAFile:           seats.CA,
+		ApproverCertFile: seats.ApproverCert,
+		ApproverKeyFile:  seats.ApproverKey,
 	})
 }
 

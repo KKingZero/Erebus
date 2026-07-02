@@ -12,7 +12,7 @@ func TestRequestApprovalApprove(t *testing.T) {
 	g := NewGate(nil)
 	done := make(chan bool, 1)
 	go func() {
-		approved, err := g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject test")
+		approved, err := g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject test", "requester-a")
 		if err != nil {
 			t.Errorf("request: %v", err)
 			done <- false
@@ -26,7 +26,7 @@ func TestRequestApprovalApprove(t *testing.T) {
 	if len(pending) != 1 {
 		t.Fatalf("expected 1 pending, got %d", len(pending))
 	}
-	if err := g.Approve(pending[0].Id); err != nil {
+	if err := g.Approve(pending[0].Id, "approver-b"); err != nil {
 		t.Fatal(err)
 	}
 	if !<-done {
@@ -38,7 +38,7 @@ func TestRequestApprovalDeny(t *testing.T) {
 	g := NewGate(nil)
 	done := make(chan bool, 1)
 	go func() {
-		approved, err := g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_CREDS_DUMP, "creds dump")
+		approved, err := g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_CREDS_DUMP, "creds dump", "requester-a")
 		if err != nil {
 			t.Errorf("request: %v", err)
 			done <- true
@@ -49,7 +49,7 @@ func TestRequestApprovalDeny(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 	pending := g.ListPending()
-	if err := g.Deny(pending[0].Id); err != nil {
+	if err := g.Deny(pending[0].Id, "denier-b", "no"); err != nil {
 		t.Fatal(err)
 	}
 	if <-done {
@@ -61,7 +61,7 @@ func TestApproveDuplicateRejected(t *testing.T) {
 	g := NewGate(nil)
 	done := make(chan struct{})
 	go func() {
-		_, _ = g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject")
+		_, _ = g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject", "requester-a")
 		close(done)
 	}()
 
@@ -71,10 +71,10 @@ func TestApproveDuplicateRejected(t *testing.T) {
 		t.Fatalf("expected 1 pending, got %d", len(pending))
 	}
 	id := pending[0].Id
-	if err := g.Approve(id); err != nil {
+	if err := g.Approve(id, "approver-b"); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.Approve(id); err == nil {
+	if err := g.Approve(id, "approver-b"); err == nil {
 		t.Fatal("expected error on duplicate approve")
 	}
 	<-done
@@ -86,11 +86,64 @@ func TestRequestApprovalTimeoutEvent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	_, err := g.RequestApproval(ctx, "sess-1", pb.TaskType_TASK_CREDS_DUMP, "creds dump")
+	_, err := g.RequestApproval(ctx, "sess-1", pb.TaskType_TASK_CREDS_DUMP, "creds dump", "requester-a")
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
 	if gotEvent == nil || gotEvent.Type != pb.EventType_EVENT_LOG {
 		t.Fatalf("expected timeout log event, got %+v", gotEvent)
+	}
+}
+
+func TestApproveSelfBlocked(t *testing.T) {
+	g := NewGate(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := g.RequestApproval(ctx, "sess-1", pb.TaskType_TASK_INJECT, "inject", "operator-a")
+		done <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	pending := g.ListPending()
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending, got %d", len(pending))
+	}
+	if err := g.Approve(pending[0].Id, "operator-a"); err == nil {
+		t.Fatal("expected dual-control error on self-approve")
+	}
+	if len(g.ListPending()) != 1 {
+		t.Fatal("pending request should remain after failed self-approve")
+	}
+	if err := g.Approve(pending[0].Id, "operator-b"); err != nil {
+		t.Fatalf("approve by different operator: %v", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("request after approve: %v", err)
+	}
+}
+
+func TestApproveSelfAllowedWhenCNEmpty(t *testing.T) {
+	g := NewGate(nil)
+	done := make(chan bool, 1)
+	go func() {
+		approved, err := g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject", "")
+		if err != nil {
+			t.Errorf("request: %v", err)
+			done <- false
+			return
+		}
+		done <- approved
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	pending := g.ListPending()
+	if err := g.Approve(pending[0].Id, ""); err != nil {
+		t.Fatalf("expected empty CN approve allowed: %v", err)
+	}
+	if !<-done {
+		t.Fatal("expected approval")
 	}
 }
