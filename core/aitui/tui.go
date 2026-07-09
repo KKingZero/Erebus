@@ -26,7 +26,7 @@ const (
 	QuitAll
 )
 
-// SessionMode is the UI mode selected via Shift+Tab (backend wiring comes later).
+// SessionMode is selected via Shift+Tab.
 type SessionMode int
 
 const (
@@ -67,6 +67,16 @@ type entry struct {
 	body string
 }
 
+type approvalReply struct {
+	action agent.ApprovalAction
+	reason string
+}
+
+type pendingApproval struct {
+	id, risk, desc string
+	reply          chan approvalReply
+}
+
 type model struct {
 	opts            Options
 	width           int
@@ -76,7 +86,6 @@ type model struct {
 	entries         []entry
 	messages        []openai.ChatCompletionMessage
 	busy            bool
-	agentRan        bool
 	quitMode        QuitMode
 	agentCh         chan tea.Msg
 	modeIdx         int
@@ -84,6 +93,7 @@ type model struct {
 	modelPickerIdx  int
 	runCtx          context.Context
 	cancel          context.CancelFunc
+	pending         *pendingApproval
 }
 
 type chatDoneMsg struct {
@@ -95,6 +105,11 @@ type agentEventMsg struct {
 	line string
 	done bool
 	err  error
+}
+
+type approvalNeededMsg struct {
+	id, risk, desc string
+	reply          chan approvalReply
 }
 
 var (
@@ -115,6 +130,7 @@ var (
 	pickerBoxStyle  = theme.Border.Border(lipgloss.NormalBorder()).Padding(0, 2)
 	pickerSelected  = theme.Active
 	pickerItemStyle = theme.Default
+	approvalStyle   = theme.Accent
 )
 
 // Run starts the AI chat TUI. Blocks until the user exits.
@@ -153,9 +169,11 @@ func newModel(opts Options) model {
 			Content: llm.ErebusSystemPrompt,
 		}},
 	}
-	m.appendSystem("Erebus AI ready. Tab = model · Shift+Tab = mode.")
+	m.appendSystem("Erebus AI ready. Tab = model · Shift+Tab = mode (Normal / Plan / Auto).")
 	if opts.AgentCfg != nil {
-		m.appendSystem("Teamserver connected — Auto mode can run the agent.")
+		m.appendSystem("Teamserver connected — use Auto mode to run the agent. Approvals happen in this TUI ([a]/[d]).")
+	} else {
+		m.appendSystem("No teamserver — Normal/Plan chat only. Start with: erebus serve")
 	}
 	m.syncViewport()
 	return m
@@ -173,6 +191,10 @@ type autoSubmitMsg struct {
 	text string
 }
 
+func (m model) currentMode() SessionMode {
+	return sessionModes[m.modeIdx].ID
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -185,6 +207,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSubmit(msg.text)
 
 	case tea.KeyMsg:
+		if m.pending != nil {
+			switch msg.String() {
+			case "a", "A", "y", "Y":
+				return m.resolveApproval(agent.ApprovalGrant, "")
+			case "d", "D", "n", "N":
+				return m.resolveApproval(agent.ApprovalDeny, "denied in TUI")
+			case "ctrl+c":
+				return m.quit(QuitBack)
+			}
+			return m, nil
+		}
+
 		if m.busy {
 			switch msg.String() {
 			case "ctrl+c":
@@ -214,8 +248,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.String() {
 		case "shift+tab":
-			m.modeIdx = (m.modeIdx + 1) % len(sessionModes)
-			return m, nil
+			return m.cycleMode()
 		case "tab":
 			m.modelPickerOpen = true
 			m.modelPickerIdx = pickerIndexForProvider(m.opts.LLMCfg.Provider)
@@ -249,6 +282,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncViewport()
 		return m, textinput.Blink
 
+	case approvalNeededMsg:
+		m.pending = &pendingApproval{
+			id:    msg.id,
+			risk:  msg.risk,
+			desc:  msg.desc,
+			reply: msg.reply,
+		}
+		m.appendSystem(formatApprovalBanner(msg.id, msg.risk, msg.desc))
+		m.syncViewport()
+		return m, listenAgent(m.runCtx, m.agentCh)
+
 	case agentEventMsg:
 		if msg.line != "" {
 			m.appendStep(msg.line)
@@ -257,8 +301,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !msg.done {
 			return m, listenAgent(m.runCtx, m.agentCh)
 		}
+		// Unblock any in-flight OnApproval wait so the agent goroutine cannot leak.
+		m = m.forceResolvePending(agent.ApprovalDeny, "agent ended")
 		m.busy = false
-		m.agentRan = true
 		if msg.err != nil && !errors.Is(msg.err, context.Canceled) {
 			m.appendError("Agent: " + msg.err.Error())
 			m.syncViewport()
@@ -271,6 +316,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m model) resolveApproval(action agent.ApprovalAction, reason string) (tea.Model, tea.Cmd) {
+	m = m.forceResolvePending(action, reason)
+	return m, listenAgent(m.runCtx, m.agentCh)
+}
+
+// forceResolvePending sends a decision on any pending approval and clears UI state.
+// Safe to call when pending is nil. Does not schedule listenAgent.
+func (m model) forceResolvePending(action agent.ApprovalAction, reason string) model {
+	p := m.pending
+	m.pending = nil
+	if p == nil || p.reply == nil {
+		return m
+	}
+	label := "approved"
+	if action == agent.ApprovalDeny {
+		label = "denied"
+	}
+	if reason == "agent ended" || reason == "session quit" {
+		m.appendSystem(fmt.Sprintf("Approval cancelled (%s): %s", reason, p.id))
+	} else {
+		m.appendSystem(fmt.Sprintf("Approval %s: %s", label, p.id))
+	}
+	m.syncViewport()
+	select {
+	case p.reply <- approvalReply{action: action, reason: reason}:
+	default:
+	}
+	return m
+}
+
+func (m model) cycleMode() (tea.Model, tea.Cmd) {
+	m.modeIdx = (m.modeIdx + 1) % len(sessionModes)
+	m.resetChatSystem()
+	mode := sessionModes[m.modeIdx]
+	m.appendSystem(fmt.Sprintf("Mode: %s — %s", mode.Label, mode.Hint))
+	if mode.ID == ModeAuto && m.opts.AgentCfg == nil {
+		m.appendSystem("Auto needs teamserver (erebus serve) + operator and approver certs under ~/.erebus/certs/.")
+	}
+	m.syncViewport()
+	return m, nil
+}
+
+func (m *model) resetChatSystem() {
+	sys := llm.ErebusSystemPrompt
+	if m.currentMode() == ModePlan {
+		sys = agent.PlanSystemPrompt()
+	}
+	m.messages = []openai.ChatCompletionMessage{{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: sys,
+	}}
+}
+
 func (m model) handleSubmit(text string) (tea.Model, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(text)) {
 	case "/back":
@@ -279,11 +377,7 @@ func (m model) handleSubmit(text string) (tea.Model, tea.Cmd) {
 		return m.quit(QuitAll)
 	case "/clear":
 		m.entries = nil
-		m.messages = []openai.ChatCompletionMessage{{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: llm.ErebusSystemPrompt,
-		}}
-		m.agentRan = false
+		m.resetChatSystem()
 		m.appendSystem("Transcript cleared.")
 		m.syncViewport()
 		return m, nil
@@ -291,29 +385,61 @@ func (m model) handleSubmit(text string) (tea.Model, tea.Cmd) {
 
 	m.appendUser(text)
 
-	// Mode selector is UI-only for now; agent still runs on first message when teamserver is up.
-	useAgent := m.opts.AgentCfg != nil && !m.agentRan
-	if useAgent {
+	switch m.currentMode() {
+	case ModeAuto:
+		if m.opts.AgentCfg == nil {
+			m.appendError("Auto mode requires teamserver (erebus serve) plus operator and approver certs (~/.erebus/certs/).")
+			m.syncViewport()
+			return m, nil
+		}
+		if m.opts.AgentCfg.ApproverCert == "" || m.opts.AgentCfg.ApproverKey == "" {
+			m.appendError("Auto mode needs approver_cert/approver_key for in-TUI [a]/[d] dual-control. Run erebus serve to generate seats.")
+			m.syncViewport()
+			return m, nil
+		}
 		m.busy = true
-		m.appendSystem("Starting autonomous agent...")
+		m.appendSystem("Starting autonomous agent (Auto)… high-risk steps pause for [a]/[d] here.")
 		m.syncViewport()
 		ch := make(chan tea.Msg, 64)
 		m.agentCh = ch
 		go runAgent(m.runCtx, m.opts.AgentCfg, text, ch)
 		return m, listenAgent(m.runCtx, ch)
-	}
 
-	m.messages = append(m.messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: text,
-	})
-	m.busy = true
-	client := llm.NewClient(m.opts.LLMCfg)
-	msgs := append([]openai.ChatCompletionMessage(nil), m.messages...)
-	return m, chatCmd(m.runCtx, client, msgs)
+	case ModePlan:
+		// Ensure plan system prompt is active for this turn.
+		if len(m.messages) == 0 || m.messages[0].Role != openai.ChatMessageRoleSystem {
+			m.resetChatSystem()
+		} else if m.messages[0].Content != agent.PlanSystemPrompt() {
+			m.messages[0].Content = agent.PlanSystemPrompt()
+		}
+		m.messages = append(m.messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: text,
+		})
+		m.busy = true
+		client := llm.NewClient(m.opts.LLMCfg)
+		msgs := append([]openai.ChatCompletionMessage(nil), m.messages...)
+		return m, chatCmd(m.runCtx, client, msgs)
+
+	default: // ModeNormal
+		if len(m.messages) == 0 || m.messages[0].Role != openai.ChatMessageRoleSystem {
+			m.resetChatSystem()
+		} else if m.messages[0].Content != llm.ErebusSystemPrompt {
+			m.messages[0].Content = llm.ErebusSystemPrompt
+		}
+		m.messages = append(m.messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: text,
+		})
+		m.busy = true
+		client := llm.NewClient(m.opts.LLMCfg)
+		msgs := append([]openai.ChatCompletionMessage(nil), m.messages...)
+		return m, chatCmd(m.runCtx, client, msgs)
+	}
 }
 
 func (m model) quit(mode QuitMode) (tea.Model, tea.Cmd) {
+	m = m.forceResolvePending(agent.ApprovalDeny, "session quit")
 	m.quitMode = mode
 	if m.cancel != nil {
 		m.cancel()
@@ -348,11 +474,28 @@ func (m model) View() string {
 
 func (m model) renderInputArea() string {
 	inputBox := m.renderInputBox()
+	if m.pending != nil {
+		banner := m.renderApprovalBanner()
+		return lipgloss.JoinVertical(lipgloss.Left, banner, inputBox)
+	}
 	if !m.modelPickerOpen {
 		return inputBox
 	}
 	picker := m.renderModelPicker()
 	return lipgloss.JoinVertical(lipgloss.Left, picker, inputBox)
+}
+
+func (m model) renderApprovalBanner() string {
+	boxW := max(20, m.width-2)
+	body := formatApprovalBanner(m.pending.id, m.pending.risk, m.pending.desc)
+	return approvalStyle.Width(boxW).Render(body)
+}
+
+func formatApprovalBanner(id, risk, desc string) string {
+	return fmt.Sprintf(
+		"⚠ APPROVAL REQUIRED\n  id:   %s\n  risk: %s\n  task: %s\n\n  [a] approve    [d] deny    (ctrl+c cancel agent)",
+		id, risk, desc,
+	)
 }
 
 func (m model) renderModelPicker() string {
@@ -439,6 +582,9 @@ func (m model) renderInputBox() string {
 	}
 	m.input.Width = inputW
 	inputLine := m.input.View()
+	if m.pending != nil || m.busy {
+		inputLine = subheadStyle.Render("› (waiting…)")
+	}
 
 	inner := lipgloss.JoinVertical(lipgloss.Left,
 		modeBar.String(),
@@ -450,6 +596,9 @@ func (m model) renderInputBox() string {
 }
 
 func (m model) renderFooter() string {
+	if m.pending != nil {
+		return approvalStyle.Render("  High-risk action blocked — [a] approve  [d] deny")
+	}
 	hint := footerStyle.Render("Tab model · ⇧Tab mode")
 	cmds := footerStyle.Render("  /back · /quit · /clear")
 	status := ""
@@ -464,6 +613,9 @@ func (m *model) layout() {
 	inputH := 6
 	if m.modelPickerOpen {
 		inputH += len(pickerModels) + 3
+	}
+	if m.pending != nil {
+		inputH += 4
 	}
 	footerH := 1
 	innerH := m.height - headerH - inputH - footerH - 2
@@ -587,7 +739,7 @@ func listenAgent(ctx context.Context, ch chan tea.Msg) tea.Cmd {
 	}
 }
 
-func sendAgentEvent(ctx context.Context, ch chan<- tea.Msg, msg agentEventMsg) {
+func sendAgentMsg(ctx context.Context, ch chan<- tea.Msg, msg tea.Msg) {
 	select {
 	case ch <- msg:
 	case <-ctx.Done():
@@ -598,18 +750,33 @@ func runAgent(ctx context.Context, cfg *agent.Config, objective string, ch chan<
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 
+	if cfg.ApproverCert == "" || cfg.ApproverKey == "" {
+		sendAgentMsg(ctx, ch, agentEventMsg{
+			done: true,
+			err:  fmt.Errorf("approver certs required for Auto (run erebus serve)"),
+		})
+		return
+	}
+
 	err := agent.Run(ctx, cfg, agent.RunOptions{
 		Objective: objective,
-		OnApproval: func(id, risk, desc string) {
-			sendAgentEvent(ctx, ch, agentEventMsg{
-				line: fmt.Sprintf("approval required: id=%s risk=%s — approve in operator", id, risk),
+		OnApproval: func(id, risk, desc string) (agent.ApprovalAction, string) {
+			reply := make(chan approvalReply, 1)
+			sendAgentMsg(ctx, ch, approvalNeededMsg{
+				id: id, risk: risk, desc: desc, reply: reply,
 			})
+			select {
+			case r := <-reply:
+				return r.action, r.reason
+			case <-ctx.Done():
+				return agent.ApprovalDeny, "cancelled"
+			}
 		},
 		OnStep: func(step agent.StepOutput) {
-			sendAgentEvent(ctx, ch, agentEventMsg{line: formatStep(step)})
+			sendAgentMsg(ctx, ch, agentEventMsg{line: formatStep(step)})
 		},
 	})
-	sendAgentEvent(ctx, ch, agentEventMsg{done: true, err: err})
+	sendAgentMsg(ctx, ch, agentEventMsg{done: true, err: err})
 }
 
 func formatStep(step agent.StepOutput) string {

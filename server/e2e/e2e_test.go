@@ -266,6 +266,17 @@ type implantSim struct {
 	baseURL        string
 	done           chan struct{}
 	pendingResults []*pb.TaskResult
+	lastBeaconTs   int64
+}
+
+// nextBeaconTs avoids ReplayCache collisions on rapid back-to-back beacons.
+func (s *implantSim) nextBeaconTs() int64 {
+	ts := time.Now().Unix()
+	if ts <= s.lastBeaconTs {
+		ts = s.lastBeaconTs + 1
+	}
+	s.lastBeaconTs = ts
+	return ts
 }
 
 func (s *implantSim) register(ctx context.Context) (string, []byte) {
@@ -320,7 +331,7 @@ func (s *implantSim) beaconLoop(ctx context.Context) {
 		default:
 		}
 
-		ts := time.Now().Unix()
+		ts := s.nextBeaconTs()
 		beacon := &pb.Beacon{
 			ImplantId: s.implantID,
 			SessionId: s.sessionID,
@@ -376,6 +387,35 @@ func (s *implantSim) beaconLoop(ctx context.Context) {
 		}
 		for _, task := range tasks {
 			s.pendingResults = append(s.pendingResults, s.executeTask(task))
+		}
+
+		// Immediate result flush (mirrors implant/implant.go P0 RTT behavior).
+		if len(s.pendingResults) > 0 {
+			flush := &pb.Beacon{
+				ImplantId: s.implantID,
+				SessionId: s.sessionID,
+				Timestamp: s.nextBeaconTs(),
+			}
+			flush.Hmac = zcrypto.ComputeHMAC(s.secret, s.implantID, flush.Timestamp)
+			if s.sessionKey != nil {
+				payload := &pb.BeaconResultsPayload{Results: s.pendingResults}
+				plain, _ := proto.Marshal(payload)
+				if enc, err := zcrypto.AESEncrypt(s.sessionKey, plain); err == nil {
+					flush.EncryptedResults = enc
+					s.pendingResults = nil
+				}
+			} else {
+				flush.Results = s.pendingResults
+				s.pendingResults = nil
+			}
+			body, _ := proto.Marshal(flush)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/beacon", bytes.NewReader(body))
+			if err == nil {
+				if resp, err := s.httpClient.Do(req); err == nil {
+					io.Copy(io.Discard, resp.Body)
+					resp.Body.Close()
+				}
+			}
 		}
 
 		sleep := time.Duration(beaconResp.NextCheckinMs) * time.Millisecond

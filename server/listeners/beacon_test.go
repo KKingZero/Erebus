@@ -68,7 +68,8 @@ func TestHandleRegisterAndBeacon(t *testing.T) {
 	if err != nil {
 		t.Fatalf("beacon: %v", err)
 	}
-	if beaconResp.NextCheckinMs <= 0 {
+	// NextCheckinMs 0 is valid: implant keeps build-time sleep (no server override).
+	if beaconResp.NextCheckinMs < 0 {
 		t.Fatalf("bad next checkin: %+v", beaconResp)
 	}
 	if len(beaconResp.EncryptedTasks) == 0 && len(beaconResp.Tasks) == 0 {

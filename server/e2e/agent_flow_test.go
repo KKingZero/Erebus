@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -125,20 +124,20 @@ func TestAgentExecutorApprovalFlow(t *testing.T) {
 	ts, sim, sessionID, grpcAddr := startAgentE2EFixture(t, ctx)
 	grpcClient, _ := newGRPCClient(t, ts, grpcAddr)
 
-	client := newAgentClient(t, sim, grpcAddr)
-	defer client.Close()
-	if err := client.StartSubscribe(ctx); err != nil {
+	// Dual-seat client: operator executes, approver grants via OnApproval callback.
+	dual := newAgentClientDual(t, sim, grpcAddr)
+	defer dual.Close()
+	if err := dual.StartSubscribe(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	var approvalID string
-	var approvalMu sync.Mutex
 	exec := &agent.Executor{
-		Client: client,
-		OnApproval: func(id, risk, desc string) {
-			approvalMu.Lock()
-			approvalID = id
-			approvalMu.Unlock()
+		Client: dual,
+		OnApproval: func(id, risk, desc string) (agent.ApprovalAction, string) {
+			if id == "" {
+				t.Error("empty approval id")
+			}
+			return agent.ApprovalGrant, ""
 		},
 	}
 
@@ -150,40 +149,14 @@ func TestAgentExecutorApprovalFlow(t *testing.T) {
 		done <- err
 	}()
 
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		approvalMu.Lock()
-		id := approvalID
-		approvalMu.Unlock()
-		if id != "" {
-			break
-		}
-		pending, err := grpcClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
-		if err == nil {
-			for _, a := range pending.Approvals {
-				if a.SessionId == sessionID && a.TaskType == pb.TaskType_TASK_CREDS_DUMP {
-					approvalID = a.Id
-					break
-				}
-			}
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if approvalID == "" {
-		t.Fatal("expected approval callback or pending approval")
-	}
-
-	if _, err := grpcClient.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
-		t.Fatalf("approve: %v", err)
-	}
-
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("creds_dump after approve: %v", err)
+			t.Fatalf("creds_dump after in-process approve: %v", err)
 		}
 	case <-time.After(30 * time.Second):
-		t.Fatal("creds_dump timed out after approval")
+		pending, _ := grpcClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
+		t.Fatalf("creds_dump timed out waiting for in-process ApprovalGrant (pending=%d)", len(pending.GetApprovals()))
 	}
 	close(sim.done)
 }
@@ -249,8 +222,19 @@ func startAgentE2EFixture(t *testing.T, ctx context.Context) (*server.Teamserver
 
 func newAgentClient(t *testing.T, sim *implantSim, addr string) *agent.Client {
 	t.Helper()
+	return newAgentClientNamed(t, sim, addr, "e2e-agent", "", "")
+}
+
+// newAgentClientDual returns an agent client with distinct operator + approver mTLS seats.
+func newAgentClientDual(t *testing.T, sim *implantSim, addr string) *agent.Client {
+	t.Helper()
+	return newAgentClientNamed(t, sim, addr, "e2e-agent-op", "e2e-agent-ap", "e2e-agent-ap")
+}
+
+func newAgentClientNamed(t *testing.T, sim *implantSim, addr, opCN, apCN, _ string) *agent.Client {
+	t.Helper()
 	dir := t.TempDir()
-	_, certPEM, keyPEM, err := sim.ts.CA.GenerateClientCert("e2e-agent")
+	_, certPEM, keyPEM, err := sim.ts.CA.GenerateClientCert(opCN)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,12 +252,30 @@ func newAgentClient(t *testing.T, sim *implantSim, addr string) *agent.Client {
 		t.Fatal(err)
 	}
 
-	client, err := agent.Connect(&agent.Config{
+	cfg := &agent.Config{
 		Server: addr,
 		Cert:   certPath,
 		Key:    keyPath,
 		CA:     caPath,
-	})
+	}
+	if apCN != "" {
+		_, apCertPEM, apKeyPEM, err := sim.ts.CA.GenerateClientCert(apCN)
+		if err != nil {
+			t.Fatal(err)
+		}
+		apCertPath := filepath.Join(dir, "approver.pem")
+		apKeyPath := filepath.Join(dir, "approver-key.pem")
+		if err := os.WriteFile(apCertPath, apCertPEM, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(apKeyPath, apKeyPEM, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg.ApproverCert = apCertPath
+		cfg.ApproverKey = apKeyPath
+	}
+
+	client, err := agent.Connect(cfg)
 	if err != nil {
 		t.Fatalf("agent connect: %v", err)
 	}

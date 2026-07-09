@@ -75,14 +75,15 @@ func main() {
 		Objective: *objective,
 		SessionID: sid,
 		JSONMode:  *jsonMode,
-		OnApproval: func(id, risk, desc string) {
-			msg := fmt.Sprintf("[APPROVAL REQUIRED] id=%s risk=%s desc=%s — run: operator → pending → approve %s",
+		OnApproval: func(id, risk, desc string) (agent.ApprovalAction, string) {
+			msg := fmt.Sprintf("[APPROVAL REQUIRED] id=%s risk=%s desc=%s — run: operator → pending → approve %s (or use AI TUI [a]/[d])",
 				id, risk, desc, id)
 			if *jsonMode {
 				agent.EmitJSON(agent.StepOutput{Message: msg})
 			} else {
 				fmt.Fprintln(os.Stderr, msg)
 			}
+			return agent.ApprovalExternal, ""
 		},
 		OnStep: func(out agent.StepOutput) {
 			if *jsonMode {

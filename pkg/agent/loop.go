@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -102,6 +103,11 @@ func (l *Loop) Run(ctx context.Context) error {
 			toolContent := result
 			if err != nil {
 				toolContent = "ERROR: " + err.Error()
+				// Denied high-risk: continue engagement with guidance (do not abort loop).
+				if isDeniedError(errStr) {
+					toolContent += "\nOperator DENIED this action. Do not retry the same tool with the same args. " +
+						"Either choose a lower-risk alternative, skip this step, or call mission_complete explaining the deny."
+				}
 			}
 			messages = append(messages, openai.ChatCompletionMessage{
 				Role:       openai.ChatMessageRoleTool,
@@ -113,6 +119,13 @@ func (l *Loop) Run(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("max steps (%d) reached", l.State.MaxSteps)
+}
+
+func isDeniedError(errStr string) bool {
+	e := strings.ToLower(errStr)
+	return strings.Contains(e, "denied") ||
+		strings.Contains(e, "deny") ||
+		(strings.Contains(e, "approval") && strings.Contains(e, "fail"))
 }
 
 func (l *Loop) emit(out StepOutput) {

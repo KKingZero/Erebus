@@ -153,9 +153,10 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 	req.ImplantSecret = secret
 
 	return &BuildResult{
-		BuildID:  buildID,
-		Binary:   binary,
-		Filename: fmt.Sprintf("implant-%s.exe", buildID),
-		Format:   FormatEXE,
+		BuildID:   buildID,
+		Binary:    binary,
+		Filename:  fmt.Sprintf("implant-%s.exe", buildID),
+		Format:    FormatEXE,
+		SizeBytes: int64(len(binary)),
 	}, nil
 }

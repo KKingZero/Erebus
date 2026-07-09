@@ -2,6 +2,10 @@ server: "127.0.0.1:50051"
 cert: "~/.erebus/certs/operator.pem"
 key: "~/.erebus/certs/operator-key.pem"
 ca: "~/.erebus/certs/ca.pem"
+# Dual-control seat for in-TUI / in-process Approve/Deny (different CN from operator).
+# Created by `erebus serve` alongside operator certs.
+approver_cert: "~/.erebus/certs/approver.pem"
+approver_key: "~/.erebus/certs/approver-key.pem"
 llm:
   # Console `ai` uses ~/.erebus/llm.yaml (multi-provider). Override here for agent sidecar only.
   base_url: "http://localhost:11434/v1"

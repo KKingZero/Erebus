@@ -13,7 +13,9 @@ type RunOptions struct {
 	SessionID  string
 	MaxSteps   int
 	JSONMode   bool
-	OnApproval func(id, risk, desc string)
+	// OnApproval: return ApprovalGrant/Deny for in-TUI dual-control, or
+	// ApprovalExternal to wait for another process.
+	OnApproval func(id, risk, desc string) (ApprovalAction, string)
 	OnStep     func(StepOutput)
 }
 
@@ -47,6 +49,11 @@ func Run(ctx context.Context, cfg *Config, opts RunOptions) error {
 	}
 
 	exec := &Executor{Client: client, OnApproval: opts.OnApproval}
+	if opts.OnStep != nil {
+		exec.OnLog = func(msg string) {
+			opts.OnStep(StepOutput{Message: "[approval] " + msg})
+		}
+	}
 	loop := &Loop{
 		LLM:      NewLLM(cfg.LLM),
 		Executor: exec,

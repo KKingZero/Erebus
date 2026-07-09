@@ -225,7 +225,7 @@ func buildImplant(t *testing.T, out, implantID, secret, callbackURL, caPEM strin
 		"-s -w -X github.com/KKingZero/erebus-exploit-framwork/implant.implantID=%s "+
 			"-X github.com/KKingZero/erebus-exploit-framwork/implant.implantSecret=%s "+
 			"-X github.com/KKingZero/erebus-exploit-framwork/implant.callbackURL=%s "+
-			"-X github.com/KKingZero/erebus-exploit-framwork/implant.sleepMs=1000 "+
+			"-X github.com/KKingZero/erebus-exploit-framwork/implant.sleepMs=500 "+
 			"-X github.com/KKingZero/erebus-exploit-framwork/implant.jitterPct=0 "+
 			"-X github.com/KKingZero/erebus-exploit-framwork/implant.caCertPEM=%s "+
 			"-X github.com/KKingZero/erebus-exploit-framwork/implant.transportType=https",

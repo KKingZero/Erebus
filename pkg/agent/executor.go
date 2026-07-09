@@ -4,14 +4,32 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
+)
+
+// ApprovalAction tells the executor how to handle a high-risk task gate.
+type ApprovalAction int
+
+const (
+	// ApprovalExternal leaves the gate pending for another process to Approve/Deny.
+	ApprovalExternal ApprovalAction = iota
+	// ApprovalGrant submits Approve via the approver seat.
+	ApprovalGrant
+	// ApprovalDeny submits Deny via the approver seat.
+	ApprovalDeny
 )
 
 // Executor runs tool calls against the C2 client.
 type Executor struct {
 	Client *Client
-	OnApproval func(approvalID, risk, description string)
+	// OnApproval is called when a high-risk task needs approval.
+	// Return ApprovalGrant/Deny for in-process dual-control, or ApprovalExternal
+	// to wait for an outside operator.
+	OnApproval func(approvalID, risk, description string) (ApprovalAction, string)
+	// OnLog is optional operator-visible diagnostics (approve failures, seat issues).
+	OnLog func(string)
 }
 
 // RunTool executes a named tool with JSON arguments.
@@ -98,10 +116,14 @@ func (e *Executor) RunTool(ctx context.Context, name, argsJSON string, defaultSe
 	return InterpretResult(tool.TaskType, result), nil
 }
 
-func (e *Executor) watchApproval(ctx context.Context, sessionID string, done <-chan struct{}) {
-	if e.OnApproval == nil {
+func (e *Executor) logf(format string, args ...any) {
+	if e.OnLog == nil {
 		return
 	}
+	e.OnLog(fmt.Sprintf(format, args...))
+}
+
+func (e *Executor) watchApproval(ctx context.Context, sessionID string, done <-chan struct{}) {
 	go func() {
 		for {
 			select {
@@ -116,20 +138,72 @@ func (e *Executor) watchApproval(ctx context.Context, sessionID string, done <-c
 				if ev.SessionId != "" && ev.SessionId != sessionID {
 					continue
 				}
-				pending, err := e.Client.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
-				if err != nil || len(pending.Approvals) == 0 {
+				target := e.findPendingForSession(ctx, sessionID)
+				if target == nil {
+					// Event can race ahead of the pending map; keep waiting for a match.
 					continue
 				}
-				for _, a := range pending.Approvals {
-					if a.SessionId == sessionID {
-						e.OnApproval(a.Id, a.RiskLevel, a.TaskDescription)
-						return
-					}
-				}
-				last := pending.Approvals[len(pending.Approvals)-1]
-				e.OnApproval(last.Id, last.RiskLevel, last.TaskDescription)
+				e.handleApproval(ctx, target)
 				return
 			}
 		}
 	}()
+}
+
+// findPendingForSession retries briefly so ListPending can catch up with the event.
+func (e *Executor) findPendingForSession(ctx context.Context, sessionID string) *pb.ApprovalRequest {
+	listClient := e.Client.Approver()
+	for attempt := 0; attempt < 10; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+		pending, err := listClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
+		if err != nil || pending == nil || len(pending.Approvals) == 0 {
+			continue
+		}
+		for _, a := range pending.Approvals {
+			if a.SessionId == sessionID {
+				return a
+			}
+		}
+		// Never fall back to another session's pending request.
+	}
+	return nil
+}
+
+func (e *Executor) handleApproval(ctx context.Context, a *pb.ApprovalRequest) {
+	if e.OnApproval == nil {
+		return
+	}
+	action, reason := e.OnApproval(a.Id, a.RiskLevel, a.TaskDescription)
+	switch action {
+	case ApprovalGrant, ApprovalDeny:
+		if !e.Client.HasApproverSeat() {
+			e.logf("approval %s: no distinct approver mTLS seat — cannot Grant/Deny in-process (set approver_cert/approver_key or use external approve)", a.Id)
+			return
+		}
+		if action == ApprovalGrant {
+			if _, err := e.Client.Approver().Approve(ctx, &pb.ApproveRequest{ApprovalId: a.Id}); err != nil {
+				e.logf("approve failed for %s: %v — denying to unblock task", a.Id, err)
+				// Unblock ExecuteTask so the agent does not hang until timeout.
+				denyReason := fmt.Sprintf("approve RPC failed: %v", err)
+				if _, derr := e.Client.Approver().Deny(ctx, &pb.DenyRequest{ApprovalId: a.Id, Reason: denyReason}); derr != nil {
+					e.logf("deny-after-approve-fail also failed for %s: %v", a.Id, derr)
+				}
+			}
+			return
+		}
+		if reason == "" {
+			reason = "denied by operator"
+		}
+		if _, err := e.Client.Approver().Deny(ctx, &pb.DenyRequest{ApprovalId: a.Id, Reason: reason}); err != nil {
+			e.logf("deny failed for %s: %v", a.Id, err)
+		}
+	case ApprovalExternal:
+		// Caller only notified; external operator must approve/deny.
+	}
 }

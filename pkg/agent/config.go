@@ -12,12 +12,14 @@ const DefaultConfigPath = "~/.erebus/agent.yaml"
 
 // Config holds agent connection and LLM settings.
 type Config struct {
-	Server   string         `yaml:"server"`
-	Cert     string         `yaml:"cert"`
-	Key      string         `yaml:"key"`
-	CA       string         `yaml:"ca"`
-	LLM      LLMConfig      `yaml:"llm"`
-	Autonomy AutonomyConfig `yaml:"autonomy"`
+	Server       string         `yaml:"server"`
+	Cert         string         `yaml:"cert"`
+	Key          string         `yaml:"key"`
+	CA           string         `yaml:"ca"`
+	ApproverCert string         `yaml:"approver_cert"` // dual-control seat (CN approver)
+	ApproverKey  string         `yaml:"approver_key"`
+	LLM          LLMConfig      `yaml:"llm"`
+	Autonomy     AutonomyConfig `yaml:"autonomy"`
 }
 
 type LLMConfig struct {
@@ -72,6 +74,8 @@ func (c *Config) expandEnv() {
 	c.Cert = expandPath(expandEnv(c.Cert))
 	c.Key = expandPath(expandEnv(c.Key))
 	c.CA = expandPath(expandEnv(c.CA))
+	c.ApproverCert = expandPath(expandEnv(c.ApproverCert))
+	c.ApproverKey = expandPath(expandEnv(c.ApproverKey))
 	c.LLM.BaseURL = expandEnv(c.LLM.BaseURL)
 	c.LLM.APIKey = expandEnv(c.LLM.APIKey)
 	c.LLM.Model = expandEnv(c.LLM.Model)

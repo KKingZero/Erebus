@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-07-08T22:36:58-05:00",
+  "total_s": 7.49702994,
+  "setup_s": 0.836271208,
+  "steps": [
+    {
+      "name": "juice_portscan",
+      "target": "127.0.0.1 [3000]",
+      "success": true,
+      "duration_s": 0.936416457,
+      "detail": "open=1 [3000/]"
+    },
+    {
+      "name": "juice_shell_curl",
+      "target": "http://127.0.0.1:3000/",
+      "success": true,
+      "duration_s": 0.518627614,
+      "detail": "exit=0 http=200"
+    },
+    {
+      "name": "juice_ifconfig",
+      "target": "local",
+      "success": true,
+      "duration_s": 0.510712865,
+      "detail": "success=true"
+    },
+    {
+      "name": "meta_portscan_mapped",
+      "target": "127.0.0.1 [18081 12222 12121]",
+      "success": true,
+      "duration_s": 0.622532025,
+      "detail": "open=3 [12222/SSH-2.0-OpenSSH_4.7p1 Debian-8ubuntu1\n 12121/220 (vsFTPd 2.3.4)\r\n 18081/]"
+    },
+    {
+      "name": "meta_shell_curl",
+      "target": "http://127.0.0.1:18081/",
+      "success": true,
+      "duration_s": 0.548786424,
+      "detail": "exit=0 http=200"
+    },
+    {
+      "name": "meta_shell_ssh_banner",
+      "target": "127.0.0.1:12222",
+      "success": true,
+      "duration_s": 3.5234910360000002,
+      "detail": "exit=0 banner_len=0 sample=\"\""
+    }
+  ],
+  "baseline_prior_review": {
+    "notes": "Prior run: external nmap/nikto via Zypheron CLI tool manager; Erebus run: implant C2 recon (portscan+shell).",
+    "source": "Zypheron-CLI-Production/reports/security-performance-review (2026-07-08)",
+    "zypheron_nikto_juice_s": 45.03,
+    "zypheron_nikto_juice_success": false,
+    "zypheron_nikto_meta_success": true,
+    "zypheron_nikto_metasploitable_s": 9.15,
+    "zypheron_nmap_local_s": 12.12
+  }
+}

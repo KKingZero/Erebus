@@ -15,9 +15,14 @@ import (
 )
 
 // Client wraps the ErebusC2 gRPC API for the AI agent.
+// Operator seat (embedded client) runs ExecuteTask; optional Approver seat
+// submits dual-control Approve/Deny with a different mTLS CN.
 type Client struct {
 	pb.ErebusC2Client
 	conn *grpc.ClientConn
+
+	approver     pb.ErebusC2Client
+	approverConn *grpc.ClientConn
 
 	eventMu sync.Mutex
 	events  []*pb.Event
@@ -25,17 +30,41 @@ type Client struct {
 	stopSub context.CancelFunc
 }
 
-// Connect dials the teamserver with mTLS.
+// Connect dials the teamserver with mTLS (operator seat).
+// When ApproverCert/ApproverKey are set, also opens the approver seat.
 func Connect(cfg *Config) (*Client, error) {
 	conn, err := dialGRPC(cfg.Server, cfg.Cert, cfg.Key, cfg.CA)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{
+	c := &Client{
 		ErebusC2Client: pb.NewErebusC2Client(conn),
 		conn:           conn,
 		eventCh:        make(chan *pb.Event, 64),
-	}, nil
+	}
+	if cfg.ApproverCert != "" && cfg.ApproverKey != "" {
+		apConn, err := dialGRPC(cfg.Server, cfg.ApproverCert, cfg.ApproverKey, cfg.CA)
+		if err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("connect approver seat: %w", err)
+		}
+		c.approverConn = apConn
+		c.approver = pb.NewErebusC2Client(apConn)
+	}
+	return c, nil
+}
+
+// Approver returns the dual-control approver client, or the operator client if unset.
+func (c *Client) Approver() pb.ErebusC2Client {
+	if c.approver != nil {
+		return c.approver
+	}
+	return c.ErebusC2Client
+}
+
+// HasApproverSeat reports whether a distinct approver mTLS connection is open.
+func (c *Client) HasApproverSeat() bool {
+	return c.approver != nil
 }
 
 func dialGRPC(addr, certFile, keyFile, caFile string) (*grpc.ClientConn, error) {
@@ -60,15 +89,23 @@ func dialGRPC(addr, certFile, keyFile, caFile string) (*grpc.ClientConn, error) 
 	return grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
 }
 
-// Close shuts down subscriptions and the gRPC connection.
+// Close shuts down subscriptions and the gRPC connection(s).
 func (c *Client) Close() error {
 	if c.stopSub != nil {
 		c.stopSub()
 	}
-	if c.conn != nil {
-		return c.conn.Close()
+	var first error
+	if c.approverConn != nil {
+		if err := c.approverConn.Close(); err != nil && first == nil {
+			first = err
+		}
 	}
-	return nil
+	if c.conn != nil {
+		if err := c.conn.Close(); err != nil && first == nil {
+			first = err
+		}
+	}
+	return first
 }
 
 // StartSubscribe begins streaming teamserver events into eventCh.

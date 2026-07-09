@@ -59,10 +59,13 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 		return nil, fmt.Errorf("encrypt session key: %w", err)
 	}
 
+	// NextCheckinMs 0 = implant keeps build-time sleep (do not force 5s override).
+	// When session has an operator-set interval, use that instead.
+	nextMs := sess.NextCheckinMs()
 	return &pb.RegisterResponse{
 		Success:             true,
 		SessionId:           sessionID,
-		NextCheckinMs:       5000,
+		NextCheckinMs:       nextMs,
 		EncryptedSessionKey: encryptedKey,
 	}, nil
 }
@@ -111,8 +114,9 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 
 	pendingTasks := sess.DrainTasks()
 
+	// 0 = implant keeps its current sleep; non-zero only when operator set interval.
 	resp := &pb.BeaconResponse{
-		NextCheckinMs: 5000,
+		NextCheckinMs: sess.NextCheckinMs(),
 		Terminate:     !sess.IsAlive(),
 	}
 

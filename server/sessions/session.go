@@ -24,6 +24,8 @@ type Session struct {
 	LastCheckin     time.Time
 	Alive          bool
 	SessionKey     []byte // AES session key for encrypted comms
+	// CheckinMs is the operator-requested beacon interval; 0 means "implant default".
+	CheckinMs int64
 
 	// Pending tasks for this session
 	taskQueue []*pb.Task
@@ -65,6 +67,25 @@ func (s *Session) Kill() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Alive = false
+}
+
+// SetCheckinMs records the operator-requested beacon interval for NextCheckinMs responses.
+// Pass 0 to clear and let the implant keep its build-time sleep.
+func (s *Session) SetCheckinMs(ms int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ms < 0 {
+		ms = 0
+	}
+	s.CheckinMs = ms
+}
+
+// NextCheckinMs returns the interval to advertise on Register/Beacon responses.
+// 0 means "do not override implant sleep".
+func (s *Session) NextCheckinMs() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.CheckinMs
 }
 
 func (s *Session) EnqueueTask(task *pb.Task) {

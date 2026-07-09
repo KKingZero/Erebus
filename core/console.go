@@ -180,71 +180,52 @@ func (c *Console) cmdHelp() {
 
 	commands := []HelpEntry{
 		{"help", "Show this menu"},
-		{"use <module>", "Load a module"},
-		{"back", "Unload current module"},
-		{"search <term>", "Search modules by name, CVE, platform"},
-		{"info", "Show current module info"},
-		{"options", "Show current module options"},
-		{"run / exploit", "Execute current module"},
-		{"sessions", "List active sessions"},
-		{"sessions -i <id>", "Interact with a session"},
-		{"workspace <new|list>", "Manage engagements"},
-		{"loot", "Show captured loot"},
-		{"report generate", "Generate pentest report"},
-		{"ai", "Open AI chat terminal (TUI)"},
-		{"ai <message>", "Open TUI with first message"},
-		{"ai providers", "List LLM providers (ollama, openai, anthropic, bedrock, kimi)"},
+		{"ai", "Open AI chat TUI (Normal / Plan / Auto)"},
+		{"ai <message>", "Open TUI and send first message"},
+		{"ai providers", "List LLM providers"},
 		{"ai key <provider>", "Set API key (hidden prompt)"},
 		{"ai provider <name>", "Switch active LLM provider"},
+		{"sessions", "List active sessions (needs teamserver)"},
+		{"sessions -i <id>", "Show session details"},
+		{"loot", "Show captured loot"},
+		{"workspace <new|list>", "Manage engagements"},
+		{"report generate", "Generate pentest report"},
 		{"clear", "Clear screen"},
 		{"exit", "Exit Erebus"},
 	}
 
-	categories := []CategoryEntry{
-		{"recon/passive", "Passive recon — no target interaction"},
-		{"recon/active", "Active recon — touches target"},
-		{"exploit/web/<name>", "Web exploitation modules"},
-		{"exploit/network/<name>", "Network exploitation modules"},
-		{"modules/ad/<name>", "Active Directory attacks"},
-		{"modules/post/windows", "Windows post-exploitation"},
-		{"modules/post/linux", "Linux post-exploitation"},
-		{"modules/container/", "Container escape modules"},
-		{"modules/pivot", "Pivoting and tunneling"},
-	}
-
 	var humanMsg strings.Builder
-	humanMsg.WriteString("\nCore Commands:\n")
+	humanMsg.WriteString("\nPrimary workflow:\n")
+	humanMsg.WriteString("  1. erebus serve          Start teamserver + operator session\n")
+	humanMsg.WriteString("  2. ai                    Open AI TUI — Plan path, Auto execute\n")
+	humanMsg.WriteString("  3. In Auto: [a]/[d]      Approve/deny high-risk tasks in the TUI\n")
+	humanMsg.WriteString("\nCommands:\n")
 	for _, cmd := range commands {
 		humanMsg.WriteString(fmt.Sprintf("  %-24s%s\n", cmd.Command, cmd.Description))
 	}
-	humanMsg.WriteString("\nModule Categories:\n")
-	for _, cat := range categories {
-		humanMsg.WriteString(fmt.Sprintf("  %-24s%s\n", cat.Path, cat.Description))
-	}
+	humanMsg.WriteString("\nOperator REPL (implant tasks):\n")
+	humanMsg.WriteString("  erebus serve / erebus operator — shell, ldap-enum, kerberoast, approve\n")
+	humanMsg.WriteString("\nNote: Metasploit-style use/run modules are not wired in this console;\n")
+	humanMsg.WriteString("use `ai` (Auto) or the operator REPL for live tasks.\n")
 
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "help",
 		Message: humanMsg.String(),
 		Data: map[string]interface{}{
-			"commands":   commands,
-			"categories": categories,
+			"commands": commands,
 		},
 	})
 }
 
 func (c *Console) cmdUse(args []string) {
-	if len(args) == 0 {
-		emitError(c.mode, "use", "Usage: use <module>")
-		return
-	}
-	c.currentModule = args[0]
 	emit(c.mode, Response{
-		Status:  "ok",
+		Status:  "info",
 		Command: "use",
-		Message: fmt.Sprintf("> Loaded module: %s", c.currentModule),
-		Data: map[string]string{
-			"module": c.currentModule,
+		Message: "> Module load is not available in the startup console.\n> Use `ai` (Plan/Auto) or `erebus serve` operator REPL for live tasks.",
+		Data: map[string]interface{}{
+			"status": "unavailable",
+			"args":   args,
 		},
 	})
 }
@@ -275,7 +256,7 @@ func (c *Console) cmdSearch(args []string) {
 	emit(c.mode, Response{
 		Status:  "info",
 		Command: "search",
-		Message: fmt.Sprintf("> Module search is not available in the startup console.\n> Use `erebus serve` operator REPL or `ai` for module discovery.\n> Query: %s", query),
+		Message: fmt.Sprintf("> Module search is not available in the startup console.\n> Use `ai` (Plan mode) or the operator REPL.\n> Query: %s", query),
 		Data: map[string]interface{}{
 			"query":   query,
 			"results": []interface{}{},
@@ -405,73 +386,33 @@ func (c *Console) cmdWorkspace(args []string) {
 }
 
 func (c *Console) cmdOptions() {
-	if c.currentModule == "" {
-		emitError(c.mode, "options", "No module loaded. Use 'use <module>' first")
-		return
-	}
-
-	type Option struct {
-		Name        string `json:"name"`
-		Value       string `json:"value"`
-		Required    bool   `json:"required"`
-		Description string `json:"description"`
-	}
-
-	opts := []Option{
-		{"RHOST", "", true, "Target host"},
-		{"LHOST", "", true, "Local host"},
-		{"LPORT", "4444", true, "Local port"},
-	}
-
-	var humanMsg strings.Builder
-	humanMsg.WriteString(fmt.Sprintf("> Options for: %s\n", c.currentModule))
-	humanMsg.WriteString("  Name        Value     Required  Description\n")
-	humanMsg.WriteString("  ----        -----     --------  -----------\n")
-	for _, o := range opts {
-		req := "yes"
-		if !o.Required {
-			req = "no"
-		}
-		humanMsg.WriteString(fmt.Sprintf("  %-10s  %-8s  %-8s  %s\n", o.Name, o.Value, req, o.Description))
-	}
-
 	emit(c.mode, Response{
-		Status:  "ok",
+		Status:  "info",
 		Command: "options",
-		Message: humanMsg.String(),
-		Data: map[string]interface{}{
-			"module":  c.currentModule,
-			"options": opts,
+		Message: "> Module options are not available in the startup console.\n> Use `ai` (Auto) or `erebus serve` operator REPL for live tasks.",
+		Data: map[string]string{
+			"status": "unavailable",
 		},
 	})
 }
 
 func (c *Console) cmdInfo() {
-	if c.currentModule == "" {
-		emitError(c.mode, "info", "No module loaded")
-		return
-	}
 	emit(c.mode, Response{
-		Status:  "ok",
+		Status:  "info",
 		Command: "info",
-		Message: fmt.Sprintf("> Module: %s\n> Full info coming soon...", c.currentModule),
+		Message: "> Module info is not available in the startup console.\n> Use `ai` (Plan mode) for attack-path planning, or the operator REPL.",
 		Data: map[string]string{
-			"module": c.currentModule,
+			"status": "unavailable",
 		},
 	})
 }
 
 func (c *Console) cmdRun() {
-	if c.currentModule == "" {
-		emitError(c.mode, "run", "No module loaded. Use 'use <module>' first")
-		return
-	}
 	emit(c.mode, Response{
-		Status:  "ok",
+		Status:  "info",
 		Command: "run",
-		Message: fmt.Sprintf("> Module execution is not available in the startup console.\n> Use `erebus serve` operator REPL or `ai` to run %s.", c.currentModule),
+		Message: "> Module execution is not available in the startup console.\n> Use `ai` (Auto mode) or `erebus serve` operator REPL.",
 		Data: map[string]string{
-			"module": c.currentModule,
 			"status": "unavailable",
 		},
 	})

@@ -62,10 +62,11 @@ type BuildRequest struct {
 
 // BuildResult contains the output of a successful build.
 type BuildResult struct {
-	BuildID  string
-	Binary   []byte
-	Filename string
-	Format   Format
+	BuildID   string
+	Binary    []byte
+	Filename  string
+	Format    Format
+	SizeBytes int64
 }
 
 // Build orchestrates the implant build process.
@@ -291,10 +292,11 @@ func Build(req *BuildRequest) (*BuildResult, error) {
 	}
 
 	return &BuildResult{
-		BuildID:  buildID,
-		Binary:   binary,
-		Filename: filename,
-		Format:   req.Format,
+		BuildID:   buildID,
+		Binary:    binary,
+		Filename:  filename,
+		Format:    req.Format,
+		SizeBytes: int64(len(binary)),
 	}, nil
 }
 

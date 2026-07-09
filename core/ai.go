@@ -80,9 +80,11 @@ func (c *Console) tryAgentLoop(ctx context.Context, objective string, llmCfg llm
 
 	err := agent.Run(ctx, agentCfg, agent.RunOptions{
 		Objective: objective,
-		OnApproval: func(id, risk, desc string) {
-			fmt.Fprintf(os.Stderr, "[approval] id=%s risk=%s — run: erebus operator → pending → approve %s (%s)\n",
+		OnApproval: func(id, risk, desc string) (agent.ApprovalAction, string) {
+			// Non-TUI path: notify and wait for external approver (or dual-seat auto if wired later).
+			fmt.Fprintf(os.Stderr, "[approval] id=%s risk=%s — approve in AI TUI (preferred) or: operator → pending → approve %s (%s)\n",
 				id, risk, id, desc)
+			return agent.ApprovalExternal, ""
 		},
 		OnStep: func(step agent.StepOutput) {
 			if c.mode == OutputJSON {

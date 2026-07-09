@@ -60,8 +60,23 @@ func (s *State) ContextSummary(events []*pb.Event) string {
 	if s.SessionID != "" {
 		fmt.Fprintf(&b, "Primary session: %s\n", s.SessionID)
 	}
+	fmt.Fprintf(&b, "Steps used: %d / max %d\n", len(s.Steps), s.MaxSteps)
+	if len(s.Steps) > 0 {
+		b.WriteString("Recent steps (tool chain):\n")
+		start := 0
+		if len(s.Steps) > 8 {
+			start = len(s.Steps) - 8
+		}
+		for _, st := range s.Steps[start:] {
+			status := "ok"
+			if st.Error != "" {
+				status = "ERR"
+			}
+			fmt.Fprintf(&b, "- step %d %s [%s] risk=%s\n", st.Step, st.Tool, status, st.Risk)
+		}
+	}
 	if len(s.Findings) > 0 {
-		b.WriteString("Recent findings:\n")
+		b.WriteString("Recent findings (prefer next_suggested_actions in them):\n")
 		start := 0
 		if len(s.Findings) > 10 {
 			start = len(s.Findings) - 10
