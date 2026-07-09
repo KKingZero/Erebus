@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/url"
@@ -42,22 +43,22 @@ const (
 
 // BuildRequest contains all parameters needed to build an implant.
 type BuildRequest struct {
-	Language     string // "go" (default), "c"
-	OS           string // "windows", "linux", "darwin"
-	Arch         string // "amd64", "arm64"
-	Transport    string // "https", "dns"
-	Callbacks    []string
-	SleepMs      int64
-	JitterPct    int32
-	Garble       bool
-	CDNDomain    string
-	DNSDomain    string
-	DNSServer    string
-	Format       Format
-	Operator     string
+	Language      string // "go" (default), "c"
+	OS            string // "windows", "linux", "darwin"
+	Arch          string // "amd64", "arm64"
+	Transport     string // "https", "dns"
+	Callbacks     []string
+	SleepMs       int64
+	JitterPct     int32
+	Garble        bool
+	CDNDomain     string
+	DNSDomain     string
+	DNSServer     string
+	Format        Format
+	Operator      string
 	ImplantSecret string // hex-encoded
-	CACertPath   string
-	ProjectRoot  string // path to the project root for build
+	CACertPath    string
+	ProjectRoot   string // path to the project root for build
 }
 
 // BuildResult contains the output of a successful build.
@@ -177,7 +178,11 @@ func Build(req *BuildRequest) (*BuildResult, error) {
 	}
 
 	if req.CACertPath != "" {
-		ldflags = append(ldflags, fmt.Sprintf("-X '%s/implant.caCertPEM=%s'", module, req.CACertPath))
+		caPEM, err := os.ReadFile(req.CACertPath)
+		if err != nil {
+			return nil, fmt.Errorf("read CA cert: %w", err)
+		}
+		ldflags = append(ldflags, fmt.Sprintf("-X '%s/implant.caCertPEM=%s'", module, base64.StdEncoding.EncodeToString(caPEM)))
 	}
 
 	// Determine output file

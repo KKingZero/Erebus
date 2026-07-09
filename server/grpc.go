@@ -19,8 +19,8 @@ import (
 
 // validOS and validArch are whitelists for build targets.
 var (
-	validOS   = map[string]bool{"windows": true, "linux": true, "darwin": true}
-	validArch = map[string]bool{"amd64": true, "arm64": true}
+	validOS        = map[string]bool{"windows": true, "linux": true, "darwin": true}
+	validArch      = map[string]bool{"amd64": true, "arm64": true}
 	validTransport = map[string]bool{"https": true, "dns": true}
 	validLanguage  = map[string]bool{"go": true, "c": true, "": true}
 )
@@ -294,10 +294,17 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 
 	// Validate callback URLs
 	for _, cb := range req.Callbacks {
-		if _, err := url.ParseRequestURI(cb); err != nil {
+		parsed, err := url.ParseRequestURI(cb)
+		if err != nil {
 			return &pb.GenerateImplantResponse{
 				Success: false,
 				Error:   fmt.Sprintf("invalid callback URL %q: %v", cb, err),
+			}, nil
+		}
+		if transport == "https" && parsed.Scheme != "https" {
+			return &pb.GenerateImplantResponse{
+				Success: false,
+				Error:   fmt.Sprintf("invalid callback URL %q: https transport requires https callback URL", cb),
 			}, nil
 		}
 	}
@@ -363,6 +370,9 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		Operator:      operator,
 		ImplantSecret: s.ts.Config.ImplantSecret,
 		ProjectRoot:   projectRoot,
+	}
+	if language == "c" {
+		buildReq.CACertPath = filepath.Join(s.ts.Config.DataDir, "ca-cert.pem")
 	}
 
 	result, err := builder.Build(buildReq)

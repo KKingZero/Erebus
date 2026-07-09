@@ -15,7 +15,7 @@ DNS_SERVER     ?=
 CDN_DOMAIN     ?=
 
 CFLAGS  = -Wall -Wextra -O2 -std=c11 -Iinclude -D_WIN32_WINNT=0x0601
-LDFLAGS = -lwinhttp -lbcrypt -lws2_32 -lgdi32 -liphlpapi -lwldap32 -lshell32 -ladvapi32 -static
+LDFLAGS = -lwinhttp -lcrypt32 -lbcrypt -lws2_32 -lgdi32 -liphlpapi -lwldap32 -lshell32 -ladvapi32 -static
 
 SRCS = \
 	src/syscall/indirect.c \

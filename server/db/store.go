@@ -139,13 +139,21 @@ func (s *Store) CompleteTask(taskID string, success bool, resultData []byte, res
 
 func (s *Store) GetTask(taskID string) (*TaskRow, error) {
 	row := &TaskRow{}
+	var resultError sql.NullString
+	var executionTime sql.NullInt64
 	err := s.db.QueryRow(`SELECT task_id, session_id, task_type, data, timeout_ms, created_at,
 		completed_at, success, result_data, result_error, execution_time_ms
 		FROM tasks WHERE task_id = ?`, taskID).Scan(
 		&row.TaskID, &row.SessionID, &row.TaskType, &row.Data, &row.TimeoutMs, &row.CreatedAt,
-		&row.CompletedAt, &row.Success, &row.ResultData, &row.ResultError, &row.ExecutionTimeMs)
+		&row.CompletedAt, &row.Success, &row.ResultData, &resultError, &executionTime)
 	if err != nil {
 		return nil, err
+	}
+	if resultError.Valid {
+		row.ResultError = resultError.String
+	}
+	if executionTime.Valid {
+		row.ExecutionTimeMs = executionTime.Int64
 	}
 	return row, nil
 }
@@ -162,10 +170,18 @@ func (s *Store) ListTasksBySession(sessionID string) ([]*TaskRow, error) {
 	var tasks []*TaskRow
 	for rows.Next() {
 		row := &TaskRow{}
+		var resultError sql.NullString
+		var executionTime sql.NullInt64
 		if err := rows.Scan(&row.TaskID, &row.SessionID, &row.TaskType, &row.Data, &row.TimeoutMs,
-			&row.CreatedAt, &row.CompletedAt, &row.Success, &row.ResultData, &row.ResultError,
-			&row.ExecutionTimeMs); err != nil {
+			&row.CreatedAt, &row.CompletedAt, &row.Success, &row.ResultData, &resultError,
+			&executionTime); err != nil {
 			return nil, err
+		}
+		if resultError.Valid {
+			row.ResultError = resultError.String
+		}
+		if executionTime.Valid {
+			row.ExecutionTimeMs = executionTime.Int64
 		}
 		tasks = append(tasks, row)
 	}

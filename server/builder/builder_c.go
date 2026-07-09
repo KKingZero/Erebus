@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"os"
@@ -86,11 +87,15 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		if err := validateLdflagValue(req.CACertPath, "CACertPath"); err != nil {
 			return nil, err
 		}
-		pem, err := os.ReadFile(req.CACertPath)
+		caPEM, err := os.ReadFile(req.CACertPath)
 		if err != nil {
 			return nil, fmt.Errorf("read CA cert: %w", err)
 		}
-		caCertB64 = base64.StdEncoding.EncodeToString(pem)
+		block, _ := pem.Decode(caPEM)
+		if block == nil || block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("decode CA cert PEM")
+		}
+		caCertB64 = base64.StdEncoding.EncodeToString(block.Bytes)
 	}
 
 	projectRoot := req.ProjectRoot

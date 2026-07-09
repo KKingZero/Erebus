@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winhttp.h>
+#include <wincrypt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include "erebus/transport.h"
 
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "crypt32.lib")
 
 typedef struct https_ctx {
     wchar_t host[256];
@@ -19,7 +21,53 @@ typedef struct https_ctx {
     wchar_t cdn_host[256];
 } https_ctx;
 
+static PCCERT_CONTEXT load_pinned_ca(void) {
+    if (EREBUS_CA_CERT_PEM[0] == '\0') return NULL;
+
+    DWORD der_len = 0;
+    if (!CryptStringToBinaryA(EREBUS_CA_CERT_PEM, 0, CRYPT_STRING_BASE64, NULL, &der_len, NULL, NULL) || der_len == 0)
+        return NULL;
+
+    BYTE *der = (BYTE *)malloc(der_len);
+    if (!der) return NULL;
+
+    PCCERT_CONTEXT ca = NULL;
+    if (CryptStringToBinaryA(EREBUS_CA_CERT_PEM, 0, CRYPT_STRING_BASE64, der, &der_len, NULL, NULL)) {
+        ca = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, der, der_len);
+    }
+    free(der);
+    return ca;
+}
+
+static int verify_server_cert_pinned(HINTERNET request) {
+    PCCERT_CONTEXT server = NULL;
+    DWORD server_len = sizeof(server);
+    if (!WinHttpQueryOption(request, WINHTTP_OPTION_SERVER_CERT_CONTEXT, &server, &server_len) || !server)
+        return 0;
+
+    PCCERT_CONTEXT ca = load_pinned_ca();
+    if (!ca) {
+        CertFreeCertificateContext(server);
+        return 0;
+    }
+
+    BOOL ok = CryptVerifyCertificateSignatureEx(0,
+        X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+        CRYPT_VERIFY_CERT_SIGN_SUBJECT_CERT,
+        (void *)server,
+        CRYPT_VERIFY_CERT_SIGN_ISSUER_CERT,
+        (void *)ca,
+        0,
+        NULL);
+
+    CertFreeCertificateContext(ca);
+    CertFreeCertificateContext(server);
+    return ok ? 1 : 0;
+}
+
 static int https_post(https_ctx *ctx, const wchar_t *path, const uint8_t *body, size_t body_len, uint8_t **resp, size_t *resp_len) {
+    if (ctx->use_tls && EREBUS_CA_CERT_PEM[0] == '\0') return 0;
+
     HINTERNET session = WinHttpOpen(L"Erebus/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
     if (!session) return 0;
 
@@ -31,12 +79,11 @@ static int https_post(https_ctx *ctx, const wchar_t *path, const uint8_t *body, 
         WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) { WinHttpCloseHandle(connect); WinHttpCloseHandle(session); return 0; }
 
-    if (ctx->use_tls && EREBUS_CA_CERT_PEM[0] == '\0') {
-        DWORD sec_flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
-            SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
-            SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-        WinHttpSetOption(request, WINHTTP_OPTION_SECURITY_FLAGS, &sec_flags, sizeof(sec_flags));
-    }
+	if (ctx->use_tls && EREBUS_CA_CERT_PEM[0] != '\0') {
+		DWORD sec_flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+			SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+		WinHttpSetOption(request, WINHTTP_OPTION_SECURITY_FLAGS, &sec_flags, sizeof(sec_flags));
+	}
 
     if (ctx->cdn_host[0]) {
         WinHttpAddRequestHeaders(request, ctx->cdn_host, (DWORD)-1, WINHTTP_ADDREQ_FLAG_ADD);
@@ -50,6 +97,8 @@ static int https_post(https_ctx *ctx, const wchar_t *path, const uint8_t *body, 
     if (!ok) goto cleanup;
     ok = WinHttpReceiveResponse(request, NULL);
     if (!ok) goto cleanup;
+
+    if (ctx->use_tls && !verify_server_cert_pinned(request)) goto cleanup;
 
     DWORD status = 0, sz = sizeof(status);
     WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,

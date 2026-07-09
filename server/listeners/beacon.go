@@ -109,7 +109,9 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 	}
 
 	for _, result := range results {
-		h.Dispatcher.HandleResult(result)
+		if h.Dispatcher != nil {
+			h.Dispatcher.HandleResultForSession(sess.SessionID, result)
+		}
 	}
 
 	pendingTasks := sess.DrainTasks()
