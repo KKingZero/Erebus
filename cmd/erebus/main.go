@@ -28,6 +28,10 @@ func main() {
 		runTeamserver(os.Args[2:])
 	case "operator":
 		runOperator(os.Args[2:])
+	case "op":
+		runOp(os.Args[2:])
+	case "certs":
+		runCerts(os.Args[2:])
 	case "console":
 		runConsole(os.Args[2:])
 	case "help", "-h", "--help":
@@ -77,9 +81,8 @@ func runTeamserver(args []string) {
 func runOperator(args []string) {
 	serverAddr := "127.0.0.1:50051"
 	defCert, defKey, defCA := erebuscli.DefaultCertPaths()
-	defApCert, defApKey := erebuscli.DefaultApproverCertPaths()
 	cert, key, ca := defCert, defKey, defCA
-	apCert, apKey := defApCert, defApKey
+	apCert, apKey := "", ""
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -116,10 +119,9 @@ func runOperator(args []string) {
 		}
 	}
 
-	if cert == defCert && key == defKey && ca == defCA && apCert == defApCert && apKey == defApKey {
-		if seats, err := erebuscli.EnsureSeatCerts(erebuscli.DataDir()); err == nil {
-			cert, key, ca = seats.OperatorCert, seats.OperatorKey, seats.CA
-			apCert, apKey = seats.ApproverCert, seats.ApproverKey
+	if cert == defCert && key == defKey && ca == defCA {
+		if opCert, opKey, opCA, err := erebuscli.EnsureOperatorCerts(erebuscli.DataDir()); err == nil {
+			cert, key, ca = opCert, opKey, opCA
 		}
 	}
 
@@ -136,6 +138,79 @@ func runOperator(args []string) {
 	}
 }
 
+func runOp(args []string) {
+	opts := erebuscli.OpOptions{Server: "127.0.0.1:50051"}
+	defCert, defKey, defCA := erebuscli.DefaultCertPaths()
+	opts.CertFile, opts.KeyFile, opts.CAFile = defCert, defKey, defCA
+	apC, apK := erebuscli.DefaultApproverCertPaths()
+	opts.ApproverCertFile, opts.ApproverKeyFile = apC, apK
+
+	// Global flags may appear before the op subcommand.
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "-server":
+			if i+1 < len(args) {
+				opts.Server = args[i+1]
+				i += 2
+				continue
+			}
+		case "-cert":
+			if i+1 < len(args) {
+				opts.CertFile = args[i+1]
+				i += 2
+				continue
+			}
+		case "-key":
+			if i+1 < len(args) {
+				opts.KeyFile = args[i+1]
+				i += 2
+				continue
+			}
+		case "-ca":
+			if i+1 < len(args) {
+				opts.CAFile = args[i+1]
+				i += 2
+				continue
+			}
+		case "-approver-cert":
+			if i+1 < len(args) {
+				opts.ApproverCertFile = args[i+1]
+				i += 2
+				continue
+			}
+		case "-approver-key":
+			if i+1 < len(args) {
+				opts.ApproverKeyFile = args[i+1]
+				i += 2
+				continue
+			}
+		}
+		break
+	}
+	if err := erebuscli.RunOp(opts, args[i:]); err != nil {
+		fmt.Fprintf(os.Stderr, "erebus op: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runCerts(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "usage: erebus certs seats\n")
+		os.Exit(1)
+	}
+	switch args[0] {
+	case "seats":
+		if err := erebuscli.RunCertsSeats(erebuscli.DataDir()); err != nil {
+			fmt.Fprintf(os.Stderr, "erebus certs seats: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown certs command: %s (try: seats)\n", args[0])
+		os.Exit(1)
+	}
+}
+
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `Erebus Exploitation Framework v%s
 
@@ -145,6 +220,8 @@ Usage:
   erebus serve         Start teamserver + operator C2 session
   erebus teamserver    Run teamserver only
   erebus operator      Connect to teamserver REPL
+  erebus op            One-shot operator commands (sessions/shell/lateral/...)
+  erebus certs seats   Ensure operator + approver mTLS certs
   erebus help          Show this help
 
 Data directory: %s

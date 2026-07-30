@@ -22,6 +22,7 @@ func NewReplayCache(ttl time.Duration) *ReplayCache {
 }
 
 // CheckAndRecord returns an error if the timestamp was already seen within TTL.
+// With millisecond timestamps, each beacon can share the same wall second safely.
 func (c *ReplayCache) CheckAndRecord(implantID string, timestamp int64) error {
 	key := fmt.Sprintf("%s|%d", implantID, timestamp)
 	now := time.Now()
@@ -29,10 +30,12 @@ func (c *ReplayCache) CheckAndRecord(implantID string, timestamp int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Prune expired entries opportunistically.
-	for k, t := range c.seen {
-		if now.Sub(t) > c.ttl {
-			delete(c.seen, k)
+	// Opportunistic prune (bounded cost when map stays small under TTL).
+	if len(c.seen) > 256 {
+		for k, t := range c.seen {
+			if now.Sub(t) > c.ttl {
+				delete(c.seen, k)
+			}
 		}
 	}
 

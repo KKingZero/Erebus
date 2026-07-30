@@ -59,13 +59,14 @@ func LoadConfig() (*Config, error) {
 		jitter = 20
 	}
 
-	// Decode base64-encoded CA cert PEM if provided
+	// Decode base64-encoded CA cert PEM if provided (fail closed on bad pin material).
 	var decodedCACert string
 	if caCertPEM != "" {
 		decoded, err := base64.StdEncoding.DecodeString(caCertPEM)
-		if err == nil {
-			decodedCACert = string(decoded)
+		if err != nil {
+			return nil, fmt.Errorf("decode CA cert PEM (base64): %w", err)
 		}
+		decodedCACert = string(decoded)
 	}
 
 	tt := transportType

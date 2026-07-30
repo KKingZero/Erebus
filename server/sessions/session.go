@@ -26,6 +26,9 @@ type Session struct {
 	SessionKey     []byte // AES session key for encrypted comms
 	// CheckinMs is the operator-requested beacon interval; 0 means "implant default".
 	CheckinMs int64
+	// terminateRequested is set by operator Kill; UpdateCheckin must not clear it.
+	// Distinct from reaper marking Alive=false (which allows revive on late check-in).
+	terminateRequested bool
 
 	// Pending tasks for this session
 	taskQueue []*pb.Task
@@ -54,7 +57,10 @@ func (s *Session) UpdateCheckin() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.LastCheckin = time.Now()
-	s.Alive = true
+	// Operator kill sticks: do not revive a terminate-requested session.
+	if !s.terminateRequested {
+		s.Alive = true
+	}
 }
 
 func (s *Session) IsAlive() bool {
@@ -63,10 +69,28 @@ func (s *Session) IsAlive() bool {
 	return s.Alive
 }
 
+// Kill marks the session dead and requests implant terminate on next beacon.
+// Used for operator kill (not reaper — use MarkDead for soft timeout).
 func (s *Session) Kill() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Alive = false
+	s.terminateRequested = true
+}
+
+// MarkDead marks the session inactive without requesting terminate.
+// Used by the reaper so a late check-in can revive the session.
+func (s *Session) MarkDead() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Alive = false
+}
+
+// ShouldTerminate reports whether the implant should exit (operator kill).
+func (s *Session) ShouldTerminate() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.terminateRequested
 }
 
 // SetCheckinMs records the operator-requested beacon interval for NextCheckinMs responses.

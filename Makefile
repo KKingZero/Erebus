@@ -8,12 +8,24 @@ BUILD_DIR   = ./build
 PREFIX      ?= $(HOME)/.local
 BINDIR      ?= $(PREFIX)/bin
 
-# Implant build-time config (override via env or make args)
-IMPLANT_ID     ?= $(shell head -c 16 /dev/urandom | xxd -p)
-IMPLANT_SECRET ?= $(shell head -c 32 /dev/urandom | xxd -p)
-CALLBACK_URL   ?= https://127.0.0.1:443
+# Implant build-time config (override via env or make args).
+# Prefer openssl/python over xxd (xxd is often missing on minimal hosts).
+IMPLANT_ID     ?= $(shell openssl rand -hex 16 2>/dev/null || python3 -c 'import secrets;print(secrets.token_hex(16))')
+IMPLANT_SECRET ?= $(shell openssl rand -hex 32 2>/dev/null || python3 -c 'import secrets;print(secrets.token_hex(32))')
+CALLBACK_URL   ?= https://127.0.0.1:8443
 SLEEP_MS       ?= 5000
 JITTER_PCT     ?= 20
+
+# Fail closed: never inject empty ldflags (empty ID crashes implant at LoadConfig).
+ifeq ($(strip $(IMPLANT_ID)),)
+$(error IMPLANT_ID is empty — install openssl or python3, or pass IMPLANT_ID=...)
+endif
+ifeq ($(strip $(IMPLANT_SECRET)),)
+$(error IMPLANT_SECRET is empty — install openssl or python3, or pass IMPLANT_SECRET=...)
+endif
+ifneq ($(shell printf '%s' '$(IMPLANT_SECRET)' | wc -c),64)
+$(error IMPLANT_SECRET must be 64 hex chars (32 bytes), got $(shell printf '%s' '$(IMPLANT_SECRET)' | wc -c))
+endif
 
 # CA cert for TLS pinning (optional, set CA_CERT_PATH to embed)
 CA_CERT_PATH   ?=

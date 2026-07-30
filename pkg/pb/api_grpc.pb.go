@@ -19,22 +19,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ErebusC2_StartListener_FullMethodName        = "/erebus.c2.ErebusC2/StartListener"
-	ErebusC2_StopListener_FullMethodName         = "/erebus.c2.ErebusC2/StopListener"
-	ErebusC2_ListListeners_FullMethodName        = "/erebus.c2.ErebusC2/ListListeners"
-	ErebusC2_ListSessions_FullMethodName         = "/erebus.c2.ErebusC2/ListSessions"
-	ErebusC2_GetSession_FullMethodName           = "/erebus.c2.ErebusC2/GetSession"
-	ErebusC2_KillSession_FullMethodName          = "/erebus.c2.ErebusC2/KillSession"
-	ErebusC2_ExecuteTask_FullMethodName          = "/erebus.c2.ErebusC2/ExecuteTask"
-	ErebusC2_GetTaskResult_FullMethodName        = "/erebus.c2.ErebusC2/GetTaskResult"
-	ErebusC2_ListTasks_FullMethodName            = "/erebus.c2.ErebusC2/ListTasks"
-	ErebusC2_Subscribe_FullMethodName            = "/erebus.c2.ErebusC2/Subscribe"
-	ErebusC2_GenerateImplant_FullMethodName      = "/erebus.c2.ErebusC2/GenerateImplant"
-	ErebusC2_ListLoot_FullMethodName             = "/erebus.c2.ErebusC2/ListLoot"
-	ErebusC2_GetLoot_FullMethodName              = "/erebus.c2.ErebusC2/GetLoot"
-	ErebusC2_ListPendingApprovals_FullMethodName = "/erebus.c2.ErebusC2/ListPendingApprovals"
-	ErebusC2_Approve_FullMethodName              = "/erebus.c2.ErebusC2/Approve"
-	ErebusC2_Deny_FullMethodName                 = "/erebus.c2.ErebusC2/Deny"
+	ErebusC2_StartListener_FullMethodName         = "/erebus.c2.ErebusC2/StartListener"
+	ErebusC2_StopListener_FullMethodName          = "/erebus.c2.ErebusC2/StopListener"
+	ErebusC2_ListListeners_FullMethodName         = "/erebus.c2.ErebusC2/ListListeners"
+	ErebusC2_ListSessions_FullMethodName          = "/erebus.c2.ErebusC2/ListSessions"
+	ErebusC2_GetSession_FullMethodName            = "/erebus.c2.ErebusC2/GetSession"
+	ErebusC2_KillSession_FullMethodName           = "/erebus.c2.ErebusC2/KillSession"
+	ErebusC2_ExecuteTask_FullMethodName           = "/erebus.c2.ErebusC2/ExecuteTask"
+	ErebusC2_GetTaskResult_FullMethodName         = "/erebus.c2.ErebusC2/GetTaskResult"
+	ErebusC2_ListTasks_FullMethodName             = "/erebus.c2.ErebusC2/ListTasks"
+	ErebusC2_Subscribe_FullMethodName             = "/erebus.c2.ErebusC2/Subscribe"
+	ErebusC2_GenerateImplant_FullMethodName       = "/erebus.c2.ErebusC2/GenerateImplant"
+	ErebusC2_RegisterImplantSecret_FullMethodName = "/erebus.c2.ErebusC2/RegisterImplantSecret"
+	ErebusC2_ListLoot_FullMethodName              = "/erebus.c2.ErebusC2/ListLoot"
+	ErebusC2_GetLoot_FullMethodName               = "/erebus.c2.ErebusC2/GetLoot"
+	ErebusC2_ListPendingApprovals_FullMethodName  = "/erebus.c2.ErebusC2/ListPendingApprovals"
+	ErebusC2_Approve_FullMethodName               = "/erebus.c2.ErebusC2/Approve"
+	ErebusC2_Deny_FullMethodName                  = "/erebus.c2.ErebusC2/Deny"
 )
 
 // ErebusC2Client is the client API for ErebusC2 service.
@@ -57,6 +58,7 @@ type ErebusC2Client interface {
 	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Event], error)
 	// Builder
 	GenerateImplant(ctx context.Context, in *GenerateImplantRequest, opts ...grpc.CallOption) (*GenerateImplantResponse, error)
+	RegisterImplantSecret(ctx context.Context, in *RegisterImplantSecretRequest, opts ...grpc.CallOption) (*RegisterImplantSecretResponse, error)
 	// Loot
 	ListLoot(ctx context.Context, in *ListLootRequest, opts ...grpc.CallOption) (*ListLootResponse, error)
 	GetLoot(ctx context.Context, in *GetLootRequest, opts ...grpc.CallOption) (*GetLootResponse, error)
@@ -193,6 +195,16 @@ func (c *erebusC2Client) GenerateImplant(ctx context.Context, in *GenerateImplan
 	return out, nil
 }
 
+func (c *erebusC2Client) RegisterImplantSecret(ctx context.Context, in *RegisterImplantSecretRequest, opts ...grpc.CallOption) (*RegisterImplantSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterImplantSecretResponse)
+	err := c.cc.Invoke(ctx, ErebusC2_RegisterImplantSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *erebusC2Client) ListLoot(ctx context.Context, in *ListLootRequest, opts ...grpc.CallOption) (*ListLootResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListLootResponse)
@@ -263,6 +275,7 @@ type ErebusC2Server interface {
 	Subscribe(*SubscribeRequest, grpc.ServerStreamingServer[Event]) error
 	// Builder
 	GenerateImplant(context.Context, *GenerateImplantRequest) (*GenerateImplantResponse, error)
+	RegisterImplantSecret(context.Context, *RegisterImplantSecretRequest) (*RegisterImplantSecretResponse, error)
 	// Loot
 	ListLoot(context.Context, *ListLootRequest) (*ListLootResponse, error)
 	GetLoot(context.Context, *GetLootRequest) (*GetLootResponse, error)
@@ -312,6 +325,9 @@ func (UnimplementedErebusC2Server) Subscribe(*SubscribeRequest, grpc.ServerStrea
 }
 func (UnimplementedErebusC2Server) GenerateImplant(context.Context, *GenerateImplantRequest) (*GenerateImplantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateImplant not implemented")
+}
+func (UnimplementedErebusC2Server) RegisterImplantSecret(context.Context, *RegisterImplantSecretRequest) (*RegisterImplantSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterImplantSecret not implemented")
 }
 func (UnimplementedErebusC2Server) ListLoot(context.Context, *ListLootRequest) (*ListLootResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListLoot not implemented")
@@ -540,6 +556,24 @@ func _ErebusC2_GenerateImplant_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ErebusC2_RegisterImplantSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterImplantSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ErebusC2Server).RegisterImplantSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ErebusC2_RegisterImplantSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ErebusC2Server).RegisterImplantSecret(ctx, req.(*RegisterImplantSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ErebusC2_ListLoot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListLootRequest)
 	if err := dec(in); err != nil {
@@ -676,6 +710,10 @@ var ErebusC2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateImplant",
 			Handler:    _ErebusC2_GenerateImplant_Handler,
+		},
+		{
+			MethodName: "RegisterImplantSecret",
+			Handler:    _ErebusC2_RegisterImplantSecret_Handler,
 		},
 		{
 			MethodName: "ListLoot",

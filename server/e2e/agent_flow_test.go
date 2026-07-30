@@ -22,13 +22,19 @@ func TestAgentExecutorShell(t *testing.T) {
 	defer cancel()
 
 	_, sim, sessionID, grpcAddr := startAgentE2EFixture(t, ctx)
-	client := newAgentClient(t, sim, grpcAddr)
+	// TASK_SHELL is high-risk: needs operator + approver seats.
+	client := newAgentClientDual(t, sim, grpcAddr)
 	defer client.Close()
 	if err := client.StartSubscribe(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	exec := &agent.Executor{Client: client}
+	exec := &agent.Executor{
+		Client: client,
+		OnApproval: func(id, risk, desc string) (agent.ApprovalAction, string) {
+			return agent.ApprovalGrant, ""
+		},
+	}
 	result, err := exec.RunTool(ctx, "run_shell",
 		fmt.Sprintf(`{"session_id":%q,"command":"echo agent-e2e-ok"}`, sessionID),
 		sessionID)
@@ -46,7 +52,8 @@ func TestAgentExecutorLDAPSuggestions(t *testing.T) {
 	defer cancel()
 
 	ts, sim, sessionID, grpcAddr := startAgentE2EFixture(t, ctx)
-	grpcClient, _ := newGRPCClient(t, ts, grpcAddr)
+	// ListPendingApprovals / Approve require an approver-seat CN.
+	approver, _ := newGRPCClientNamed(t, ts, grpcAddr, "e2e-agent-ap")
 
 	client := newAgentClient(t, sim, grpcAddr)
 	defer client.Close()
@@ -70,8 +77,8 @@ func TestAgentExecutorLDAPSuggestions(t *testing.T) {
 		done <- runResult{out, err}
 	}()
 
-	approvalID := waitForPendingApproval(t, ctx, grpcClient, sessionID, pb.TaskType_TASK_LDAP_ENUM)
-	if _, err := grpcClient.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
+	approvalID := waitForPendingApproval(t, ctx, approver, sessionID, pb.TaskType_TASK_LDAP_ENUM)
+	if _, err := approver.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
 		t.Fatalf("approve: %v", err)
 	}
 
@@ -122,24 +129,15 @@ func TestAgentExecutorApprovalFlow(t *testing.T) {
 	defer cancel()
 
 	ts, sim, sessionID, grpcAddr := startAgentE2EFixture(t, ctx)
-	grpcClient, _ := newGRPCClient(t, ts, grpcAddr)
-
-	// Dual-seat client: operator executes, approver grants via OnApproval callback.
-	dual := newAgentClientDual(t, sim, grpcAddr)
-	defer dual.Close()
-	if err := dual.StartSubscribe(ctx); err != nil {
+	// Operator seat runs the tool; approver seat lists/approves (dual-control).
+	opClient := newAgentClientNamed(t, sim, grpcAddr, "e2e-agent-op", "", "")
+	defer opClient.Close()
+	if err := opClient.StartSubscribe(ctx); err != nil {
 		t.Fatal(err)
 	}
+	approver, _ := newGRPCClientNamed(t, ts, grpcAddr, "e2e-agent-ap")
 
-	exec := &agent.Executor{
-		Client: dual,
-		OnApproval: func(id, risk, desc string) (agent.ApprovalAction, string) {
-			if id == "" {
-				t.Error("empty approval id")
-			}
-			return agent.ApprovalGrant, ""
-		},
-	}
+	exec := &agent.Executor{Client: opClient}
 
 	done := make(chan error, 1)
 	go func() {
@@ -149,14 +147,18 @@ func TestAgentExecutorApprovalFlow(t *testing.T) {
 		done <- err
 	}()
 
+	approvalID := waitForPendingApproval(t, ctx, approver, sessionID, pb.TaskType_TASK_CREDS_DUMP)
+	if _, err := approver.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("creds_dump after in-process approve: %v", err)
+			t.Fatalf("creds_dump after approve: %v", err)
 		}
 	case <-time.After(30 * time.Second):
-		pending, _ := grpcClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
-		t.Fatalf("creds_dump timed out waiting for in-process ApprovalGrant (pending=%d)", len(pending.GetApprovals()))
+		t.Fatal("creds_dump timed out after approve")
 	}
 	close(sim.done)
 }
@@ -179,6 +181,8 @@ func startAgentE2EFixture(t *testing.T, ctx context.Context) (*server.Teamserver
 		GRPCAddr:      grpcAddr,
 		DBPath:        filepath.Join(dataDir, "erebus.db"),
 		DataDir:       dataDir,
+		OperatorCNs:   []string{"e2e-operator", "e2e-agent", "e2e-agent-op"},
+		ApproverCNs:   []string{"e2e-agent-ap"},
 		ImplantSecret: hex.EncodeToString(secret),
 		AutoHarvest:   server.AutoHarvestYAML{Enabled: &ahDisabled},
 		Listeners: []server.ListenerConfig{

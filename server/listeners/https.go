@@ -21,11 +21,13 @@ import (
 
 // BeaconHandler processes Register and Beacon messages from implants.
 type BeaconHandler struct {
-	Sessions    *sessions.Manager
-	Dispatcher  *tasks.Dispatcher
-	Secret      []byte // Pre-shared secret for HMAC validation
-	OnEvent     tasks.EventCallback
-	ReplayCache *zcrypto.ReplayCache
+	Sessions      *sessions.Manager
+	Dispatcher    *tasks.Dispatcher
+	Secret        []byte         // Legacy fleet-wide PSK (fallback when ResolveSecret is nil)
+	ResolveSecret SecretResolver // Per-implant secret lookup (preferred)
+	Socks         SocksBridge    // optional reverse SOCKS hub
+	OnEvent       tasks.EventCallback
+	ReplayCache   *zcrypto.ReplayCache
 }
 
 // HTTPSListener is an HTTPS listener for implant callbacks.

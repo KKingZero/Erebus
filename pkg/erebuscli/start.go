@@ -24,15 +24,19 @@ func Start() error {
 	if err := cfg.EnsureDirs(); err != nil {
 		return fmt.Errorf("create data dirs: %w", err)
 	}
-	if err := cfg.Save(configPath); err != nil {
-		log.Printf("[erebus] warning: save config: %v", err)
-	}
 
 	var ts *server.Teamserver
 	if !GRPCReachable(cfg.GRPCAddr) {
 		ts, err = server.NewTeamserver(cfg)
 		if err != nil {
 			return fmt.Errorf("init teamserver: %v", err)
+		}
+		if _, _, _, err := EnsureOperatorCerts(cfg.DataDir); err != nil {
+			return err
+		}
+		// Persist after NewTeamserver so generated master_key is saved.
+		if err := cfg.Save(configPath); err != nil {
+			log.Printf("[erebus] warning: save config: %v", err)
 		}
 		if err := ts.Start(); err != nil {
 			return fmt.Errorf("start teamserver: %w", err)
@@ -45,21 +49,23 @@ func Start() error {
 		}
 	} else {
 		log.Printf("[erebus] teamserver already running at %s", cfg.GRPCAddr)
+		// Still refresh on-disk config if defaults were applied without a teamserver start.
+		if err := cfg.Save(configPath); err != nil {
+			log.Printf("[erebus] warning: save config: %v", err)
+		}
 	}
 
-	seats, err := EnsureSeatCerts(cfg.DataDir)
+	cert, key, ca, err := EnsureOperatorCerts(cfg.DataDir)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "[erebus] connecting operator to %s (approver seat for pending/approve/deny)\n", cfg.GRPCAddr)
+	fmt.Fprintf(os.Stderr, "[erebus] connecting operator to %s\n", cfg.GRPCAddr)
 	return operatorcli.RunREPL(operatorcli.Options{
-		Server:           cfg.GRPCAddr,
-		CertFile:         seats.OperatorCert,
-		KeyFile:          seats.OperatorKey,
-		CAFile:           seats.CA,
-		ApproverCertFile: seats.ApproverCert,
-		ApproverKeyFile:  seats.ApproverKey,
+		Server:   cfg.GRPCAddr,
+		CertFile: cert,
+		KeyFile:  key,
+		CAFile:   ca,
 	})
 }
 
@@ -86,6 +92,17 @@ func RunTeamserver(configPath string, passphrase string) error {
 	ts, err := server.NewTeamserver(cfg)
 	if err != nil {
 		return err
+	}
+	if _, _, _, err := EnsureOperatorCerts(cfg.DataDir); err != nil {
+		return err
+	}
+	// Persist after NewTeamserver so generated master_key is saved.
+	if passphrase != "" {
+		if err := cfg.SaveEncrypted(configPath, passphrase); err != nil {
+			log.Printf("[erebus] warning: save encrypted config: %v", err)
+		}
+	} else if err := cfg.Save(configPath); err != nil {
+		log.Printf("[erebus] warning: save config: %v", err)
 	}
 	if err := ts.Start(); err != nil {
 		return err

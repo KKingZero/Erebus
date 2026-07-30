@@ -28,6 +28,49 @@ func TestForLDAPEnumKerberoastable(t *testing.T) {
 	}
 }
 
+func TestForLDAPEnumInteresting(t *testing.T) {
+	actions := ForLDAPEnum(&pb.LDAPEnumResult{
+		Domain:       "support.htb",
+		Dc:           "dc.support.htb",
+		QueryType:    "interesting",
+		TotalResults: 1,
+		Entries: []*pb.LDAPEntry{
+			{
+				Dn: "CN=support,CN=Users,DC=support,DC=htb",
+				Attributes: map[string]*pb.LDAPValues{
+					"sAMAccountName": {Values: []string{"support"}},
+					"info":           {Values: []string{"not-echoed-in-suggestion"}},
+				},
+			},
+		},
+	})
+	if len(actions) == 0 {
+		t.Fatal("expected suggestions")
+	}
+	joined := strings.Join(actions, " ")
+	if !strings.Contains(joined, "lateral_move") && !strings.Contains(joined, "winrm") {
+		t.Fatalf("expected winrm/lateral suggestion: %v", actions)
+	}
+	if strings.Contains(joined, "not-echoed") {
+		t.Fatal("must not echo free-text secret into suggestions")
+	}
+}
+
+func TestForSMBListShares(t *testing.T) {
+	actions := ForSMB(&pb.SMBClientResult{
+		Action: "list_shares",
+		Host:   "10.1.1.1",
+		Names:  []string{"ADMIN$", "support-tools", "IPC$"},
+	})
+	if len(actions) == 0 {
+		t.Fatal("expected suggestions")
+	}
+	joined := strings.Join(actions, " ")
+	if !strings.Contains(joined, "support-tools") {
+		t.Fatalf("expected support-tools list_dir: %v", actions)
+	}
+}
+
 func TestForLDAPEnumEmpty(t *testing.T) {
 	actions := ForLDAPEnum(&pb.LDAPEnumResult{
 		QueryType:    "kerberoastable",

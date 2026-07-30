@@ -11,9 +11,14 @@ var queryFilters = map[string]string{
 	"trusts":                  "(objectClass=trustedDomain)",
 	"unconstrained_delegation": "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=524288))",
 	"constrained_delegation":   "(msDS-AllowedToDelegateTo=*)",
+	// Users with free-text notes often used as secret stashes (Support-style info=password).
+	"interesting": "(&(objectCategory=person)(objectClass=user)(|(info=*)(description=*)(comment=*)))",
+	"secrets":     "(&(objectCategory=person)(objectClass=user)(|(info=*)(description=*)(comment=*)))",
 	"users":                   "(&(objectCategory=person)(objectClass=user))",
 	"groups":                  "(objectCategory=group)",
 	"admins":                  "(&(objectCategory=person)(adminCount=1))",
+	// RBCD-related: accounts that already have an allowed-to-act blob set.
+	"rbcd": "(msDS-AllowedToActOnBehalfOfOtherIdentity=*)",
 }
 
 // DefaultAttributes are the attributes to retrieve for each query type.
@@ -27,7 +32,10 @@ var defaultAttributes = map[string][]string{
 	"trusts":                  {"cn", "trustDirection", "trustType", "trustAttributes"},
 	"unconstrained_delegation": {"dNSHostName", "sAMAccountName", "distinguishedName"},
 	"constrained_delegation":   {"dNSHostName", "sAMAccountName", "msDS-AllowedToDelegateTo", "distinguishedName"},
-	"users":                   {"sAMAccountName", "distinguishedName", "memberOf", "lastLogon"},
+	"interesting":             {"sAMAccountName", "distinguishedName", "info", "description", "comment", "memberOf"},
+	"secrets":                 {"sAMAccountName", "distinguishedName", "info", "description", "comment", "memberOf"},
+	"users":                   {"sAMAccountName", "distinguishedName", "memberOf", "lastLogon", "info", "description"},
 	"groups":                  {"sAMAccountName", "distinguishedName", "member"},
 	"admins":                  {"sAMAccountName", "distinguishedName", "memberOf", "adminCount"},
+	"rbcd":                    {"sAMAccountName", "dNSHostName", "distinguishedName", "msDS-AllowedToActOnBehalfOfOtherIdentity"},
 }

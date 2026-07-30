@@ -271,3 +271,35 @@ func (s *Store) HasAutoHarvested(sessionID string) (bool, error) {
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM autoharvest_tasks WHERE session_id = ?`, sessionID).Scan(&count)
 	return count > 0, err
 }
+
+// --- Implants (per-implant secrets) ---
+
+func (s *Store) CreateImplant(row *ImplantRow) error {
+	_, err := s.db.Exec(`INSERT INTO implants (implant_id, build_id, secret_enc, created_at, operator)
+		VALUES (?, ?, ?, ?, ?)`,
+		row.ImplantID, row.BuildID, row.SecretEnc, row.CreatedAt, row.Operator)
+	return err
+}
+
+// UpsertImplant inserts or replaces a sealed implant secret (manual registration).
+func (s *Store) UpsertImplant(row *ImplantRow) error {
+	_, err := s.db.Exec(`INSERT INTO implants (implant_id, build_id, secret_enc, created_at, operator)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(implant_id) DO UPDATE SET
+			build_id = excluded.build_id,
+			secret_enc = excluded.secret_enc,
+			operator = excluded.operator`,
+		row.ImplantID, row.BuildID, row.SecretEnc, row.CreatedAt, row.Operator)
+	return err
+}
+
+func (s *Store) GetImplant(implantID string) (*ImplantRow, error) {
+	row := &ImplantRow{}
+	err := s.db.QueryRow(`SELECT implant_id, build_id, secret_enc, created_at, operator
+		FROM implants WHERE implant_id = ?`, implantID).Scan(
+		&row.ImplantID, &row.BuildID, &row.SecretEnc, &row.CreatedAt, &row.Operator)
+	if err != nil {
+		return nil, err
+	}
+	return row, nil
+}

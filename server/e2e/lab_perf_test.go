@@ -21,21 +21,21 @@ import (
 
 // LabPerfStep is one timed recon action.
 type LabPerfStep struct {
-	Name       string  `json:"name"`
-	Target     string  `json:"target"`
-	Success    bool    `json:"success"`
-	DurationS  float64 `json:"duration_s"`
-	Detail     string  `json:"detail,omitempty"`
-	Error      string  `json:"error,omitempty"`
+	Name      string  `json:"name"`
+	Target    string  `json:"target"`
+	Success   bool    `json:"success"`
+	DurationS float64 `json:"duration_s"`
+	Detail    string  `json:"detail,omitempty"`
+	Error     string  `json:"error,omitempty"`
 }
 
 // LabPerfReport compares Erebus implant recon to prior Zypheron CLI lab numbers.
 type LabPerfReport struct {
-	Timestamp  string        `json:"timestamp"`
-	TotalS     float64       `json:"total_s"`
-	SetupS     float64       `json:"setup_s"`
-	Steps      []LabPerfStep `json:"steps"`
-	Baseline   map[string]any `json:"baseline_prior_review,omitempty"`
+	Timestamp string         `json:"timestamp"`
+	TotalS    float64        `json:"total_s"`
+	SetupS    float64        `json:"setup_s"`
+	Steps     []LabPerfStep  `json:"steps"`
+	Baseline  map[string]any `json:"baseline_prior_review,omitempty"`
 }
 
 // TestLabPerfJuiceAndMetasploitable times Erebus teamserver+implant recon against
@@ -58,13 +58,13 @@ func TestLabPerfJuiceAndMetasploitable(t *testing.T) {
 	report := LabPerfReport{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Baseline: map[string]any{
-			"source": "Zypheron-CLI-Production/reports/security-performance-review (2026-07-08)",
-			"zypheron_nmap_local_s":             12.12,
-			"zypheron_nikto_metasploitable_s":   9.15,
-			"zypheron_nikto_juice_s":            45.03,
-			"zypheron_nikto_juice_success":      false,
-			"zypheron_nikto_meta_success":       true,
-			"notes": "Prior run: external nmap/nikto via Zypheron CLI tool manager; Erebus run: implant C2 recon (portscan+shell).",
+			"source":                          "Zypheron-CLI-Production/reports/security-performance-review (2026-07-08)",
+			"zypheron_nmap_local_s":           12.12,
+			"zypheron_nikto_metasploitable_s": 9.15,
+			"zypheron_nikto_juice_s":          45.03,
+			"zypheron_nikto_juice_success":    false,
+			"zypheron_nikto_meta_success":     true,
+			"notes":                           "Prior run: external nmap/nikto via Zypheron CLI tool manager; Erebus run: implant C2 recon (portscan+shell).",
 		},
 	}
 
@@ -85,6 +85,8 @@ func TestLabPerfJuiceAndMetasploitable(t *testing.T) {
 		GRPCAddr:      fmt.Sprintf("127.0.0.1:%d", grpcPort),
 		DBPath:        filepath.Join(dataDir, "erebus.db"),
 		DataDir:       dataDir,
+		OperatorCNs:   []string{"e2e-operator", "lab-requester"},
+		ApproverCNs:   []string{"lab-approver"},
 		ImplantSecret: hex.EncodeToString(secret),
 		AutoHarvest:   server.AutoHarvestYAML{Enabled: &ahDisabled},
 		Listeners: []server.ListenerConfig{
@@ -124,6 +126,8 @@ func TestLabPerfJuiceAndMetasploitable(t *testing.T) {
 	})
 
 	grpcClient, _ := newGRPCClient(t, ts, cfg.GRPCAddr)
+	requester, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "lab-requester")
+	approver, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "lab-approver")
 	sessionID := waitSession(t, ctx, grpcClient, implantID, 20*time.Second)
 	report.SetupS = time.Since(setupStart).Seconds()
 	t.Logf("setup teamserver+implant+session: %.3fs session=%s", report.SetupS, sessionID)
@@ -133,7 +137,7 @@ func TestLabPerfJuiceAndMetasploitable(t *testing.T) {
 		"juice_portscan", juiceHost, []uint32{juicePort}))
 
 	// --- Juice: shell curl ---
-	report.Steps = append(report.Steps, timedShell(t, ctx, grpcClient, sessionID,
+	report.Steps = append(report.Steps, timedShell(t, ctx, requester, approver, sessionID,
 		"juice_shell_curl", juiceURL,
 		"curl", []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", juiceURL},
 		func(stdout string, code int32) (bool, string) {
@@ -154,7 +158,7 @@ func TestLabPerfJuiceAndMetasploitable(t *testing.T) {
 		"meta_portscan_mapped", metaHost, metaPorts))
 
 	// --- Metasploitable: shell curl HTTP ---
-	report.Steps = append(report.Steps, timedShell(t, ctx, grpcClient, sessionID,
+	report.Steps = append(report.Steps, timedShell(t, ctx, requester, approver, sessionID,
 		"meta_shell_curl", metaURL,
 		"curl", []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", "-m", "10", metaURL},
 		func(stdout string, code int32) (bool, string) {
@@ -165,7 +169,7 @@ func TestLabPerfJuiceAndMetasploitable(t *testing.T) {
 		}))
 
 	// --- Metasploitable: banner-ish nc to SSH mapped port ---
-	report.Steps = append(report.Steps, timedShell(t, ctx, grpcClient, sessionID,
+	report.Steps = append(report.Steps, timedShell(t, ctx, requester, approver, sessionID,
 		"meta_shell_ssh_banner", "127.0.0.1:12222",
 		"bash", []string{"-c", "timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/12222; head -c 80 <&3' || true"},
 		func(stdout string, code int32) (bool, string) {
@@ -315,20 +319,17 @@ func timedPortscan(t *testing.T, ctx context.Context, client pb.ErebusC2Client, 
 	return step
 }
 
-func timedShell(t *testing.T, ctx context.Context, client pb.ErebusC2Client, sessionID, name, target, cmd string, args []string, check func(stdout string, code int32) (bool, string)) LabPerfStep {
+func timedShell(t *testing.T, ctx context.Context, requester, approver pb.ErebusC2Client, sessionID, name, target, cmd string, args []string, check func(stdout string, code int32) (bool, string)) LabPerfStep {
 	t.Helper()
 	start := time.Now()
 	step := LabPerfStep{Name: name, Target: target}
 	data, _ := proto.Marshal(&pb.ShellTask{Command: cmd, Args: args})
-	resp, err := client.ExecuteTask(ctx, &pb.ExecuteTaskRequest{
+	// TASK_SHELL is high-risk: dual-control approval required.
+	resp := executeTaskWithApproval(t, ctx, requester, approver, &pb.ExecuteTaskRequest{
 		SessionId: sessionID, TaskType: pb.TaskType_TASK_SHELL,
 		Data: data, Wait: true, TimeoutMs: 30000,
 	})
 	step.DurationS = time.Since(start).Seconds()
-	if err != nil {
-		step.Error = err.Error()
-		return step
-	}
 	if resp.Result == nil {
 		step.Error = "nil result"
 		return step

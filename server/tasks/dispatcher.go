@@ -159,6 +159,16 @@ func (d *Dispatcher) maybeStoreLoot(row *db.TaskRow, result *pb.TaskResult) {
 		lootType = "ldap_enum"
 	case pb.TaskType_TASK_CREDS_DUMP:
 		lootType = "creds"
+	case pb.TaskType_TASK_MODULE:
+		// Auto-loot SMB downloads and cloud harvest payloads.
+		if smb := (&pb.SMBClientResult{}); proto.Unmarshal(result.Data, smb) == nil && len(smb.FileData) > 0 {
+			lootType = "smb_file"
+		} else if cloud := (&pb.CloudHarvestResult{}); proto.Unmarshal(result.Data, cloud) == nil &&
+			(len(cloud.Tokens) > 0 || len(cloud.Credentials) > 0) {
+			lootType = "cloud_creds"
+		} else {
+			return
+		}
 	default:
 		return
 	}

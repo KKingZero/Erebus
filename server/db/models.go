@@ -74,3 +74,12 @@ type AutoHarvestTaskRow struct {
 	Status    string // "pending", "completed", "failed"
 	CreatedAt time.Time
 }
+
+// ImplantRow stores a per-implant auth secret (secret_enc is sealed with master key).
+type ImplantRow struct {
+	ImplantID string
+	BuildID   string
+	SecretEnc []byte
+	CreatedAt time.Time
+	Operator  string
+}

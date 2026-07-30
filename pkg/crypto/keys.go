@@ -27,14 +27,29 @@ func ComputeHMAC(secret []byte, implantID string, timestamp int64) []byte {
 }
 
 // VerifyHMAC verifies an HMAC with a replay window.
+//
+// Timestamps may be Unix seconds (legacy) or Unix milliseconds (current implants).
+// Values < 1e12 are treated as seconds; otherwise milliseconds. replayWindowSec is
+// always expressed in seconds and converted for millisecond timestamps.
 func VerifyHMAC(secret []byte, implantID string, timestamp int64, providedMAC []byte, replayWindowSec int64) error {
-	now := time.Now().Unix()
-	diff := now - timestamp
+	var now, window, diff int64
+	if timestamp < 1_000_000_000_000 { // ~2001-09-09 in ms → treat as seconds
+		now = time.Now().Unix()
+		window = replayWindowSec
+	} else {
+		now = time.Now().UnixMilli()
+		window = replayWindowSec * 1000
+	}
+	diff = now - timestamp
 	if diff < 0 {
 		diff = -diff
 	}
-	if diff > replayWindowSec {
-		return fmt.Errorf("timestamp outside replay window: %ds drift", diff)
+	if diff > window {
+		unit := "ms"
+		if timestamp < 1_000_000_000_000 {
+			unit = "s"
+		}
+		return fmt.Errorf("timestamp outside replay window: drift=%d%s", diff, unit)
 	}
 
 	expected := ComputeHMAC(secret, implantID, timestamp)

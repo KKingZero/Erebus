@@ -12,8 +12,8 @@ func TestRequiresModuleApproval(t *testing.T) {
 	if !p.RequiresModuleApproval("creds_dump") {
 		t.Fatal("creds_dump should require approval")
 	}
-	if p.RequiresModuleApproval("shell") {
-		t.Fatal("shell should not require approval")
+	if !p.RequiresModuleApproval("shell") {
+		t.Fatal("shell module should require approval")
 	}
 }
 
@@ -32,13 +32,25 @@ func TestRequiresApprovalDirectTasks(t *testing.T) {
 	if !p.RequiresApproval(pb.TaskType_TASK_INJECT) {
 		t.Fatal("inject should require approval")
 	}
-	if p.RequiresApproval(pb.TaskType_TASK_SHELL) {
-		t.Fatal("shell should not require approval")
+	if !p.RequiresApproval(pb.TaskType_TASK_SHELL) {
+		t.Fatal("shell should require approval (balanced policy)")
+	}
+	if !p.RequiresApproval(pb.TaskType_TASK_FILE_UPLOAD) {
+		t.Fatal("file upload should require approval")
+	}
+	if !p.RequiresApproval(pb.TaskType_TASK_KEYLOG_START) {
+		t.Fatal("keylog_start should require approval")
+	}
+	if p.RequiresApproval(pb.TaskType_TASK_SCREENSHOT) {
+		t.Fatal("screenshot should not require approval")
 	}
 	if !p.RequiresApproval(pb.TaskType_TASK_KERBEROAST) {
 		t.Fatal("kerberoast should require approval")
 	}
 	if !p.RequiresApproval(pb.TaskType_TASK_LDAP_ENUM) {
 		t.Fatal("ldap_enum should require approval")
+	}
+	if !p.RequiresModuleApproval("cloud") {
+		t.Fatal("cloud module should require approval")
 	}
 }

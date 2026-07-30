@@ -32,14 +32,13 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		return nil, fmt.Errorf("generate implant ID: %w", err)
 	}
 
-	secret := req.ImplantSecret
-	if secret == "" {
-		secretBytes, err := zcrypto.RandomBytes(32)
-		if err != nil {
-			return nil, fmt.Errorf("generate secret: %w", err)
-		}
-		secret = hex.EncodeToString(secretBytes)
+	// Always generate a unique per-implant secret (do not reuse fleet ImplantSecret).
+	secretBytes, err := zcrypto.RandomBytes(32)
+	if err != nil {
+		return nil, fmt.Errorf("generate secret: %w", err)
 	}
+	secret := hex.EncodeToString(secretBytes)
+	req.ImplantSecret = secret
 
 	callbackURL := "https://127.0.0.1:443"
 	if len(req.Callbacks) > 0 {
@@ -155,13 +154,13 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		return nil, fmt.Errorf("generate build ID: %w", err)
 	}
 
-	req.ImplantSecret = secret
-
 	return &BuildResult{
-		BuildID:   buildID,
-		Binary:    binary,
-		Filename:  fmt.Sprintf("implant-%s.exe", buildID),
-		Format:    FormatEXE,
-		SizeBytes: int64(len(binary)),
+		BuildID:       buildID,
+		Binary:        binary,
+		Filename:      fmt.Sprintf("implant-%s.exe", buildID),
+		Format:        FormatEXE,
+		SizeBytes:     int64(len(binary)),
+		ImplantID:     implantID,
+		ImplantSecret: secret,
 	}, nil
 }

@@ -62,6 +62,44 @@ func TestRegisterOrReconnectUpdatesMetadata(t *testing.T) {
 	}
 }
 
+func TestKillDoesNotReviveOnUpdateCheckin(t *testing.T) {
+	m := NewManager(nil)
+	sess := NewSession(&pb.Register{ImplantId: "implant-kill", Hostname: "h"}, "https", "1.1.1.1:1")
+	id, _, err := m.RegisterOrReconnect(sess)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Kill(id); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := m.Get(id)
+	if !ok {
+		t.Fatal("session missing")
+	}
+	got.UpdateCheckin()
+	if got.IsAlive() {
+		t.Fatal("operator-killed session must not revive on UpdateCheckin")
+	}
+	if !got.ShouldTerminate() {
+		t.Fatal("expected ShouldTerminate after Kill")
+	}
+}
+
+func TestMarkDeadAllowsReviveOnUpdateCheckin(t *testing.T) {
+	sess := NewSession(&pb.Register{ImplantId: "implant-reaper", Hostname: "h"}, "https", "1.1.1.1:1")
+	sess.MarkDead()
+	if sess.IsAlive() {
+		t.Fatal("expected dead after MarkDead")
+	}
+	if sess.ShouldTerminate() {
+		t.Fatal("reaper MarkDead must not request terminate")
+	}
+	sess.UpdateCheckin()
+	if !sess.IsAlive() {
+		t.Fatal("reaper-dead session should revive on UpdateCheckin")
+	}
+}
+
 func TestRegisterPrunesDeadSessionsForImplant(t *testing.T) {
 	m := NewManager(nil)
 

@@ -58,6 +58,8 @@ func TestJuiceShopRecon(t *testing.T) {
 		GRPCAddr:      fmt.Sprintf("127.0.0.1:%d", grpcPort),
 		DBPath:        filepath.Join(dataDir, "erebus.db"),
 		DataDir:       dataDir,
+		OperatorCNs:   []string{"e2e-operator", "juice-requester"},
+		ApproverCNs:   []string{"juice-approver"},
 		ImplantSecret: hex.EncodeToString(secret),
 		AutoHarvest:   server.AutoHarvestYAML{Enabled: &ahDisabled},
 		Listeners: []server.ListenerConfig{
@@ -151,21 +153,20 @@ func TestJuiceShopRecon(t *testing.T) {
 	}
 	t.Logf("portscan: %s:%d open service=%q", host, scanResult.Ports[0].Port, scanResult.Ports[0].Service)
 
-	// Shell curl against Juice Shop
+	// Shell curl against Juice Shop (shell is high-risk → dual-control)
+	requester, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "juice-requester")
+	approver, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "juice-approver")
 	shellData, _ := proto.Marshal(&pb.ShellTask{
 		Command: "curl",
 		Args:    []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", juiceURL},
 	})
-	shellResp, err := grpcClient.ExecuteTask(ctx, &pb.ExecuteTaskRequest{
+	shellResp := executeTaskWithApproval(t, ctx, requester, approver, &pb.ExecuteTaskRequest{
 		SessionId: sessionID,
 		TaskType:  pb.TaskType_TASK_SHELL,
 		Data:      shellData,
 		Wait:      true,
 		TimeoutMs: 30000,
 	})
-	if err != nil {
-		t.Fatalf("shell execute: %v", err)
-	}
 	if shellResp.Result == nil || !shellResp.Result.Success {
 		t.Fatalf("shell failed: %+v", shellResp.Result)
 	}

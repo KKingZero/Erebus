@@ -1,6 +1,6 @@
 package db
 
-const schemaVersion = 4
+const schemaVersion = 5
 
 var migrations = []string{
 	// Version 1: Initial schema
@@ -103,4 +103,14 @@ var migrations = []string{
 	// Version 4: H1 — add unique constraint on autoharvest_tasks(session_id, task_type)
 	// to prevent race condition in idempotency check
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_autoharvest_unique ON autoharvest_tasks(session_id, task_type);`,
+
+	// Version 5: per-implant secrets (encrypted at rest with server master key)
+	`CREATE TABLE IF NOT EXISTS implants (
+		implant_id TEXT PRIMARY KEY,
+		build_id   TEXT,
+		secret_enc BLOB NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		operator   TEXT
+	);
+	CREATE INDEX IF NOT EXISTS idx_implants_build ON implants(build_id);`,
 }

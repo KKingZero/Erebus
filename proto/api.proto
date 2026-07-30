@@ -178,6 +178,18 @@ message GenerateImplantResponse {
   string format    = 6;
 }
 
+// Register a per-implant PSK for manually built implants (ldflags without GenerateImplant).
+message RegisterImplantSecretRequest {
+  string implant_id = 1;
+  string secret_hex = 2; // 64 hex chars (32 bytes)
+  string build_id   = 3; // optional label
+}
+
+message RegisterImplantSecretResponse {
+  bool   success = 1;
+  string error   = 2;
+}
+
 // --- Loot ---
 
 message LootItem {
@@ -226,6 +238,7 @@ service ErebusC2 {
 
   // Builder
   rpc GenerateImplant(GenerateImplantRequest) returns (GenerateImplantResponse);
+  rpc RegisterImplantSecret(RegisterImplantSecretRequest) returns (RegisterImplantSecretResponse);
 
   // Loot
   rpc ListLoot(ListLootRequest) returns (ListLootResponse);

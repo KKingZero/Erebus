@@ -1,48 +1,48 @@
 {
-  "timestamp": "2026-07-08T22:36:58-05:00",
-  "total_s": 7.49702994,
-  "setup_s": 0.836271208,
+  "timestamp": "2026-07-16T07:26:05-05:00",
+  "total_s": 8.107805314,
+  "setup_s": 1.462353253,
   "steps": [
     {
       "name": "juice_portscan",
       "target": "127.0.0.1 [3000]",
       "success": true,
-      "duration_s": 0.936416457,
+      "duration_s": 0.92638528,
       "detail": "open=1 [3000/]"
     },
     {
       "name": "juice_shell_curl",
       "target": "http://127.0.0.1:3000/",
       "success": true,
-      "duration_s": 0.518627614,
+      "duration_s": 0.517759437,
       "detail": "exit=0 http=200"
     },
     {
       "name": "juice_ifconfig",
       "target": "local",
       "success": true,
-      "duration_s": 0.510712865,
+      "duration_s": 0.515000476,
       "detail": "success=true"
     },
     {
       "name": "meta_portscan_mapped",
       "target": "127.0.0.1 [18081 12222 12121]",
       "success": true,
-      "duration_s": 0.622532025,
-      "detail": "open=3 [12222/SSH-2.0-OpenSSH_4.7p1 Debian-8ubuntu1\n 12121/220 (vsFTPd 2.3.4)\r\n 18081/]"
+      "duration_s": 0.617776571,
+      "detail": "open=3 [12121/ 12222/SSH-2.0-OpenSSH_4.7p1 Debian-8ubuntu1\n 18081/]"
     },
     {
       "name": "meta_shell_curl",
       "target": "http://127.0.0.1:18081/",
       "success": true,
-      "duration_s": 0.548786424,
+      "duration_s": 0.550946394,
       "detail": "exit=0 http=200"
     },
     {
       "name": "meta_shell_ssh_banner",
       "target": "127.0.0.1:12222",
       "success": true,
-      "duration_s": 3.5234910360000002,
+      "duration_s": 3.51731701,
       "detail": "exit=0 banner_len=0 sample=\"\""
     }
   ],

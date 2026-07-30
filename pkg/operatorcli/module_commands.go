@@ -10,7 +10,7 @@ import (
 
 func (c *Commands) cmdLDAPEnum(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: ldap-enum <query_type> --domain <domain> --dc <dc> [--user u] [--pass p]")
+		return fmt.Errorf("usage: ldap-enum <query_type> --domain <domain> --dc <dc> [--user u] [--pass p] [--hash h] [--filter f]")
 	}
 	cfg := &pb.LDAPEnumConfig{
 		QueryType: args[0],
@@ -20,6 +20,8 @@ func (c *Commands) cmdLDAPEnum(args []string) error {
 		"--dc":     func(v string) { cfg.TargetDc = v },
 		"--user":   func(v string) { cfg.Username = v },
 		"--pass":   func(v string) { cfg.Password = v },
+		"--hash":   func(v string) { cfg.NtlmHash = v },
+		"--filter": func(v string) { cfg.CustomFilter = v },
 	}); err != nil {
 		return err
 	}
@@ -70,6 +72,87 @@ func (c *Commands) cmdCredsDump(args []string) error {
 	}
 	cfg := &pb.CredDumpConfig{Method: args[0]}
 	return c.runTypedTask(pb.TaskType_TASK_CREDS_DUMP, cfg, true, printTypedResult)
+}
+
+func (c *Commands) cmdSMB(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: smb <list_shares|list_dir|download> --host <h> [--share s] [--path p] [--user u] [--pass p] [--hash h] [--domain d] [--anon]")
+	}
+	cfg := &pb.SMBClientConfig{Action: args[0]}
+	// Strip bare boolean --anon before parseKVFlags (which requires values).
+	var flagArgs []string
+	for _, a := range args[1:] {
+		if a == "--anon" {
+			cfg.Anonymous = true
+			continue
+		}
+		flagArgs = append(flagArgs, a)
+	}
+	if err := parseKVFlags(flagArgs, map[string]func(string){
+		"--host":   func(v string) { cfg.Host = v },
+		"--share":  func(v string) { cfg.Share = v },
+		"--path":   func(v string) { cfg.Path = v },
+		"--user":   func(v string) { cfg.Username = v },
+		"--pass":   func(v string) { cfg.Password = v },
+		"--hash":   func(v string) { cfg.NtlmHash = v },
+		"--domain": func(v string) { cfg.Domain = v },
+	}); err != nil {
+		return err
+	}
+	if cfg.Host == "" {
+		return fmt.Errorf("--host is required")
+	}
+	inner, err := proto.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return c.runTypedTask(pb.TaskType_TASK_MODULE, &pb.ModuleTask{ModuleName: "smb", Config: inner}, true, printSMBResult)
+}
+
+func printSMBResult(_ pb.TaskType, result *pb.TaskResult) {
+	if result == nil {
+		return
+	}
+	if !result.Success {
+		fmt.Printf("smb failed: %s\n", result.Error)
+		return
+	}
+	r := &pb.SMBClientResult{}
+	if err := proto.Unmarshal(result.Data, r); err != nil {
+		fmt.Printf("smb: raw result %d bytes\n", len(result.Data))
+		return
+	}
+	fmt.Printf("smb action=%s host=%s share=%s path=%s\n", r.Action, r.Host, r.Share, r.Path)
+	for _, n := range r.Names {
+		fmt.Printf("  %s\n", n)
+	}
+	if len(r.FileData) > 0 {
+		fmt.Printf("  downloaded %d bytes\n", len(r.FileData))
+		// Preview text-ish content (cap)
+		preview := r.FileData
+		if len(preview) > 512 {
+			preview = preview[:512]
+		}
+		if isMostlyPrintable(preview) {
+			fmt.Printf("--- preview ---\n%s\n", string(preview))
+		}
+	}
+	for _, a := range r.NextSuggestedActions {
+		fmt.Printf("  next: %s\n", a)
+	}
+}
+
+func isMostlyPrintable(b []byte) bool {
+	if len(b) == 0 {
+		return false
+	}
+	printable := 0
+	for _, c := range b {
+		if c == '\n' || c == '\r' || c == '\t' || (c >= 32 && c < 127) {
+			printable++
+		}
+	}
+	return printable*100/len(b) >= 85
 }
 
 func (c *Commands) cmdLateral(args []string) error {

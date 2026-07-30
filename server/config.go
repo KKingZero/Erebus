@@ -14,13 +14,22 @@ import (
 const encryptedPrefix = "EREBUS_ENC_V1:"
 
 type Config struct {
-	GRPCAddr      string              `yaml:"grpc_addr"`
-	DBPath        string              `yaml:"db_path"`
-	DataDir       string              `yaml:"data_dir"`
-	ImplantSecret string              `yaml:"implant_secret"` // Hex-encoded shared secret
-	Listeners     []ListenerConfig    `yaml:"listeners"`
-	AutoHarvest   AutoHarvestYAML     `yaml:"auto_harvest"`
-	Debug         bool                `yaml:"debug,omitempty"`
+	GRPCAddr          string   `yaml:"grpc_addr"`
+	DBPath            string   `yaml:"db_path"`
+	DataDir           string   `yaml:"data_dir"`
+	OperatorCertFiles []string `yaml:"operator_cert_files,omitempty"`
+	ApproverCertFiles []string `yaml:"approver_cert_files,omitempty"`
+	OperatorCNs       []string `yaml:"operator_cns,omitempty"`
+	ApproverCNs       []string `yaml:"approver_cns,omitempty"`
+	// ImplantSecret is a legacy fleet-wide PSK (hex). New builds use unique
+	// per-implant secrets stored in the DB. Kept only for old implants / e2e.
+	ImplantSecret string `yaml:"implant_secret"`
+	// MasterKey is a hex-encoded 32-byte key used to seal session keys and
+	// per-implant secrets at rest.
+	MasterKey   string           `yaml:"master_key,omitempty"`
+	Listeners   []ListenerConfig `yaml:"listeners"`
+	AutoHarvest AutoHarvestYAML  `yaml:"auto_harvest"`
+	Debug       bool             `yaml:"debug,omitempty"`
 }
 
 type AutoHarvestYAML struct {
@@ -40,9 +49,11 @@ func DefaultConfig() *Config {
 	home, _ := os.UserHomeDir()
 	dataDir := filepath.Join(home, ".erebus")
 	return &Config{
-		GRPCAddr: "127.0.0.1:50051",
-		DBPath:   filepath.Join(dataDir, "erebus.db"),
-		DataDir:  dataDir,
+		GRPCAddr:          "127.0.0.1:50051",
+		DBPath:            filepath.Join(dataDir, "erebus.db"),
+		DataDir:           dataDir,
+		OperatorCertFiles: []string{filepath.Join(dataDir, "certs", "operator.pem")},
+		ApproverCertFiles: []string{filepath.Join(dataDir, "certs", "approver.pem")},
 		Listeners: []ListenerConfig{
 			{
 				Name:     "default-https",
@@ -146,6 +157,26 @@ func (c *Config) SaveEncrypted(path, passphrase string) error {
 
 func (c *Config) EnsureDirs() error {
 	return os.MkdirAll(c.DataDir, 0700)
+}
+
+func (c *Config) IsOperatorCN(cn string) bool {
+	return containsCN(c.OperatorCNs, cn)
+}
+
+func (c *Config) IsApproverCN(cn string) bool {
+	return containsCN(c.ApproverCNs, cn)
+}
+
+func containsCN(allowed []string, cn string) bool {
+	if cn == "" {
+		return false
+	}
+	for _, allowedCN := range allowed {
+		if strings.TrimSpace(allowedCN) == cn {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Config) Save(path string) error {

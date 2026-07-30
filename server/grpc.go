@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // validOS and validArch are whitelists for build targets.
@@ -90,6 +91,8 @@ func NewGRPCService(ts *Teamserver) *GRPCService {
 // --- Listeners ---
 
 func (s *GRPCService) StartListener(ctx context.Context, req *pb.StartListenerRequest) (*pb.StartListenerResponse, error) {
+	op := operatorFromContext(ctx)
+	log.Printf("[audit] op=StartListener operator=%q name=%q", op, req.GetConfig().GetName())
 	if req.Config == nil {
 		return &pb.StartListenerResponse{Success: false, Error: "config required"}, nil
 	}
@@ -106,6 +109,8 @@ func (s *GRPCService) StartListener(ctx context.Context, req *pb.StartListenerRe
 }
 
 func (s *GRPCService) StopListener(ctx context.Context, req *pb.StopListenerRequest) (*pb.StopListenerResponse, error) {
+	op := operatorFromContext(ctx)
+	log.Printf("[audit] op=StopListener operator=%q id=%q", op, req.GetId())
 	if err := s.ts.Listeners.Stop(req.Id); err != nil {
 		return &pb.StopListenerResponse{Success: false, Error: err.Error()}, nil
 	}
@@ -136,6 +141,8 @@ func (s *GRPCService) GetSession(ctx context.Context, req *pb.GetSessionRequest)
 }
 
 func (s *GRPCService) KillSession(ctx context.Context, req *pb.KillSessionRequest) (*pb.KillSessionResponse, error) {
+	op := operatorFromContext(ctx)
+	log.Printf("[audit] op=KillSession operator=%q session=%q", op, req.GetSessionId())
 	// Enqueue EXIT task so implant terminates on next beacon
 	s.ts.Dispatcher.Dispatch(ctx, req.SessionId, pb.TaskType_TASK_EXIT, nil, 0, false)
 
@@ -151,9 +158,21 @@ func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, t
 	if s.ts.Approval == nil {
 		return nil
 	}
+	needs := s.ts.Approval.RequiresApproval(taskType)
+	moduleName := ""
+	if !needs && taskType == pb.TaskType_TASK_MODULE {
+		moduleName = approval.ModuleNameFromTaskData(data)
+		needs = moduleName != "" && s.ts.Approval.RequiresModuleApproval(moduleName)
+	}
+	if !needs {
+		return nil
+	}
+	requester := operatorFromContext(ctx)
+	if requester == "" {
+		return status.Errorf(codes.PermissionDenied, "operator identity required for high-risk tasks")
+	}
 	if s.ts.Approval.RequiresApproval(taskType) {
 		desc := fmt.Sprintf("%s on session %s", taskType.String(), sessionID)
-		requester := operatorFromContext(ctx)
 		approved, err := s.ts.Approval.RequestApproval(ctx, sessionID, taskType, desc, requester)
 		if err != nil {
 			return err
@@ -163,27 +182,43 @@ func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, t
 		}
 		return nil
 	}
-	if taskType == pb.TaskType_TASK_MODULE {
-		moduleName := approval.ModuleNameFromTaskData(data)
-		if moduleName != "" && s.ts.Approval.RequiresModuleApproval(moduleName) {
-			desc := fmt.Sprintf("module %s on session %s", moduleName, sessionID)
-			requester := operatorFromContext(ctx)
-			approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, moduleName, desc, requester)
-			if err != nil {
-				return err
-			}
-			if !approved {
-				return status.Errorf(codes.PermissionDenied, "task denied by operator")
-			}
-		}
+	desc := fmt.Sprintf("module %s on session %s", moduleName, sessionID)
+	approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, moduleName, desc, requester)
+	if err != nil {
+		return err
+	}
+	if !approved {
+		return status.Errorf(codes.PermissionDenied, "task denied by operator")
 	}
 	return nil
 }
 
 func (s *GRPCService) ExecuteTask(ctx context.Context, req *pb.ExecuteTaskRequest) (*pb.ExecuteTaskResponse, error) {
+	op := operatorFromContext(ctx)
+	log.Printf("[audit] op=ExecuteTask operator=%q session=%q type=%s", op, req.GetSessionId(), req.GetTaskType().String())
 	if err := s.checkTaskApproval(ctx, req.SessionId, req.TaskType, req.Data); err != nil {
 		return nil, err
 	}
+
+	// Reverse SOCKS: start/stop teamserver-side listener bound to the session.
+	if s.ts.Socks != nil {
+		switch req.TaskType {
+		case pb.TaskType_TASK_SOCKS_START:
+			port := uint32(1080)
+			if len(req.Data) > 0 {
+				var st pb.SocksStartTask
+				if err := proto.Unmarshal(req.Data, &st); err == nil && st.Port > 0 {
+					port = st.Port
+				}
+			}
+			if _, err := s.ts.Socks.StartForSession(req.SessionId, port); err != nil {
+				return nil, status.Errorf(codes.Internal, "start socks: %v", err)
+			}
+		case pb.TaskType_TASK_SOCKS_STOP:
+			_ = s.ts.Socks.StopForSession(req.SessionId)
+		}
+	}
+
 	taskID, result, err := s.ts.Dispatcher.Dispatch(ctx, req.SessionId, req.TaskType, req.Data, req.TimeoutMs, req.Wait)
 	if err != nil {
 		return nil, err
@@ -354,22 +389,25 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		}, nil
 	}
 
+	log.Printf("[audit] op=GenerateImplant operator=%q os=%s arch=%s transport=%s lang=%s",
+		operator, targetOS, targetArch, transport, language)
+
 	buildReq := &builder.BuildRequest{
-		Language:      language,
-		OS:            targetOS,
-		Arch:          targetArch,
-		Transport:     transport,
-		Callbacks:     req.Callbacks,
-		SleepMs:       req.SleepMs,
-		JitterPct:     req.JitterPct,
-		Garble:        req.Garble,
-		CDNDomain:     req.CdnDomain,
-		DNSDomain:     req.DnsDomain,
-		DNSServer:     req.DnsServer,
-		Format:        format,
-		Operator:      operator,
-		ImplantSecret: s.ts.Config.ImplantSecret,
-		ProjectRoot:   projectRoot,
+		Language:    language,
+		OS:          targetOS,
+		Arch:        targetArch,
+		Transport:   transport,
+		Callbacks:   req.Callbacks,
+		SleepMs:     req.SleepMs,
+		JitterPct:   req.JitterPct,
+		Garble:      req.Garble,
+		CDNDomain:   req.CdnDomain,
+		DNSDomain:   req.DnsDomain,
+		DNSServer:   req.DnsServer,
+		Format:      format,
+		Operator:    operator,
+		// Unique per-implant secret is generated inside Build; do not inject fleet PSK.
+		ProjectRoot: projectRoot,
 	}
 	if language == "c" {
 		buildReq.CACertPath = filepath.Join(s.ts.Config.DataDir, "ca-cert.pem")
@@ -381,6 +419,17 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 			Success: false,
 			Error:   err.Error(),
 		}, nil
+	}
+
+	// Persist sealed per-implant secret for auth / session-key wrap.
+	if s.ts.Store != nil && result.ImplantID != "" && result.ImplantSecret != "" {
+		if err := s.ts.RegisterImplantSecret(result.ImplantID, result.BuildID, operator, result.ImplantSecret, false); err != nil {
+			log.Printf("[grpc] warning: failed to register implant secret: %v", err)
+			return &pb.GenerateImplantResponse{
+				Success: false,
+				Error:   fmt.Sprintf("build ok but failed to register implant secret: %v", err),
+			}, nil
+		}
 	}
 
 	// H5: Log warning if build recording fails
@@ -397,6 +446,32 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		Filename: result.Filename,
 		Format:   string(result.Format),
 	}, nil
+}
+
+// RegisterImplantSecret stores a sealed per-implant PSK for manual/ldflags builds.
+func (s *GRPCService) RegisterImplantSecret(ctx context.Context, req *pb.RegisterImplantSecretRequest) (*pb.RegisterImplantSecretResponse, error) {
+	op := operatorFromContext(ctx)
+	log.Printf("[audit] op=RegisterImplantSecret operator=%q implant_id=%q", op, req.GetImplantId())
+	if req.GetImplantId() == "" || req.GetSecretHex() == "" {
+		return &pb.RegisterImplantSecretResponse{
+			Success: false,
+			Error:   "implant_id and secret_hex required",
+		}, nil
+	}
+	if op == "" {
+		return &pb.RegisterImplantSecretResponse{
+			Success: false,
+			Error:   "operator identity required",
+		}, nil
+	}
+	buildID := req.GetBuildId()
+	if buildID == "" {
+		buildID = "manual"
+	}
+	if err := s.ts.RegisterImplantSecret(req.ImplantId, buildID, op, req.SecretHex, true); err != nil {
+		return &pb.RegisterImplantSecretResponse{Success: false, Error: err.Error()}, nil
+	}
+	return &pb.RegisterImplantSecretResponse{Success: true}, nil
 }
 
 // --- Loot ---
@@ -447,6 +522,7 @@ func (s *GRPCService) ListPendingApprovals(ctx context.Context, req *pb.ListPend
 
 func (s *GRPCService) Approve(ctx context.Context, req *pb.ApproveRequest) (*pb.ApproveResponse, error) {
 	approver := operatorFromContext(ctx)
+	log.Printf("[audit] op=Approve operator=%q approval_id=%q", approver, req.GetApprovalId())
 	if err := s.ts.Approval.Approve(req.ApprovalId, approver); err != nil {
 		return &pb.ApproveResponse{Success: false}, err
 	}
@@ -455,6 +531,7 @@ func (s *GRPCService) Approve(ctx context.Context, req *pb.ApproveRequest) (*pb.
 
 func (s *GRPCService) Deny(ctx context.Context, req *pb.DenyRequest) (*pb.DenyResponse, error) {
 	denier := operatorFromContext(ctx)
+	log.Printf("[audit] op=Deny operator=%q approval_id=%q reason=%q", denier, req.GetApprovalId(), req.GetReason())
 	if err := s.ts.Approval.Deny(req.ApprovalId, denier, req.Reason); err != nil {
 		return &pb.DenyResponse{Success: false}, err
 	}

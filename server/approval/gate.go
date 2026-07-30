@@ -117,8 +117,12 @@ func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType p
 }
 
 func (g *Gate) checkDualControl(requestedBy, actorCN string) error {
-	if requestedBy == "" || actorCN == "" {
-		return nil
+	// Fail closed: both identities required for dual-control.
+	if actorCN == "" {
+		return fmt.Errorf("dual-control: operator identity required (empty certificate CN)")
+	}
+	if requestedBy == "" {
+		return fmt.Errorf("dual-control: approval request has no requester identity")
 	}
 	if requestedBy == actorCN {
 		return fmt.Errorf("dual-control: approver cannot be the same operator as requester (%s)", actorCN)

@@ -24,3 +24,18 @@ func TestReplayCacheAllowsDifferentTimestamps(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReplayCacheAllowsSubSecondMillis(t *testing.T) {
+	c := NewReplayCache(60 * time.Second)
+	// Two beacons in the same wall second (ms timestamps differ).
+	base := time.Now().UnixMilli()
+	if err := c.CheckAndRecord("implant-1", base); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.CheckAndRecord("implant-1", base+1); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.CheckAndRecord("implant-1", base); err == nil {
+		t.Fatal("expected replay on same ms")
+	}
+}

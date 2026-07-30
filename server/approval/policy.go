@@ -27,6 +27,12 @@ func DefaultPolicy() *Policy {
 			pb.TaskType_TASK_LDAP_ENUM:    "high",
 			pb.TaskType_TASK_KERBEROAST:   "high",
 			pb.TaskType_TASK_ASREPROAST:   "high",
+			// Balanced policy expansion
+			pb.TaskType_TASK_SHELL:        "high",
+			pb.TaskType_TASK_FILE_UPLOAD:  "high",
+			pb.TaskType_TASK_KEYLOG_START: "high",
+			pb.TaskType_TASK_KEYLOG_STOP:  "high",
+			pb.TaskType_TASK_KEYLOG_DUMP:  "high",
 		},
 		HighRiskModules: map[string]string{
 			"creds_dump":   "critical",
@@ -37,6 +43,9 @@ func DefaultPolicy() *Policy {
 			"ldap_enum":    "high",
 			"kerberoast":   "high",
 			"asreproast":   "high",
+			"cloud":        "high",
+			"smb":          "high",
+			"shell":        "high",
 		},
 	}
 }

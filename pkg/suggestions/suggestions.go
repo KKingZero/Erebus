@@ -86,6 +86,24 @@ func ForLDAPEnum(r *pb.LDAPEnumResult) []string {
 				out = append(out, fmt.Sprintf("lateral_move target=<host> username=%s (after cred recovery)", sam))
 			}
 		}
+	case "interesting", "secrets":
+		out = append(out, "review info/description/comment for cleartext secrets")
+		for i, e := range r.Entries {
+			if i >= 3 {
+				break
+			}
+			sam := ldapAttr(e, "sAMAccountName")
+			if sam == "" {
+				continue
+			}
+			// Prefer non-empty free-text attrs as lateral candidates (do not echo secret values).
+			if ldapAttr(e, "info") != "" || ldapAttr(e, "description") != "" || ldapAttr(e, "comment") != "" {
+				out = append(out, fmt.Sprintf("lateral_move method=winrm username=%s (try password from free-text attr)", sam))
+			}
+		}
+		out = append(out, fmt.Sprintf("ldap_enum query_type=kerberoastable domain=%s target_dc=%s", r.Domain, r.Dc))
+	case "rbcd":
+		out = append(out, "msDS-AllowedToActOnBehalfOfOtherIdentity set — review RBCD abuse path")
 	case "computers":
 		for i, e := range r.Entries {
 			if i >= 2 {
@@ -105,6 +123,63 @@ func ForLDAPEnum(r *pb.LDAPEnumResult) []string {
 	}
 
 	return Cap(out)
+}
+
+// ForSMB derives follow-on actions from remote SMB client results.
+func ForSMB(r *pb.SMBClientResult) []string {
+	if r == nil {
+		return nil
+	}
+	var out []string
+	action := strings.ToLower(r.Action)
+	switch action {
+	case "list_shares", "shares":
+		for i, name := range r.Names {
+			if i >= 4 {
+				break
+			}
+			// Skip default admin shares in suggestions; surface non-default first.
+			upper := strings.ToUpper(strings.TrimSuffix(name, "$"))
+			if name == "ADMIN$" || name == "C$" || name == "IPC$" {
+				continue
+			}
+			_ = upper
+			out = append(out, fmt.Sprintf("smb action=list_dir host=%s share=%s", r.Host, name))
+		}
+		if len(out) == 0 && len(r.Names) > 0 {
+			out = append(out, fmt.Sprintf("smb action=list_dir host=%s share=%s", r.Host, r.Names[0]))
+		}
+	case "list_dir", "ls", "dir":
+		for i, name := range r.Names {
+			if i >= 4 {
+				break
+			}
+			if strings.HasSuffix(name, "/") {
+				out = append(out, fmt.Sprintf("smb action=list_dir host=%s share=%s path=%s", r.Host, r.Share, pathJoin(r.Path, strings.TrimSuffix(name, "/"))))
+				continue
+			}
+			lower := strings.ToLower(name)
+			if strings.HasSuffix(lower, ".zip") || strings.HasSuffix(lower, ".exe") ||
+				strings.HasSuffix(lower, ".txt") || strings.HasSuffix(lower, ".log") ||
+				strings.HasSuffix(lower, ".xml") || strings.HasSuffix(lower, ".config") {
+				out = append(out, fmt.Sprintf("smb action=download host=%s share=%s path=%s", r.Host, r.Share, pathJoin(r.Path, name)))
+			}
+		}
+	case "download", "get":
+		if r.FileSize > 0 {
+			out = append(out, "review downloaded file for credentials / tooling secrets")
+		}
+	}
+	return Cap(out)
+}
+
+func pathJoin(base, name string) string {
+	base = strings.Trim(base, `/\`)
+	name = strings.Trim(name, `/\`)
+	if base == "" || base == "." {
+		return name
+	}
+	return base + "/" + name
 }
 
 // ForKerberoast derives follow-on actions from kerberoast results.

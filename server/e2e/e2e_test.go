@@ -47,6 +47,8 @@ func TestLiveE2E(t *testing.T) {
 		GRPCAddr:      fmt.Sprintf("127.0.0.1:%d", grpcPort),
 		DBPath:        filepath.Join(dataDir, "erebus.db"),
 		DataDir:       dataDir,
+		OperatorCNs:   []string{"e2e-operator", "e2e-requester"},
+		ApproverCNs:   []string{"e2e-approver"},
 		ImplantSecret: hex.EncodeToString(secret),
 		AutoHarvest:   server.AutoHarvestYAML{Enabled: &ahDisabled},
 		Listeners: []server.ListenerConfig{
@@ -67,6 +69,8 @@ func TestLiveE2E(t *testing.T) {
 	waitForTCP(t, fmt.Sprintf("127.0.0.1:%d", httpsPort), 5*time.Second)
 
 	grpcClient, opTLS := newGRPCClient(t, ts, cfg.GRPCAddr)
+	requesterClient, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "e2e-requester")
+	approverClient, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "e2e-approver")
 	httpsURL := fmt.Sprintf("https://127.0.0.1:%d", httpsPort)
 	httpClient := newHTTPSClient(opTLS)
 
@@ -86,18 +90,15 @@ func TestLiveE2E(t *testing.T) {
 	sim.sessionKey = sessionKey
 	go sim.beaconLoop(ctx)
 
-	// Step 3: shell task round-trip
+	// Step 3: shell task round-trip (shell is high-risk → dual-control approval)
 	shellData, _ := proto.Marshal(&pb.ShellTask{Command: "echo erebus-e2e-ok"})
-	execResp, err := grpcClient.ExecuteTask(ctx, &pb.ExecuteTaskRequest{
+	execResp := executeTaskWithApproval(t, ctx, requesterClient, approverClient, &pb.ExecuteTaskRequest{
 		SessionId: sessionID,
 		TaskType:  pb.TaskType_TASK_SHELL,
 		Data:      shellData,
 		Wait:      true,
 		TimeoutMs: 30000,
 	})
-	if err != nil {
-		t.Fatalf("execute shell: %v", err)
-	}
 	if execResp.Result == nil || !execResp.Result.Success {
 		t.Fatalf("shell failed: %+v", execResp.Result)
 	}
@@ -113,54 +114,12 @@ func TestLiveE2E(t *testing.T) {
 	}
 
 	// Step 4: approval gate for creds dump (dual-control: requester != approver)
-	requesterClient, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "e2e-requester")
-	approverClient, _ := newGRPCClientNamed(t, ts, cfg.GRPCAddr, "e2e-approver")
-
-	approvalDone := make(chan error, 1)
-	go func() {
-		_, err := requesterClient.ExecuteTask(ctx, &pb.ExecuteTaskRequest{
-			SessionId: sessionID,
-			TaskType:  pb.TaskType_TASK_CREDS_DUMP,
-			Wait:      true,
-			TimeoutMs: 30000,
-		})
-		approvalDone <- err
-	}()
-
-	var approvalID string
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		pending, err := approverClient.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
-		if err != nil {
-			t.Fatalf("list pending: %v", err)
-		}
-		for _, a := range pending.Approvals {
-			if a.TaskType == pb.TaskType_TASK_CREDS_DUMP && a.SessionId == sessionID {
-				approvalID = a.Id
-				break
-			}
-		}
-		if approvalID != "" {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if approvalID == "" {
-		t.Fatal("expected pending creds_dump approval")
-	}
-
-	if _, err := approverClient.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
-		t.Fatalf("approve: %v", err)
-	}
-
-	select {
-	case err := <-approvalDone:
-		if err != nil {
-			t.Fatalf("creds dump after approve: %v", err)
-		}
-	case <-time.After(30 * time.Second):
-		t.Fatal("creds dump task timed out after approval")
-	}
+	_ = executeTaskWithApproval(t, ctx, requesterClient, approverClient, &pb.ExecuteTaskRequest{
+		SessionId: sessionID,
+		TaskType:  pb.TaskType_TASK_CREDS_DUMP,
+		Wait:      true,
+		TimeoutMs: 30000,
+	})
 
 	// Verify creds dump result is real protobuf, not simulated JSON
 	tasks, err := grpcClient.ListTasks(ctx, &pb.ListTasksRequest{SessionId: sessionID})
@@ -221,6 +180,56 @@ func newGRPCClient(t *testing.T, ts *server.Teamserver, addr string) (pb.ErebusC
 	return newGRPCClientNamed(t, ts, addr, "e2e-operator")
 }
 
+// executeTaskWithApproval runs ExecuteTask on requester while approver grants the pending gate.
+func executeTaskWithApproval(t *testing.T, ctx context.Context, requester, approver pb.ErebusC2Client, req *pb.ExecuteTaskRequest) *pb.ExecuteTaskResponse {
+	t.Helper()
+	type result struct {
+		resp *pb.ExecuteTaskResponse
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		resp, err := requester.ExecuteTask(ctx, req)
+		done <- result{resp, err}
+	}()
+
+	var approvalID string
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		pending, err := approver.ListPendingApprovals(ctx, &pb.ListPendingApprovalsRequest{})
+		if err != nil {
+			t.Fatalf("list pending: %v", err)
+		}
+		for _, a := range pending.Approvals {
+			if a.TaskType == req.TaskType && a.SessionId == req.SessionId {
+				approvalID = a.Id
+				break
+			}
+		}
+		if approvalID != "" {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if approvalID == "" {
+		t.Fatalf("expected pending approval for %s", req.TaskType)
+	}
+	if _, err := approver.Approve(ctx, &pb.ApproveRequest{ApprovalId: approvalID}); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+
+	select {
+	case r := <-done:
+		if r.err != nil {
+			t.Fatalf("execute after approve: %v", r.err)
+		}
+		return r.resp
+	case <-time.After(45 * time.Second):
+		t.Fatalf("task %s timed out after approval", req.TaskType)
+		return nil
+	}
+}
+
 func newGRPCClientNamed(t *testing.T, ts *server.Teamserver, addr, cn string) (pb.ErebusC2Client, *tls.Config) {
 	t.Helper()
 	_, certPEM, keyPEM, err := ts.CA.GenerateClientCert(cn)
@@ -270,8 +279,9 @@ type implantSim struct {
 }
 
 // nextBeaconTs avoids ReplayCache collisions on rapid back-to-back beacons.
+// Uses Unix milliseconds so sub-second beacons do not share a key.
 func (s *implantSim) nextBeaconTs() int64 {
-	ts := time.Now().Unix()
+	ts := time.Now().UnixMilli()
 	if ts <= s.lastBeaconTs {
 		ts = s.lastBeaconTs + 1
 	}
@@ -280,7 +290,7 @@ func (s *implantSim) nextBeaconTs() int64 {
 }
 
 func (s *implantSim) register(ctx context.Context) (string, []byte) {
-	ts := time.Now().Unix()
+	ts := s.nextBeaconTs()
 	reg := &pb.Register{
 		ImplantId: s.implantID,
 		Hostname:  "e2e-host",

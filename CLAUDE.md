@@ -2,6 +2,12 @@
 
 Custom C2 framework for AI-driven offensive security operations.
 
+## Agent skills (HTB)
+
+- **`erebus-htb`** — run authorized HTB labs with this C2 (`.claude/skills/` and `.grok/skills/`)
+- **`htb-pentest`** — general HTB methodology (also user-global under `~/.claude/skills/` / `~/.grok/skills/`)
+- Runbook: `docs/HTB_NEXT_RUNBOOK.md` · AD cookbook: `docs/AD_ENGAGEMENT.md`
+
 ## Build
 
 ```bash

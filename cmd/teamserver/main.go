@@ -70,10 +70,17 @@ func main() {
 		cfg.Debug = true
 	}
 
-	// Ensure data directory exists and save config
+	// Ensure data directory exists
 	if err := cfg.EnsureDirs(); err != nil {
 		log.Fatalf("create data dirs: %v", err)
 	}
+
+	ts, err := server.NewTeamserver(cfg)
+	if err != nil {
+		log.Fatalf("init teamserver: %v", err)
+	}
+
+	// Persist after NewTeamserver so generated master_key / secrets are saved.
 	if pp != "" {
 		if err := cfg.SaveEncrypted(*configPath, pp); err != nil {
 			log.Printf("[main] warning: save encrypted config: %v", err)
@@ -82,11 +89,6 @@ func main() {
 		if err := cfg.Save(*configPath); err != nil {
 			log.Printf("[main] warning: save config: %v", err)
 		}
-	}
-
-	ts, err := server.NewTeamserver(cfg)
-	if err != nil {
-		log.Fatalf("init teamserver: %v", err)
 	}
 
 	if err := ts.Start(); err != nil {

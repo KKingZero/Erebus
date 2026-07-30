@@ -11,6 +11,7 @@ import (
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/persist" // Register persist modules
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/cloud"   // Register cloud modules
 	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/privesc" // Register privesc modules
+	_ "github.com/KKingZero/erebus-exploit-framwork/implant/modules/smb"     // Register remote SMB client
 )
 
 func main() {

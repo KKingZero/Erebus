@@ -9,6 +9,62 @@ import (
 	"github.com/KKingZero/erebus-exploit-framwork/server/sessions"
 )
 
+func TestHandleBeaconTerminateAfterKill(t *testing.T) {
+	secret, err := zcrypto.RandomBytes(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := &BeaconHandler{
+		Secret:      secret,
+		Sessions:    sessions.NewManager(nil),
+		ReplayCache: zcrypto.NewReplayCache(60 * time.Second),
+	}
+
+	ts := time.Now().Unix()
+	reg := &pb.Register{
+		ImplantId: "implant-kill",
+		Hostname:  "testhost",
+		Username:  "tester",
+		Os:        "linux",
+		Arch:      "amd64",
+		Timestamp: ts,
+		Hmac:      zcrypto.ComputeHMAC(secret, "implant-kill", ts),
+	}
+	resp, err := HandleRegister(h, reg, "https", "127.0.0.1:1")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	sess, ok := h.Sessions.Get(resp.SessionId)
+	if !ok {
+		t.Fatal("session missing")
+	}
+	if err := h.Sessions.Kill(resp.SessionId); err != nil {
+		t.Fatal(err)
+	}
+	if !sess.ShouldTerminate() {
+		t.Fatal("expected ShouldTerminate after Kill")
+	}
+
+	beaconTs := ts + 1
+	beaconResp, err := HandleBeacon(h, &pb.Beacon{
+		ImplantId: "implant-kill",
+		SessionId: resp.SessionId,
+		Timestamp: beaconTs,
+		Hmac:      zcrypto.ComputeHMAC(secret, "implant-kill", beaconTs),
+	})
+	if err != nil {
+		t.Fatalf("beacon: %v", err)
+	}
+	if !beaconResp.Terminate {
+		t.Fatal("expected Terminate=true after operator kill")
+	}
+	if sess.IsAlive() {
+		t.Fatal("killed session must not revive on check-in")
+	}
+}
+
 func TestHandleRegisterAndBeacon(t *testing.T) {
 	secret, err := zcrypto.RandomBytes(32)
 	if err != nil {

