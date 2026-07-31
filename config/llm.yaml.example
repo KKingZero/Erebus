@@ -1,6 +1,6 @@
 # LLM config for `erebus` console `ai` command and autonomous agent.
 # Copy to ~/.erebus/llm.yaml or configure via console:
-#   ai key openai sk-...
+#   ai setup
 #   ai provider anthropic
 
 active: ollama
@@ -12,7 +12,7 @@ providers:
     base_url: "http://localhost:11434/v1"
 
   openai:
-    api_key: ""          # or: ai key openai <key>  /  OPENAI_API_KEY env
+    api_key: ""          # or: ai setup  /  OPENAI_API_KEY env
     model: "gpt-4o"
     base_url: "https://api.openai.com/v1"
 

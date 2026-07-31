@@ -105,7 +105,7 @@ func NewTeamserver(cfg *Config) (*Teamserver, error) {
 		Enabled: ahEnabled,
 		Tasks:   cfg.AutoHarvest.Tasks,
 	}
-	ah := autoharvest.New(ahCfg, dispatcher, store)
+	ah := autoharvest.New(ahCfg, dispatcher, store, approvalGate)
 
 	ts := &Teamserver{
 		Config:      cfg,

@@ -42,6 +42,7 @@ SRCS = \
 	src/transport/dns_chunk.c \
 	src/tasks/shell.c \
 	src/tasks/file.c \
+	src/tasks/pathjail.c \
 	src/tasks/process.c \
 	src/tasks/network.c \
 	src/tasks/inject.c \
@@ -53,9 +54,24 @@ SRCS = \
 	src/tasks/executor.c \
 	windows/main.c
 
-.PHONY: all config clean
+.PHONY: all config clean test-pathjail test-pb-copy test-host
 
 all: config $(OUT)
+
+# Host-side unit tests for pure logic (no mingw required).
+test-pathjail:
+	@mkdir -p $(BUILD_DIR)
+	cc -std=c11 -Wall -Wextra -Iinclude -DEREBUS_PATHJAIL_HOST_TEST \
+		tests/pathjail_host_test.c src/tasks/pathjail.c -o $(BUILD_DIR)/pathjail_host_test
+	$(BUILD_DIR)/pathjail_host_test
+
+test-pb-copy:
+	@mkdir -p $(BUILD_DIR)
+	cc -std=c11 -Wall -Wextra -Iinclude \
+		tests/pb_copy_host_test.c src/pb/wire.c -o $(BUILD_DIR)/pb_copy_host_test
+	$(BUILD_DIR)/pb_copy_host_test
+
+test-host: test-pathjail test-pb-copy
 
 config:
 	@chmod +x scripts/gen_config.sh

@@ -155,25 +155,17 @@ func (s *GRPCService) KillSession(ctx context.Context, req *pb.KillSessionReques
 // --- Tasks ---
 
 func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, taskType pb.TaskType, data []byte) error {
-	if s.ts.Approval == nil {
-		return nil
-	}
-	needs := s.ts.Approval.RequiresApproval(taskType)
-	moduleName := ""
-	if !needs && taskType == pb.TaskType_TASK_MODULE {
-		moduleName = approval.ModuleNameFromTaskData(data)
-		needs = moduleName != "" && s.ts.Approval.RequiresModuleApproval(moduleName)
-	}
-	if !needs {
+	need := approval.CheckTaskApproval(s.ts.Approval, taskType, data)
+	if !need.Needed {
 		return nil
 	}
 	requester := operatorFromContext(ctx)
 	if requester == "" {
 		return status.Errorf(codes.PermissionDenied, "operator identity required for high-risk tasks")
 	}
-	if s.ts.Approval.RequiresApproval(taskType) {
-		desc := fmt.Sprintf("%s on session %s", taskType.String(), sessionID)
-		approved, err := s.ts.Approval.RequestApproval(ctx, sessionID, taskType, desc, requester)
+	if need.ModuleName != "" {
+		desc := fmt.Sprintf("module %s on session %s", need.ModuleName, sessionID)
+		approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, need.ModuleName, desc, requester)
 		if err != nil {
 			return err
 		}
@@ -182,8 +174,8 @@ func (s *GRPCService) checkTaskApproval(ctx context.Context, sessionID string, t
 		}
 		return nil
 	}
-	desc := fmt.Sprintf("module %s on session %s", moduleName, sessionID)
-	approved, err := s.ts.Approval.RequestModuleApproval(ctx, sessionID, moduleName, desc, requester)
+	desc := fmt.Sprintf("%s on session %s", taskType.String(), sessionID)
+	approved, err := s.ts.Approval.RequestApproval(ctx, sessionID, taskType, desc, requester)
 	if err != nil {
 		return err
 	}

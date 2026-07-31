@@ -4,12 +4,6 @@
 #include "erebus/pb_c2.h"
 #include "erebus/pb_wire.h"
 
-static void copy_str(char *dst, size_t cap, const char *src) {
-    if (!src) src = "";
-    strncpy(dst, src, cap - 1);
-    dst[cap - 1] = '\0';
-}
-
 static int encode_task_result_msg(const erebus_task_result *r, uint8_t **out, size_t *out_len) {
     erebus_pb_writer w;
     if (!erebus_pb_writer_init(&w, 512)) return 0;
@@ -60,7 +54,7 @@ int erebus_pb_decode_register_resp(const uint8_t *in, size_t in_len, erebus_regi
             m->success = (int)v;
             break;
         case 2:
-            if (erebus_pb_read_bytes(&r, &b, &n)) copy_str(m->session_id, sizeof(m->session_id), (const char *)b);
+            if (erebus_pb_read_bytes(&r, &b, &n)) erebus_pb_copy_bytes(m->session_id, sizeof(m->session_id), b, n);
             break;
         case 3:
             erebus_pb_read_varint(&r, &v);
@@ -114,10 +108,10 @@ static int decode_task_msg(const uint8_t *in, size_t in_len, erebus_task *t) {
         uint64_t v;
         switch (field) {
         case 1:
-            if (erebus_pb_read_bytes(&r, &b, &n)) copy_str(t->task_id, sizeof(t->task_id), (const char *)b);
+            if (erebus_pb_read_bytes(&r, &b, &n)) erebus_pb_copy_bytes(t->task_id, sizeof(t->task_id), b, n);
             break;
         case 2:
-            if (erebus_pb_read_bytes(&r, &b, &n)) copy_str(t->implant_id, sizeof(t->implant_id), (const char *)b);
+            if (erebus_pb_read_bytes(&r, &b, &n)) erebus_pb_copy_bytes(t->implant_id, sizeof(t->implant_id), b, n);
             break;
         case 3:
             erebus_pb_read_varint(&r, &v);
@@ -261,7 +255,7 @@ int erebus_pb_decode_shell_task(const uint8_t *in, size_t in_len, erebus_shell_t
         const uint8_t *b;
         size_t n;
         if (field == 1 && erebus_pb_read_bytes(&r, &b, &n))
-            copy_str(t->command, sizeof(t->command), (const char *)b);
+            erebus_pb_copy_bytes(t->command, sizeof(t->command), b, n);
         else if (!erebus_pb_skip(&r, wire))
             return 0;
     }

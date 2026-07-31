@@ -1,6 +1,9 @@
 package dnstransport
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestBuildAndParseQueryName(t *testing.T) {
 	domain := "c2.example.com."
@@ -13,6 +16,29 @@ func TestBuildAndParseQueryName(t *testing.T) {
 	}
 	if parsed.Seq != 1 || parsed.Total != 3 || parsed.Data != "abc123" || parsed.SessionLabel != session {
 		t.Fatalf("unexpected parsed query: %+v", parsed)
+	}
+}
+
+func TestParseQueryNameRejectsSeqOutOfRange(t *testing.T) {
+	// seq=3, total=3 → seq must be < total
+	if _, err := ParseQueryName("003.003.abc.sess"); err == nil {
+		t.Fatal("expected error for seq >= total")
+	}
+	// seq=0, total=1 is valid
+	if _, err := ParseQueryName("000.001.abc.sess"); err != nil {
+		t.Fatalf("boundary seq=0 total=1 should be ok: %v", err)
+	}
+	// seq=2, total=3 is valid
+	if _, err := ParseQueryName("002.003.abc.sess"); err != nil {
+		t.Fatalf("boundary seq=total-1 should be ok: %v", err)
+	}
+}
+
+func TestParseQueryNameRejectsOversizedSession(t *testing.T) {
+	long := strings.Repeat("a", MaxLabelLen+1)
+	name := "000.001.abc." + long
+	if _, err := ParseQueryName(name); err == nil {
+		t.Fatal("expected error for oversized session label")
 	}
 }
 

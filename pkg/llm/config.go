@@ -136,7 +136,7 @@ func (f *FileConfig) ActiveConfig() (Config, error) {
 	if cfg.Provider != string(ProviderOllama) && cfg.APIKey == "" {
 		meta, _ := LookupProvider(active)
 		if meta.NeedsKey {
-			return cfg, fmt.Errorf("%s API key not set — run: ai key %s <key>", meta.Label, active)
+			return cfg, fmt.Errorf("%s API key not set — run: ai setup", meta.Label)
 		}
 	}
 	return cfg, nil
@@ -155,7 +155,7 @@ func (f *FileConfig) SetAPIKey(provider, apiKey string, activate bool) error {
 	if cur.Model == "" {
 		cur = defaultProviderSettings(meta)
 	}
-	cur.APIKey = strings.TrimSpace(apiKey)
+	cur.APIKey = NormalizeAPIKey(apiKey)
 	if meta.ID == ProviderOllama && cur.APIKey == "" {
 		cur.APIKey = "ollama"
 	}

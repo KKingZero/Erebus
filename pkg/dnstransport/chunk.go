@@ -58,11 +58,23 @@ func ParseQueryName(name string) (*ParsedQuery, error) {
 	if err != nil || total <= 0 || total > 999 {
 		return nil, fmt.Errorf("invalid total label")
 	}
+	// Reject out-of-range sequence numbers before any reassembly state is allocated.
+	if seq >= total {
+		return nil, fmt.Errorf("seq %d out of range for total %d", seq, total)
+	}
+	data := parts[2]
+	if len(data) > MaxLabelLen {
+		return nil, fmt.Errorf("data label too long")
+	}
+	sessionLabel := parts[3]
+	if sessionLabel == "" || len(sessionLabel) > MaxLabelLen {
+		return nil, fmt.Errorf("invalid session label")
+	}
 
 	return &ParsedQuery{
 		Seq:          seq,
 		Total:        total,
-		Data:         parts[2],
-		SessionLabel: parts[3],
+		Data:         data,
+		SessionLabel: sessionLabel,
 	}, nil
 }

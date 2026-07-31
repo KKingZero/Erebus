@@ -26,8 +26,19 @@ func erebusHistoryPath() string {
 // commandMayContainSecret reports whether a REPL line could embed credentials.
 func commandMayContainSecret(line string) bool {
 	parts := strings.Fields(line)
-	// ai key <provider> <secret...>
-	return len(parts) >= 4 && parts[0] == "ai" && parts[1] == "key"
+	if len(parts) < 3 || parts[0] != "ai" {
+		return false
+	}
+	// Legacy: ai key <provider> <secret...>
+	// Blocked by the wizard, but still scrub if someone pastes secrets on the CLI.
+	if parts[1] == "key" && len(parts) >= 4 {
+		return true
+	}
+	// ai setup <anything that looks like a secret>
+	if parts[1] == "setup" && len(parts) >= 3 {
+		return true
+	}
+	return false
 }
 
 // scrubLastHistoryEntry removes the most recent line from the history file.

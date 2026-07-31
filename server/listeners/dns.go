@@ -17,7 +17,12 @@ import (
 
 var b32 = base32.StdEncoding.WithPadding(base32.NoPadding)
 
-const chunkBufferTTL = 2 * time.Minute
+const (
+	chunkBufferTTL = 2 * time.Minute
+	// Conservative caps on unauthenticated reassembly state (before HMAC).
+	maxDNSChunkLabels  = 64  // max concurrent SessionLabel buffers
+	maxDNSChunksGlobal = 256 // max stored chunk entries across all labels
+)
 
 // DNSListener implements the Listener interface for DNS-based C2 transport.
 type DNSListener struct {
@@ -160,13 +165,32 @@ func (l *DNSListener) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 func (l *DNSListener) ingestChunk(parsed *dnstransport.ParsedQuery, remoteAddr string) []byte {
 	key := parsed.SessionLabel
 
+	// Belt-and-suspenders: parser should already enforce this.
+	if parsed.Seq < 0 || parsed.Total <= 0 || parsed.Seq >= parsed.Total {
+		return nil
+	}
+
 	l.chunksMu.Lock()
 	defer l.chunksMu.Unlock()
 
 	l.purgeExpiredChunksLocked()
 
 	buf, ok := l.chunks[key]
+	if ok && buf.total != parsed.Total {
+		// Total mismatch mid-stream — drop the buffer to avoid merge attacks.
+		delete(l.chunks, key)
+		ok = false
+	}
+
 	if !ok || parsed.Seq == 0 {
+		// New label: enforce active buffer cap.
+		if !ok && len(l.chunks) >= maxDNSChunkLabels {
+			return nil
+		}
+		// Global chunk entry cap: reserve room for this buffer's total slots.
+		if l.globalChunkCountLocked() >= maxDNSChunksGlobal {
+			return nil
+		}
 		buf = &chunkBuffer{
 			chunks:  make(map[int]string),
 			total:   parsed.Total,
@@ -175,8 +199,17 @@ func (l *DNSListener) ingestChunk(parsed *dnstransport.ParsedQuery, remoteAddr s
 		l.chunks[key] = buf
 	}
 
+	// Cap per-buffer entries at total (ignore duplicates that would bloat).
+	if _, exists := buf.chunks[parsed.Seq]; !exists {
+		if len(buf.chunks) >= buf.total {
+			return nil
+		}
+		if l.globalChunkCountLocked() >= maxDNSChunksGlobal {
+			return nil
+		}
+	}
+
 	buf.updated = time.Now()
-	buf.total = parsed.Total
 	buf.chunks[parsed.Seq] = strings.ToUpper(parsed.Data)
 
 	if len(buf.chunks) < buf.total {
@@ -202,6 +235,14 @@ func (l *DNSListener) ingestChunk(parsed *dnstransport.ParsedQuery, remoteAddr s
 	}
 
 	return l.processPayload(raw, remoteAddr)
+}
+
+func (l *DNSListener) globalChunkCountLocked() int {
+	n := 0
+	for _, buf := range l.chunks {
+		n += len(buf.chunks)
+	}
+	return n
 }
 
 func (l *DNSListener) purgeExpiredChunksLocked() {

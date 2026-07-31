@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/KKingZero/erebus-exploit-framwork/core/aisetup"
 	"github.com/KKingZero/erebus-exploit-framwork/pkg/llm"
-	"golang.org/x/term"
 )
 
 func (c *Console) cmdAI(args []string) {
@@ -19,8 +19,11 @@ func (c *Console) cmdAI(args []string) {
 		c.aiProviders()
 	case "provider":
 		c.aiSetProvider(args[1:])
+	case "setup":
+		c.aiSetup(args[1:])
 	case "key":
-		c.aiSetKey(args[1:])
+		// Backward-compatible alias for `ai setup`.
+		c.aiSetup(args[1:])
 	case "model":
 		c.aiSetModel(args[1:])
 	case "config":
@@ -40,18 +43,50 @@ func (c *Console) aiUsage() {
 	msg := `AI commands:
   ai                               Open AI chat terminal (TUI)
   ai <message>                     Open TUI and send first message
+  ai setup                         Interactive provider / key / model wizard
   ai providers                     List LLM providers
-  ai provider <name>               Switch active provider (ollama, openai, anthropic, bedrock, kimi)
-  ai key <provider>                Set API key (hidden prompt; never pass key on command line)
+  ai provider <name>               Switch active provider (ollama, openai, anthropic, bedrock, kimi, gemini)
   ai model <provider> <model>      Set model for a provider
   ai config                        Show active provider and saved keys (masked)
 
 In TUI: /back = return to erebus ›   /quit = exit Erebus   /clear = reset transcript
-Providers: ollama (local), openai, anthropic, bedrock, kimi`
+Providers: ollama (local), openai, anthropic, bedrock, kimi, gemini`
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "ai",
 		Message: msg,
+	})
+}
+
+func (c *Console) aiSetup(args []string) {
+	if c.mode == OutputJSON {
+		emitError(c.mode, "ai", "ai setup requires an interactive terminal (not JSON mode)")
+		return
+	}
+	if len(args) > 0 {
+		// Never accept keys on the command line.
+		emitError(c.mode, "ai", "Do not pass secrets on the command line. Run: ai setup")
+		return
+	}
+
+	result, err := aisetup.Run()
+	if err != nil {
+		emitError(c.mode, "ai", err.Error())
+		return
+	}
+	// Wizard already rendered the Shannon-style form (success or cancel) in the terminal.
+	if result.Cancelled {
+		return
+	}
+	// Keep a structured status for tooling without reprinting the form.
+	emit(c.mode, Response{
+		Status:  "ok",
+		Command: "ai setup",
+		Data: map[string]string{
+			"provider": result.Provider,
+			"model":    result.Model,
+			"path":     result.Path,
+		},
 	})
 }
 
@@ -84,7 +119,7 @@ func (c *Console) aiProviders() {
 			p.ID, p.Label, model, keyStatus, active))
 	}
 	b.WriteString(fmt.Sprintf("\nActive: %s\n", cfg.Active))
-	b.WriteString("Set key: ai key <provider> <api-key>\n")
+	b.WriteString("Configure: ai setup\n")
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "ai",
@@ -97,7 +132,7 @@ func (c *Console) aiProviders() {
 
 func (c *Console) aiSetProvider(args []string) {
 	if len(args) != 1 {
-		emitError(c.mode, "ai", "Usage: ai provider <ollama|openai|anthropic|bedrock|kimi>")
+		emitError(c.mode, "ai", "Usage: ai provider <ollama|openai|anthropic|bedrock|kimi|gemini>")
 		return
 	}
 	cfg, err := llm.LoadFile(llm.DefaultConfigPath)
@@ -120,69 +155,6 @@ func (c *Console) aiSetProvider(args []string) {
 		Message: fmt.Sprintf("> Active LLM provider: %s (%s)", meta.ID, meta.Label),
 		Data: map[string]string{
 			"provider": string(meta.ID),
-		},
-	})
-}
-
-func (c *Console) aiSetKey(args []string) {
-	if len(args) < 1 {
-		emitError(c.mode, "ai", "Usage: ai key <provider>")
-		return
-	}
-	provider := args[0]
-	meta, err := llm.LookupProvider(provider)
-	if err != nil {
-		emitError(c.mode, "ai", err.Error())
-		return
-	}
-	if !meta.NeedsKey {
-		emitError(c.mode, "ai", fmt.Sprintf("%s does not require an API key", meta.Label))
-		return
-	}
-
-	if len(args) >= 2 {
-		emitError(c.mode, "ai", "Do not pass API keys on the command line (saved in shell history). Use: ai key "+provider)
-		return
-	}
-
-	apiKey := ""
-	if c.mode == OutputHuman && term.IsTerminal(int(os.Stdin.Fd())) {
-		fmt.Fprintf(os.Stderr, "> Enter %s API key: ", meta.Label)
-		raw, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Fprintln(os.Stderr)
-		if err != nil {
-			emitError(c.mode, "ai", fmt.Sprintf("read API key: %v", err))
-			return
-		}
-		apiKey = string(raw)
-	} else {
-		emitError(c.mode, "ai", "Usage: ai key <provider> (interactive terminal required for hidden prompt)")
-		return
-	}
-	if strings.TrimSpace(apiKey) == "" {
-		emitError(c.mode, "ai", "API key cannot be empty")
-		return
-	}
-
-	cfg, err := llm.LoadFile(llm.DefaultConfigPath)
-	if err != nil {
-		emitError(c.mode, "ai", err.Error())
-		return
-	}
-	if err := cfg.SetAPIKey(provider, apiKey, true); err != nil {
-		emitError(c.mode, "ai", err.Error())
-		return
-	}
-	if err := llm.SaveFile(llm.DefaultConfigPath, cfg); err != nil {
-		emitError(c.mode, "ai", err.Error())
-		return
-	}
-	emit(c.mode, Response{
-		Status:  "ok",
-		Command: "ai",
-		Message: fmt.Sprintf("> Saved %s API key and set provider active (%s)", meta.Label, llm.MaskKey(apiKey)),
-		Data: map[string]string{
-			"provider": provider,
 		},
 	})
 }
@@ -236,6 +208,7 @@ func (c *Console) aiShowConfig() {
 			p.ID, llm.MaskKey(s.APIKey), firstNonEmpty(s.Model, p.DefaultModel)))
 	}
 	b.WriteString(fmt.Sprintf("\nConfig file: %s\n", expandErebusPath(llm.DefaultConfigPath)))
+	b.WriteString("Reconfigure: ai setup\n")
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "ai",

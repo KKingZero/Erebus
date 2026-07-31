@@ -28,8 +28,9 @@ type HarvestTask struct {
 	Data     []byte
 }
 
-// DefaultTasks returns the default set of recon tasks dispatched on SESSION_NEW.
-// All tasks are recon-level — no approval gates triggered.
+// DefaultTasks returns the default set of tasks considered on SESSION_NEW.
+// Low-risk tasks (e.g. process_list, net_ifconfig) auto-dispatch; high-risk
+// tasks (cloud modules, shell) require operator approval via the approval gate.
 func DefaultTasks(targetOS string) []HarvestTask {
 	tasks := []HarvestTask{
 		{

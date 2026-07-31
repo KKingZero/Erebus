@@ -34,4 +34,8 @@ int erebus_pb_read_varint(erebus_pb_reader *r, uint64_t *v);
 int erebus_pb_read_bytes(erebus_pb_reader *r, const uint8_t **b, size_t *n);
 int erebus_pb_skip(erebus_pb_reader *r, uint8_t wire);
 
+/* Bounded copy of a protobuf length-delimited field into a C string.
+ * Does not require src to be NUL-terminated (protobuf strings are not). */
+void erebus_pb_copy_bytes(char *dst, size_t cap, const uint8_t *src, size_t n);
+
 #endif

@@ -12,6 +12,12 @@ func TestCommandMayContainSecret(t *testing.T) {
 	if commandMayContainSecret("ai key openai") {
 		t.Fatal("provider only should not scrub")
 	}
+	if !commandMayContainSecret("ai setup sk-secret") {
+		t.Fatal("setup with trailing secret should scrub")
+	}
+	if commandMayContainSecret("ai setup") {
+		t.Fatal("plain setup should not scrub")
+	}
 	if commandMayContainSecret("ai providers") {
 		t.Fatal("unrelated command")
 	}

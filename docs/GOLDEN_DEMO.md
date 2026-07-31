@@ -19,7 +19,7 @@
 | C2 listener URL | `https://<teamserver>:443` (reachable from implant host) |
 | Implant host | Domain-joined Windows workstation |
 | Operator machine | Teamserver + `erebus` CLI |
-| LLM | Hosted Claude/GPT recommended (`ai provider …` / `ai key …`) |
+| LLM | Hosted Claude/GPT recommended (`ai setup`) |
 
 ---
 

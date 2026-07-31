@@ -4,17 +4,11 @@
 #include "erebus/pb_c2.h"
 #include "erebus/pb_wire.h"
 
-static void copy_str(char *dst, size_t cap, const char *src) {
-    if (!src) src = "";
-    strncpy(dst, src, cap - 1);
-    dst[cap - 1] = '\0';
-}
-
 static int decode_string_field(erebus_pb_reader *r, uint8_t wire, char *dst, size_t cap) {
     const uint8_t *b;
     size_t n;
     if (wire != 2 || !erebus_pb_read_bytes(r, &b, &n)) return 0;
-    copy_str(dst, cap, (const char *)b);
+    erebus_pb_copy_bytes(dst, cap, b, n);
     return 1;
 }
 

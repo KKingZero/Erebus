@@ -174,3 +174,15 @@ int erebus_pb_read_bytes(erebus_pb_reader *r, const uint8_t **b, size_t *n) {
     r->pos += (size_t)len;
     return 1;
 }
+
+void erebus_pb_copy_bytes(char *dst, size_t cap, const uint8_t *src, size_t n) {
+    if (!dst || cap == 0) return;
+    if (!src || n == 0) {
+        dst[0] = '\0';
+        return;
+    }
+    size_t copy = n;
+    if (copy > cap - 1) copy = cap - 1;
+    memcpy(dst, src, copy);
+    dst[copy] = '\0';
+}
