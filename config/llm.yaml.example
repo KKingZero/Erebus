@@ -26,6 +26,11 @@ providers:
     model: "claude-sonnet-4-6"
     base_url: "https://api.anthropic.com/v1"
 
+  grok:
+    api_key: ""          # XAI_API_KEY (console.x.ai)
+    model: "grok-4.5"
+    base_url: "https://api.x.ai/v1"
+
   bedrock:
     api_key: ""          # AWS_BEARER_TOKEN_BEDROCK
     model: "us.anthropic.claude-sonnet-4-6"

@@ -45,12 +45,13 @@ func (c *Console) aiUsage() {
   ai <message>                     Open TUI and send first message
   ai setup                         Interactive provider / key / model wizard
   ai providers                     List LLM providers
-  ai provider <name>               Switch active provider (ollama, openai, anthropic, bedrock, kimi, gemini)
+  ai provider <name>               Switch active provider (ollama, openai, anthropic, grok, bedrock, kimi, gemini)
   ai model <provider> <model>      Set model for a provider
   ai config                        Show active provider and saved keys (masked)
 
 In TUI: /back = return to erebus ›   /quit = exit Erebus   /clear = reset transcript
-Providers: ollama (local), openai, anthropic, bedrock, kimi, gemini`
+Providers: ollama (local), openai, anthropic, grok (xAI), bedrock, kimi, gemini
+Auth: API keys (or env vars) only — no browser OAuth in this release`
 	emit(c.mode, Response{
 		Status:  "ok",
 		Command: "ai",
@@ -132,7 +133,7 @@ func (c *Console) aiProviders() {
 
 func (c *Console) aiSetProvider(args []string) {
 	if len(args) != 1 {
-		emitError(c.mode, "ai", "Usage: ai provider <ollama|openai|anthropic|bedrock|kimi|gemini>")
+		emitError(c.mode, "ai", "Usage: ai provider <ollama|openai|anthropic|grok|bedrock|kimi|gemini>")
 		return
 	}
 	cfg, err := llm.LoadFile(llm.DefaultConfigPath)

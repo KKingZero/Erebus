@@ -20,6 +20,13 @@ func SuggestedModels(provider string) []string {
 			"o3",
 			"o4-mini",
 		}
+	case ProviderGrok:
+		return []string{
+			"grok-4.5",
+			"grok-4",
+			"grok-3",
+			"grok-3-mini",
+		}
 	case ProviderGemini:
 		return []string{
 			"gemini-2.0-flash",

@@ -9,6 +9,7 @@ const (
 	ProviderOllama    ProviderID = "ollama"
 	ProviderOpenAI    ProviderID = "openai"
 	ProviderAnthropic ProviderID = "anthropic"
+	ProviderGrok      ProviderID = "grok" // xAI Grok (api.x.ai)
 	ProviderBedrock   ProviderID = "bedrock"
 	ProviderKimi      ProviderID = "kimi"
 	ProviderGemini    ProviderID = "gemini"
@@ -48,6 +49,14 @@ var supportedProviders = []ProviderMeta{
 		BaseURL:      "https://api.anthropic.com/v1",
 		DefaultModel: "claude-sonnet-4-6",
 		APIKeyEnv:    "ANTHROPIC_API_KEY",
+		NeedsKey:     true,
+	},
+	{
+		ID:           ProviderGrok,
+		Label:        "Grok (xAI)",
+		BaseURL:      "https://api.x.ai/v1",
+		DefaultModel: "grok-4.5",
+		APIKeyEnv:    "XAI_API_KEY",
 		NeedsKey:     true,
 	},
 	{
@@ -91,7 +100,7 @@ func LookupProvider(id string) (ProviderMeta, error) {
 			return p, nil
 		}
 	}
-	return ProviderMeta{}, fmt.Errorf("unknown provider %q (supported: ollama, openai, anthropic, bedrock, kimi, gemini)", id)
+	return ProviderMeta{}, fmt.Errorf("unknown provider %q (supported: ollama, openai, anthropic, grok, bedrock, kimi, gemini)", id)
 }
 
 func bedrockBaseURL(region string) string {

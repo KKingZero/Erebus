@@ -194,6 +194,7 @@ func newModel() model {
 func setupProviders() []providerOption {
 	order := []string{
 		string(llm.ProviderAnthropic),
+		string(llm.ProviderGrok),
 		string(llm.ProviderOpenAI),
 		string(llm.ProviderGemini),
 		string(llm.ProviderKimi),
@@ -815,6 +816,8 @@ func keyPlaceholder(provider string) string {
 		return "sk-ant-api03-..."
 	case llm.ProviderOpenAI:
 		return "sk-..."
+	case llm.ProviderGrok:
+		return "xai-..."
 	case llm.ProviderGemini:
 		return "AIza..."
 	case llm.ProviderOllama:

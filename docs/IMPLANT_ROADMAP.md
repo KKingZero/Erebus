@@ -1,7 +1,7 @@
 # Erebus Implant Roadmap
 
 **Status:** v0.1.0 lab / research  
-**Last updated:** 2026-07-31 (decisions locked)  
+**Last updated:** 2026-07-31 (decisions locked; AI OAuth deferred)  
 **Audience:** maintainers planning the next implant sprint(s)
 
 This document inventories **what the implant can do today**, **what is left**, and **how a possible Zig implant branch fits**. It does not authorize use against unauthorized targets — authorized labs and engagements only.
@@ -260,6 +260,7 @@ Locked product intent:
 - Public "EDR-proof" guarantees
 - Unauthorized targeting features
 - Expanding **Go Windows** modules as the product path (maintenance/demo only)
+- **LLM browser OAuth / “Sign in with Anthropic|OpenAI|xAI” in the current sprints** — API keys + env vars only for now (see §17)
 
 ---
 
@@ -456,3 +457,39 @@ Sleep mask, ETW/AMSI, inject matrix, malleable C2 — after demos are boring.
 | Linux track | **L1 — thin Go Linux peer** |
 | First C lateral | **WinRM first** |
 | Go Windows long-term | **Archive eventually** (after C AD + lateral proven) |
+
+---
+
+## 17. AI / LLM auth backlog (related product — not implant)
+
+This section tracks **console AI provider auth**, separate from implant work. Recorded so it is not forgotten, but **not scheduled** against Sprint 0–2.
+
+### Today (shipped)
+
+| Mechanism | Status |
+|-----------|--------|
+| API key via `ai setup` (hidden prompt) | Yes |
+| Environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY`, `OLLAMA_API_KEY`, …) | Yes |
+| Multi-provider config in `~/.erebus/llm.yaml` | Yes |
+| Providers | Ollama (local/remote/cloud), Anthropic, OpenAI, **Grok (xAI)**, Gemini, Kimi, Bedrock bearer |
+
+All hosted providers use the **OpenAI-compatible HTTP client** with a **Bearer API key** (except Ollama local dummy key).
+
+### Future (eventually — **not now**)
+
+| Item | Notes |
+|------|--------|
+| **OAuth / browser login** for Anthropic, OpenAI, xAI (Grok), etc. | Device-code or redirect flow; per-provider OAuth apps; refresh tokens; secure token store under `~/.erebus/` |
+| Token refresh / expiry handling | Required if OAuth ships |
+| Revoke / re-auth in `ai setup` | UX for expired sessions |
+| Optional multi-account seats per provider | Nice-to-have after single-account OAuth works |
+
+**Why deferred**
+
+- Implant C-primary + Golden Demo 5/5 is higher priority.
+- API keys already unblock all current providers (including Grok).
+- OAuth is a large cross-cutting feature (security review, token storage, provider-specific apps).
+
+**When to reopen:** After M0–M2 implant milestones, or if design partners refuse raw API keys.
+
+**Decision:** OAuth for LLM providers is **planned eventually**, **not implemented in the current plan**. Stay on API keys + env vars.
