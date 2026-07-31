@@ -69,7 +69,7 @@ func DefaultConfig() Config {
 	return resolveProvider(ProviderOllama, ProviderSettings{
 		APIKey:  "ollama",
 		Model:   "llama3.2",
-		BaseURL: "http://localhost:11434/v1",
+		BaseURL: OllamaLocalBaseURL,
 	})
 }
 
@@ -133,6 +133,11 @@ func (f *FileConfig) ActiveConfig() (Config, error) {
 		return Config{}, fmt.Errorf("active provider %q not configured", active)
 	}
 	cfg := resolveProvider(ProviderID(active), settings)
+	if cfg.Provider == string(ProviderOllama) && OllamaNeedsAPIKey(cfg.BaseURL) {
+		if cfg.APIKey == "" || cfg.APIKey == "ollama" {
+			return cfg, fmt.Errorf("Ollama Cloud API key not set — run: ai setup (or set %s)", OllamaAPIKeyEnv)
+		}
+	}
 	if cfg.Provider != string(ProviderOllama) && cfg.APIKey == "" {
 		meta, _ := LookupProvider(active)
 		if meta.NeedsKey {
@@ -156,13 +161,35 @@ func (f *FileConfig) SetAPIKey(provider, apiKey string, activate bool) error {
 		cur = defaultProviderSettings(meta)
 	}
 	cur.APIKey = NormalizeAPIKey(apiKey)
-	if meta.ID == ProviderOllama && cur.APIKey == "" {
+	if meta.ID == ProviderOllama && cur.APIKey == "" && !OllamaNeedsAPIKey(cur.BaseURL) {
 		cur.APIKey = "ollama"
 	}
 	f.Providers[provider] = cur
 	if activate {
 		f.Active = provider
 	}
+	return nil
+}
+
+// SetBaseURL sets the base URL for a provider (used by Ollama local/remote/cloud).
+func (f *FileConfig) SetBaseURL(provider, baseURL string) error {
+	meta, err := LookupProvider(provider)
+	if err != nil {
+		return err
+	}
+	if f.Providers == nil {
+		f.Providers = make(map[string]ProviderSettings)
+	}
+	cur := f.Providers[provider]
+	if cur.Model == "" && cur.BaseURL == "" {
+		cur = defaultProviderSettings(meta)
+	}
+	baseURL = strings.TrimSpace(baseURL)
+	if meta.ID == ProviderOllama {
+		baseURL = NormalizeOllamaBaseURL(baseURL)
+	}
+	cur.BaseURL = baseURL
+	f.Providers[provider] = cur
 	return nil
 }
 
@@ -207,6 +234,10 @@ func (f *FileConfig) HasAPIKey(provider string) bool {
 		return false
 	}
 	if provider == string(ProviderOllama) {
+		if OllamaNeedsAPIKey(s.BaseURL) {
+			k := strings.TrimSpace(s.APIKey)
+			return k != "" && k != "ollama"
+		}
 		return true
 	}
 	return strings.TrimSpace(s.APIKey) != ""
@@ -281,8 +312,12 @@ func applyProviderEnv(id ProviderID, s ProviderSettings) ProviderSettings {
 			s.APIKey = v
 		}
 	}
-	if id == ProviderOllama && strings.TrimSpace(s.APIKey) == "" {
+	// Local/remote Ollama: dummy key is fine. Cloud needs a real key (env or yaml).
+	if id == ProviderOllama && strings.TrimSpace(s.APIKey) == "" && !OllamaNeedsAPIKey(s.BaseURL) {
 		s.APIKey = "ollama"
+	}
+	if id == ProviderOllama && s.BaseURL != "" {
+		s.BaseURL = NormalizeOllamaBaseURL(s.BaseURL)
 	}
 	return s
 }
@@ -317,8 +352,11 @@ func resolveProvider(id ProviderID, s ProviderSettings) Config {
 		}
 	}
 	apiKey := strings.TrimSpace(s.APIKey)
-	if id == ProviderOllama && apiKey == "" {
-		apiKey = "ollama"
+	if id == ProviderOllama {
+		baseURL = NormalizeOllamaBaseURL(baseURL)
+		if apiKey == "" && !OllamaNeedsAPIKey(baseURL) {
+			apiKey = "ollama"
+		}
 	}
 	cfg := Config{
 		BaseURL:  baseURL,
@@ -332,13 +370,17 @@ func resolveProvider(id ProviderID, s ProviderSettings) Config {
 
 func (c *Config) normalize() {
 	c.BaseURL = strings.TrimSuffix(c.BaseURL, "/")
+	if c.Provider == string(ProviderOllama) {
+		c.BaseURL = NormalizeOllamaBaseURL(c.BaseURL)
+		if c.APIKey == "" && !OllamaNeedsAPIKey(c.BaseURL) {
+			c.APIKey = "ollama"
+		}
+		return
+	}
 	if !strings.HasSuffix(c.BaseURL, "/v1") {
-		if strings.Contains(c.BaseURL, "11434") || c.Provider == string(ProviderOllama) {
+		if strings.Contains(c.BaseURL, "11434") {
 			c.BaseURL = c.BaseURL + "/v1"
 		}
-	}
-	if c.Provider == string(ProviderOllama) && c.APIKey == "" {
-		c.APIKey = "ollama"
 	}
 }
 
@@ -349,7 +391,7 @@ func MaskKey(key string) string {
 		return "(not set)"
 	}
 	if key == "ollama" {
-		return "(local)"
+		return "(local/none)"
 	}
 	if len(key) <= 8 {
 		return "****"

@@ -28,10 +28,11 @@ type ProviderMeta struct {
 var supportedProviders = []ProviderMeta{
 	{
 		ID:           ProviderOllama,
-		Label:        "Ollama (local)",
-		BaseURL:      "http://localhost:11434/v1",
+		Label:        "Ollama (local / remote / cloud)",
+		BaseURL:      OllamaLocalBaseURL,
 		DefaultModel: "llama3.2",
-		NeedsKey:     false,
+		APIKeyEnv:    OllamaAPIKeyEnv, // optional local; required for Ollama Cloud
+		NeedsKey:     false,           // local/remote usually; cloud enforced separately
 	},
 	{
 		ID:           ProviderOpenAI,

@@ -6,10 +6,15 @@
 active: ollama
 
 providers:
+  # Ollama: local, remote self-hosted, or Ollama Cloud (https://ollama.com/v1 + OLLAMA_API_KEY).
+  # Configure interactively: ai setup → Ollama → Local | Remote | Cloud
   ollama:
-    api_key: "ollama"
+    api_key: "ollama"              # local/remote: dummy; cloud: set key or OLLAMA_API_KEY
     model: "llama3.2"
     base_url: "http://localhost:11434/v1"
+    # base_url: "http://gpu-box:11434/v1"     # remote
+    # base_url: "https://ollama.com/v1"       # cloud
+    # api_key: "${OLLAMA_API_KEY}"
 
   openai:
     api_key: ""          # or: ai setup  /  OPENAI_API_KEY env

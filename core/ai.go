@@ -113,7 +113,10 @@ func fileExists(path string) bool {
 func providerHint(cfg llm.Config, err error) string {
 	switch cfg.Provider {
 	case "ollama":
-		return "Hint: ensure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull " + cfg.Model + "`)."
+		if llm.IsOllamaCloudURL(cfg.BaseURL) {
+			return "Hint: set OLLAMA_API_KEY (or run `ai setup` → Ollama → Cloud) and pick a cloud model."
+		}
+		return "Hint: ensure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull " + cfg.Model + "`). For remote/cloud use `ai setup`."
 	case "openai", "anthropic", "bedrock", "kimi", "gemini":
 		return "Hint: run `ai setup` to configure provider and API key, or set the provider env var. Run `ai providers` to see options."
 	default:

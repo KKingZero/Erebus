@@ -2,7 +2,37 @@
 
 A custom command-and-control (C2) framework for AI-driven offensive security operations. The **teamserver**, operator CLI, and listeners are Go; implants are available as **Go** (default) or an optional **C** Windows build (`cimplant/`). Erebus uses beacon-mode architecture with protobuf wire protocols, gRPC operator API, and mTLS-secured communications.
 
-> **For authorized security testing, red team engagements, and research purposes only.**
+> **For authorized security testing, red team engagements, and research purposes only.**  
+> Unauthorized access to computer systems is illegal. See [SECURITY.md](SECURITY.md) and [LICENSE](LICENSE).
+
+## Project status
+
+| | |
+|---|---|
+| **Release** | **v0.1.0** — lab / research early public |
+| **Maturity** | Core C2 loop is usable; not a finished commercial product |
+| **Primary implant** | **Go** (Linux + Windows) — recommended |
+| **C implant** | Experimental Windows PE; several AD/lateral paths are stubs |
+| **Validation** | Unit/e2e smoke tests; authorized HTB/lab engagements |
+
+### What works well (v0.1)
+
+- Teamserver + HTTPS listener, session management, task queue, SQLite loot
+- Go implant: shell, files (path-jailed), process, network recon, AD modules (LDAP / Kerberoast / AS-REP), cloud harvest, Windows post-ex modules
+- Operator CLI + mTLS seats; dual-control **approval gate** for high-risk tasks
+- AI console: multi-provider LLM (`ai setup`), Plan/Auto TUI, Ollama local/remote/cloud
+- DNS listener with bounded unauthenticated reassembly (lab use)
+
+### Experimental / incomplete
+
+- **C implant:** Kerberoast/AS-REP ticket extraction and PsExec/WinRM/DCOM lateral are stubs; TLS pinning incomplete
+- Console Metasploit-style `use` / `run` module tree is **not** fully wired — use `ai` (Auto) or `erebus operator`
+- Some Windows post-ex edges (e.g. browser DPAPI depth, inject error paths)
+- No malleable C2 profiles, sleep masking, or multi-teamserver federation yet
+
+### Not production claims
+
+Do **not** treat v0.1 as enterprise-ready C2, EDR-evasive by default, or support-backed commercial software. Use in **labs and authorized engagements** only. Report vulns per [SECURITY.md](SECURITY.md).
 
 ## Architecture
 
