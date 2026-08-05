@@ -338,12 +338,12 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 
 	language := req.Language
 	if language == "" {
-		language = "go"
+		language = "c"
 	}
 	if !validLanguage[language] {
 		return &pb.GenerateImplantResponse{
 			Success: false,
-			Error:   fmt.Sprintf("unsupported language: %s (available: go, c)", language),
+			Error:   fmt.Sprintf("unsupported language: %s (available: c, go)", language),
 		}, nil
 	}
 
@@ -374,10 +374,16 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 			Error:   "C implant only supports exe format",
 		}, nil
 	}
-	if language == "c" && (targetOS != "windows" || targetArch != "amd64") {
+	if language == "c" && targetArch != "amd64" {
 		return &pb.GenerateImplantResponse{
 			Success: false,
-			Error:   "C implant only supports windows/amd64",
+			Error:   "C implant only supports amd64",
+		}, nil
+	}
+	if language == "c" && targetOS != "windows" && targetOS != "linux" {
+		return &pb.GenerateImplantResponse{
+			Success: false,
+			Error:   "C implant only supports windows or linux",
 		}, nil
 	}
 
@@ -401,8 +407,17 @@ func (s *GRPCService) GenerateImplant(ctx context.Context, req *pb.GenerateImpla
 		// Unique per-implant secret is generated inside Build; do not inject fleet PSK.
 		ProjectRoot: projectRoot,
 	}
-	if language == "c" {
-		buildReq.CACertPath = filepath.Join(s.ts.Config.DataDir, "ca-cert.pem")
+	// Always embed teamserver CA for HTTPS so implants never fall back to InsecureSkipVerify.
+	// DNS transport does not use TLS to the teamserver listener.
+	if transport == "https" || transport == "" {
+		caPath := filepath.Join(s.ts.Config.DataDir, "ca-cert.pem")
+		if _, err := os.Stat(caPath); err != nil {
+			return &pb.GenerateImplantResponse{
+				Success: false,
+				Error:   fmt.Sprintf("teamserver CA required for HTTPS implant builds: %v", err),
+			}, nil
+		}
+		buildReq.CACertPath = caPath
 	}
 
 	result, err := builder.Build(buildReq)

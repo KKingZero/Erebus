@@ -153,7 +153,25 @@ int erebus_pb_encode_lateral_result(const char *method, const char *target, int 
 int erebus_pb_encode_ldap_enum_result(const char *domain, const char *dc, const char *query_type,
     const erebus_ldap_entry *entries, size_t entry_count, int32_t total, uint8_t **out, size_t *out_len);
 void erebus_pb_free_ldap_entries(erebus_ldap_entry *entries, size_t count);
+typedef struct erebus_kerberoast_hash {
+    const char *spn;
+    const char *sam;
+    const char *hash;
+    const char *enc;
+} erebus_kerberoast_hash;
+
+/* Single-hash convenience (wraps multi). */
 int erebus_pb_encode_kerberoast_result(const char *spn, const char *sam, const char *hash, const char *enc, uint8_t **out, size_t *out_len);
+/* Repeated KerberoastHash (field 1). count==0 encodes an empty result. */
+int erebus_pb_encode_kerberoast_result_multi(const erebus_kerberoast_hash *hashes, size_t count,
+    uint8_t **out, size_t *out_len);
+typedef struct erebus_asreproast_hash {
+    const char *username;
+    const char *hash;
+} erebus_asreproast_hash;
+
 int erebus_pb_encode_asreproast_result(const char *username, const char *hash, uint8_t **out, size_t *out_len);
+int erebus_pb_encode_asreproast_result_multi(const erebus_asreproast_hash *hashes, size_t count,
+    uint8_t **out, size_t *out_len);
 
 #endif

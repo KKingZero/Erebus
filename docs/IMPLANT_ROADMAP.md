@@ -1,7 +1,7 @@
 # Erebus Implant Roadmap
 
 **Status:** v0.1.0 lab / research  
-**Last updated:** 2026-07-31 (decisions locked; AI OAuth deferred)  
+**Last updated:** 2026-08-05 (Sprint A+B+C: CA/beacon/auth + Linux tunnel scripts + explicit Linux stubs)  
 **Audience:** maintainers planning the next implant sprint(s)
 
 This document inventories **what the implant can do today**, **what is left**, and **how a possible Zig implant branch fits**. It does not authorize use against unauthorized targets — authorized labs and engagements only.
@@ -29,7 +29,7 @@ This document inventories **what the implant can do today**, **what is left**, a
 | Language | Path | Platforms | Role |
 |----------|------|-----------|------|
 | **Go** | `implant/`, `cmd/implant/` | Linux + Windows | Control-plane peer / temporary demo / possible Linux peer (not product Windows focus) |
-| **C** | `cimplant/` | Windows PE | **Primary Windows implant** (product focus) |
+| **C** | `cimplant/` | Windows PE + **Linux basic peer** | **Primary Windows implant**; Linux: shell/files/process/net + HTTPS |
 | **Zig** | *(not started)* | TBD | Possible third peer on same wire protocol |
 
 **Shared (do not rewrite per language):**
@@ -40,7 +40,7 @@ This document inventories **what the implant can do today**, **what is left**, a
 - Crypto contract: HMAC-SHA256 identity, AES-256-GCM session payloads  
 - Build-time identity: implant ID, secret, callback URL, sleep/jitter  
 
-**Builder today:** `language: "go"` (default) or `language: "c"`. A Zig path would add `language: "zig"` later without changing the server contract.
+**Builder today:** `language: "c"` (default, Windows PE) or `language: "go"` (explicit; Linux peer / dll/shellcode). A Zig path would add `language: "zig"` later without changing the server contract.
 
 ---
 
@@ -132,13 +132,20 @@ Many modules have `_stub.go` (`//go:build !windows`) and return clear “not sup
 
 ## 5. C implant — what works
 
-- Windows PE build (`make implant-c` / `language: "c"`)  
+**Windows PE** (`make implant-c` / `generate --language c --os windows`)
+
 - Beacon, HTTPS + DNS, HMAC + AES-GCM  
 - Shell, file (+ path jail), process, network  
 - Screenshot, keylog, SOCKS, inject, PE load  
 - Modules: shell, LDAP (basic), cloud, creds (partial), persist/privesc (partial)  
-- Lateral **WMI only** (via `wmic`)  
+- Lateral **WMI** + WinRM password (WSMan); Kerberoast wire (RC4 MVP)  
 - Indirect syscall scaffolding  
+
+**Linux basic peer** (`make implant-c-linux` / `generate --language c --os linux`)
+
+- Beacon + HTTPS (libcurl + OpenSSL, CA pin required)  
+- Shell (`/bin/sh -c`), file download/upload + path jail, process list/kill, ifconfig + portscan  
+- Module `shell` only; Windows post-ex / AD / lateral / DNS transport hard-fail  
 - Host unit tests: path jail pure logic, protobuf bounded string copy  
 
 ---
@@ -149,15 +156,18 @@ Many modules have `_stub.go` (`//go:build !windows`) and return clear “not sup
 
 | # | Item | Current behavior |
 |---|------|------------------|
-| C1 | **Kerberoast** | Placeholder: ticket extraction not ported — use Go |
-| C2 | **AS-REP roast** | Same |
-| C3 | **Lateral PsExec** | “not yet implemented in C implant” |
-| C4 | **Lateral WinRM** | Same |
-| C5 | **Lateral DCOM** | Same |
-| C6 | **TLS pinning** | Partial CA load/verify; not full Go parity |
-| C7 | **Module depth** | Cloud/creds/persist/privesc thinner than Go |
+| C1 | **Kerberoast** | Wire Kerberos (RC4 + AES, hashcat format) — **no placeholder hashes**; **lab-verify GOAD/HTB** still open |
+| C2 | **AS-REP roast** | Real AS-REQ without pre-auth + hashcat lines — lab-verify still open |
+| C3 | **Lateral PsExec** | Password: ADMIN$ stage + SCM create/start; PTH via hash not on WNet (use WinRM PTH) |
+| C4 | **Lateral WinRM** | Password via WSMan; PTH via WinHTTP+NTLMv2+SOAP — **clearer errors + parse tests**; **live pypsrp parity eng-verify** |
+| C5 | **Lateral DCOM** | MMC20 ExecuteShellCommand (password) |
+| C6 | **TLS pinning** | **Makefile/builder PEM→DER b64**; empty CA fail-closed at build + runtime |
+| C7 | **Module depth** | Linux: unsupported modules return explicit error strings |
 | C8 | **Output formats** | PE EXE only (no shellcode/DLL pipeline) |
-| C9 | **Tests** | No Windows integration CI; host tests only for pure logic |
+| C9 | **Tests** | Host: pathjail, pb-copy, kerberoast-pb, **ntlm-parse**; no Windows integration CI |
+| C10 | **Beacon timestamps** | **Unix ms** (was seconds → same-second replay on SLEEP_MS=500) |
+| C11 | **Auth observability** | Server logs `unknown_implant|hmac|skew|replay` on drop; wire still 404 |
+| C12 | **Linux drop UX** | `scripts/htb_reverse_tunnel.sh`, `scripts/c_linux_e2e_smoke.sh`; SOCKS explicitly unsupported with message |
 
 ### Policy (locked)
 

@@ -106,12 +106,15 @@ static int dns_send_query(dns_ctx *ctx, const char *qname, uint8_t **resp, size_
     uint16_t rdlen = (uint16_t)(rbuf[p] << 8 | rbuf[p + 1]);
     p += 2;
     if (p + rdlen > (size_t)rlen) return 0;
+    size_t rdata_end = p + rdlen;
 
+    /* TXT RDATA: series of length-prefixed strings. Bound by RDATA end and stack buffer. */
     char b32[2048] = {0};
     size_t bi = 0;
-    while (p < (size_t)rlen && bi < sizeof(b32) - 1) {
+    while (p < rdata_end) {
         uint8_t slen = rbuf[p++];
-        if (p + slen > (size_t)rlen) break;
+        if ((size_t)slen > rdata_end - p) return 0;
+        if (bi + (size_t)slen >= sizeof(b32)) return 0;
         memcpy(b32 + bi, rbuf + p, slen);
         bi += slen;
         p += slen;
@@ -189,10 +192,18 @@ static void dns_destroy(erebus_transport *t) {
     free(t);
 }
 
+static void dns_set_session_id(erebus_transport *t, const char *session_id) {
+    dns_ctx *ctx = (dns_ctx *)t->ctx;
+    if (!ctx || !session_id) return;
+    memset(ctx->session_id, 0, sizeof(ctx->session_id));
+    strncpy(ctx->session_id, session_id, sizeof(ctx->session_id) - 1);
+}
+
 static const erebus_transport_ops dns_ops = {
     dns_register,
     dns_beacon,
     dns_destroy,
+    dns_set_session_id,
 };
 
 int erebus_transport_create_dns(erebus_transport **out) {

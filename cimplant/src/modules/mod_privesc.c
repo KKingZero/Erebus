@@ -85,14 +85,15 @@ int erebus_mod_privesc(const uint8_t *config, size_t config_len, uint8_t **out, 
 
     if (strcmp(cfg.method, "token") == 0) {
         success = privesc_token(&cfg, &new_pid);
-        integrity = "high";
+        integrity = success ? "high" : "";
     } else if (strcmp(cfg.method, "uac_fodhelper") == 0) {
         success = privesc_fodhelper(&cfg, &new_pid);
-        integrity = "high";
+        integrity = success ? "high" : "";
     } else if (strcmp(cfg.method, "uac_eventvwr") == 0) {
-        return 0;
+        /* Not implemented — honest failure (no fake elevation). */
+        return erebus_pb_encode_privesc_result(0, "uac_eventvwr", "unsupported", 0, out, out_len);
     } else {
-        return 0;
+        return erebus_pb_encode_privesc_result(0, cfg.method, "unsupported", 0, out, out_len);
     }
 
     return erebus_pb_encode_privesc_result(success, cfg.method, integrity, new_pid, out, out_len);

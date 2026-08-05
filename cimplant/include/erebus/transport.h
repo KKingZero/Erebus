@@ -10,6 +10,8 @@ typedef struct erebus_transport_ops {
     int (*register_call)(erebus_transport *t, const uint8_t *req, size_t req_len, uint8_t **resp, size_t *resp_len);
     int (*beacon_call)(erebus_transport *t, const uint8_t *req, size_t req_len, uint8_t **resp, size_t *resp_len);
     void (*destroy)(erebus_transport *t);
+    /* Optional: DNS needs session id in queries; HTTPS must be NULL or no-op (do not overwrite ctx). */
+    void (*set_session_id)(erebus_transport *t, const char *session_id);
 } erebus_transport_ops;
 
 struct erebus_transport {

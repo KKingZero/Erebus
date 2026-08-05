@@ -3,6 +3,7 @@ package listeners
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	zcrypto "github.com/KKingZero/erebus-exploit-framwork/pkg/crypto"
@@ -11,8 +12,31 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ErrBeaconAuth is returned when HMAC validation fails (callers should drop silently).
+// ErrBeaconAuth is returned when implant auth fails (callers keep silent 404 on the wire).
 var ErrBeaconAuth = fmt.Errorf("beacon auth failed")
+
+// authFail wraps ErrBeaconAuth with a short reason class for server logs.
+// Reason values: unknown_implant | hmac | skew | replay | internal
+func authFail(reason, detail string) error {
+	if detail == "" {
+		return fmt.Errorf("%w: %s", ErrBeaconAuth, reason)
+	}
+	return fmt.Errorf("%w: %s: %s", ErrBeaconAuth, reason, detail)
+}
+
+func hmacRejectReason(err error) string {
+	if err == nil {
+		return "hmac"
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "replay window") || strings.Contains(msg, "outside replay") {
+		return "skew"
+	}
+	if strings.Contains(msg, "HMAC verification failed") {
+		return "hmac"
+	}
+	return "hmac"
+}
 
 // SecretResolver looks up the per-implant HMAC/wrap secret.
 // If nil, BeaconHandler.Secret is used as a legacy fleet-wide PSK.
@@ -41,14 +65,23 @@ func resolveSecret(h *BeaconHandler, implantID string) ([]byte, error) {
 func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr string) (*pb.RegisterResponse, error) {
 	secret, err := resolveSecret(h, reg.ImplantId)
 	if err != nil || len(secret) == 0 {
-		return nil, ErrBeaconAuth
+		detail := "no secret"
+		if err != nil {
+			detail = err.Error()
+		}
+		log.Printf("[register] unknown_implant id=%s: %s", reg.ImplantId, detail)
+		return nil, authFail("unknown_implant", detail)
 	}
-	if err := zcrypto.VerifyHMAC(secret, reg.ImplantId, reg.Timestamp, reg.Hmac, 30); err != nil {
-		return nil, ErrBeaconAuth
+	// 8h window: HTB Fries (and similar) often have multi-hour DC/host skew.
+	if err := zcrypto.VerifyHMAC(secret, reg.ImplantId, reg.Timestamp, reg.Hmac, 8*3600); err != nil {
+		reason := hmacRejectReason(err)
+		log.Printf("[register] %s reject implant=%s: %v", reason, reg.ImplantId, err)
+		return nil, authFail(reason, err.Error())
 	}
 	if h.ReplayCache != nil {
 		if err := h.ReplayCache.CheckAndRecord(reg.ImplantId, reg.Timestamp); err != nil {
-			return nil, ErrBeaconAuth
+			log.Printf("[register] replay reject implant=%s: %v", reg.ImplantId, err)
+			return nil, authFail("replay", err.Error())
 		}
 	}
 
@@ -101,23 +134,29 @@ func HandleRegister(h *BeaconHandler, reg *pb.Register, protocol, remoteAddr str
 func HandleBeacon(h *BeaconHandler, beacon *pb.Beacon) (*pb.BeaconResponse, error) {
 	secret, err := resolveSecret(h, beacon.ImplantId)
 	if err != nil || len(secret) == 0 {
-		return nil, ErrBeaconAuth
+		detail := "no secret"
+		if err != nil {
+			detail = err.Error()
+		}
+		log.Printf("[beacon] unknown_implant id=%s: %s", beacon.ImplantId, detail)
+		return nil, authFail("unknown_implant", detail)
 	}
-	if err := zcrypto.VerifyHMAC(secret, beacon.ImplantId, beacon.Timestamp, beacon.Hmac, 30); err != nil {
-		log.Printf("[beacon] HMAC reject implant=%s: %v", beacon.ImplantId, err)
-		return nil, ErrBeaconAuth
+	if err := zcrypto.VerifyHMAC(secret, beacon.ImplantId, beacon.Timestamp, beacon.Hmac, 8*3600); err != nil {
+		reason := hmacRejectReason(err)
+		log.Printf("[beacon] %s reject implant=%s: %v", reason, beacon.ImplantId, err)
+		return nil, authFail(reason, err.Error())
 	}
 	if h.ReplayCache != nil {
 		if err := h.ReplayCache.CheckAndRecord(beacon.ImplantId, beacon.Timestamp); err != nil {
 			log.Printf("[beacon] replay reject implant=%s: %v", beacon.ImplantId, err)
-			return nil, ErrBeaconAuth
+			return nil, authFail("replay", err.Error())
 		}
 	}
 
 	sess, ok := h.Sessions.GetByImplant(beacon.ImplantId)
 	if !ok {
 		log.Printf("[beacon] unknown implant=%s (not registered)", beacon.ImplantId)
-		return nil, ErrBeaconAuth
+		return nil, authFail("unknown_implant", "not registered")
 	}
 
 	h.Sessions.UpdateCheckin(sess.SessionID)

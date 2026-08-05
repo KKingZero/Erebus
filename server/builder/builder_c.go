@@ -15,16 +15,20 @@ import (
 	zcrypto "github.com/KKingZero/erebus-exploit-framwork/pkg/crypto"
 )
 
-// BuildC compiles the C implant via cimplant/Makefile (mingw cross-compile).
+// BuildC compiles the C implant via cimplant/Makefile.
+// Windows: mingw cross-compile PE. Linux: host gcc + libcurl/openssl (basic peer).
 func BuildC(req *BuildRequest) (*BuildResult, error) {
-	if req.OS != "windows" {
-		return nil, fmt.Errorf("C implant only supports windows (got %s)", req.OS)
+	if req.OS != "windows" && req.OS != "linux" {
+		return nil, fmt.Errorf("C implant supports windows|linux (got %q); use --language go for %s", req.OS, req.OS)
 	}
 	if req.Arch != "amd64" {
-		return nil, fmt.Errorf("C implant only supports amd64 (got %s)", req.Arch)
+		return nil, fmt.Errorf("C implant only supports amd64 (got %q)", req.Arch)
 	}
-	if req.Format != FormatEXE {
-		return nil, fmt.Errorf("C implant only supports exe format (got %s)", req.Format)
+	if req.Format != "" && req.Format != FormatEXE {
+		return nil, fmt.Errorf("C implant only supports exe format (got %s); dll/shellcode not available for C yet", req.Format)
+	}
+	if req.Format == "" {
+		req.Format = FormatEXE
 	}
 
 	implantID, err := zcrypto.RandomID(16)
@@ -82,6 +86,9 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 	}
 
 	caCertB64 := ""
+	if transport == "https" && req.CACertPath == "" {
+		return nil, fmt.Errorf("CACertPath required for HTTPS C implant builds (teamserver ca-cert.pem)")
+	}
 	if req.CACertPath != "" {
 		if err := validateLdflagValue(req.CACertPath, "CACertPath"); err != nil {
 			return nil, err
@@ -109,18 +116,29 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		return nil, fmt.Errorf("cimplant Makefile not found under %s", absRoot)
 	}
 
-	if _, err := exec.LookPath("x86_64-w64-mingw32-gcc"); err != nil {
-		return nil, fmt.Errorf("C implant build requires mingw32 toolchain: x86_64-w64-mingw32-gcc not found in PATH")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), buildTimeout)
 	defer cancel()
 
 	cimplantDir := filepath.Join(absRoot, "cimplant")
 	buildDir := filepath.Join(absRoot, "build")
+	makeOS := "windows"
 	outputFile := filepath.Join(buildDir, "implant_c.exe")
+	filename := "implant_c.exe"
+	if req.OS == "linux" {
+		makeOS = "linux"
+		outputFile = filepath.Join(buildDir, "implant_c_linux")
+		filename = "implant_c_linux"
+		if _, err := exec.LookPath("gcc"); err != nil {
+			return nil, fmt.Errorf("C Linux implant build requires gcc: %w", err)
+		}
+	} else {
+		if _, err := exec.LookPath("x86_64-w64-mingw32-gcc"); err != nil {
+			return nil, fmt.Errorf("C Windows implant build requires mingw32: x86_64-w64-mingw32-gcc not found in PATH")
+		}
+	}
 
 	cmd := exec.CommandContext(ctx, "make", "all",
+		"OS="+makeOS,
 		fmt.Sprintf("IMPLANT_ID=%s", implantID),
 		fmt.Sprintf("IMPLANT_SECRET=%s", secret),
 		fmt.Sprintf("CALLBACK_URL=%s", callbackURL),
@@ -133,11 +151,15 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		fmt.Sprintf("CA_CERT_PEM=%s", caCertB64),
 	)
 	cmd.Dir = cimplantDir
-	toolchainBin := filepath.Join(absRoot, ".toolchain", "llvm-mingw", "bin")
-	if _, err := os.Stat(filepath.Join(toolchainBin, "x86_64-w64-mingw32-gcc")); err != nil {
-		toolchainBin = filepath.Join(absRoot, ".toolchain", "mingw-root", "usr", "bin")
+	if req.OS == "windows" {
+		toolchainBin := filepath.Join(absRoot, ".toolchain", "llvm-mingw", "bin")
+		if _, err := os.Stat(filepath.Join(toolchainBin, "x86_64-w64-mingw32-gcc")); err != nil {
+			toolchainBin = filepath.Join(absRoot, ".toolchain", "mingw-root", "usr", "bin")
+		}
+		cmd.Env = append(os.Environ(), "CC=x86_64-w64-mingw32-gcc", "PATH="+toolchainBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	} else {
+		cmd.Env = os.Environ()
 	}
-	cmd.Env = append(os.Environ(), "CC=x86_64-w64-mingw32-gcc", "PATH="+toolchainBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -154,10 +176,15 @@ func BuildC(req *BuildRequest) (*BuildResult, error) {
 		return nil, fmt.Errorf("generate build ID: %w", err)
 	}
 
+	if req.OS == "linux" {
+		filename = fmt.Sprintf("implant-%s-linux", buildID)
+	} else {
+		filename = fmt.Sprintf("implant-%s.exe", buildID)
+	}
 	return &BuildResult{
 		BuildID:       buildID,
 		Binary:        binary,
-		Filename:      fmt.Sprintf("implant-%s.exe", buildID),
+		Filename:      filename,
 		Format:        FormatEXE,
 		SizeBytes:     int64(len(binary)),
 		ImplantID:     implantID,

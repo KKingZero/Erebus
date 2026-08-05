@@ -43,7 +43,7 @@ const (
 
 // BuildRequest contains all parameters needed to build an implant.
 type BuildRequest struct {
-	Language      string // "go" (default), "c"
+	Language      string // "c" (default), "go"
 	OS            string // "windows", "linux", "darwin"
 	Arch          string // "amd64", "arm64"
 	Transport     string // "https", "dns"
@@ -76,13 +76,23 @@ type BuildResult struct {
 func Build(req *BuildRequest) (*BuildResult, error) {
 	lang := req.Language
 	if lang == "" {
-		lang = "go"
+		lang = "c"
 	}
 	if lang == "c" {
+		// Fail closed: C is Windows PE only. Empty OS/arch/format → engagement defaults.
+		if req.OS == "" {
+			req.OS = "windows"
+		}
+		if req.Arch == "" {
+			req.Arch = "amd64"
+		}
+		if req.Format == "" {
+			req.Format = FormatEXE
+		}
 		return BuildC(req)
 	}
 	if lang != "go" {
-		return nil, fmt.Errorf("unsupported implant language: %s (available: go, c)", lang)
+		return nil, fmt.Errorf("unsupported implant language: %s (available: c, go)", lang)
 	}
 
 	if req.OS == "" {
@@ -178,7 +188,21 @@ func Build(req *BuildRequest) (*BuildResult, error) {
 		}
 	}
 
-	if req.CACertPath != "" {
+	// HTTPS Go implants require an embedded CA (fail closed — no InsecureSkipVerify).
+	transport := req.Transport
+	if transport == "" {
+		transport = "https"
+	}
+	if transport == "https" {
+		if req.CACertPath == "" {
+			return nil, fmt.Errorf("CACertPath required for HTTPS Go implant builds (teamserver ca-cert.pem)")
+		}
+		caPEM, err := os.ReadFile(req.CACertPath)
+		if err != nil {
+			return nil, fmt.Errorf("read CA cert: %w", err)
+		}
+		ldflags = append(ldflags, fmt.Sprintf("-X '%s/implant.caCertPEM=%s'", module, base64.StdEncoding.EncodeToString(caPEM)))
+	} else if req.CACertPath != "" {
 		caPEM, err := os.ReadFile(req.CACertPath)
 		if err != nil {
 			return nil, fmt.Errorf("read CA cert: %w", err)
@@ -319,7 +343,7 @@ func RecordBuild(store *db.Store, req *BuildRequest, result *BuildResult) error 
 	// L6: Populate evasion field with build config snapshot
 	lang := req.Language
 	if lang == "" {
-		lang = "go"
+		lang = "c"
 	}
 	evasion := fmt.Sprintf("language=%s,format=%s,garble=%v", lang, req.Format, req.Garble)
 	if req.CDNDomain != "" {

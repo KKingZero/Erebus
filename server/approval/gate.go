@@ -90,6 +90,9 @@ func (g *Gate) requestApproval(ctx context.Context, sessionID string, taskType p
 		})
 	}
 
+	// Blocks the caller (typically ExecuteTask gRPC handler) until approve/deny
+	// or timeout. Authenticated operators only; dual-control requires a real wait.
+	// Async "approval-required + resume" is a future API change (pending_id).
 	waitCtx := ctx
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc

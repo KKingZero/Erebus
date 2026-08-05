@@ -22,22 +22,18 @@ type HTTPSTransport struct {
 }
 
 func NewHTTPSTransport(baseURL string, caCertPEM string, cdnDomain string) (*HTTPSTransport, error) {
-	tlsConfig := &tls.Config{}
-
-	if caCertPEM != "" {
-		// Pin to our CA certificate
-		certPool := x509.NewCertPool()
-		if certPool.AppendCertsFromPEM([]byte(caCertPEM)) {
-			tlsConfig.RootCAs = certPool
-			tlsConfig.InsecureSkipVerify = false
-		} else {
-			// C6: Fail hard if CA cert is provided but cannot be parsed.
-			// Never silently degrade to InsecureSkipVerify.
-			return nil, fmt.Errorf("failed to parse CA certificate PEM")
-		}
-	} else {
-		// Dev mode: no CA cert embedded
-		tlsConfig.InsecureSkipVerify = true
+	// Fail closed: HTTPS implants must pin the teamserver CA. Builds without an embedded
+	// CA used to set InsecureSkipVerify and were MITM-able on any TLS endpoint.
+	if caCertPEM == "" {
+		return nil, fmt.Errorf("CA certificate required for HTTPS transport (embed at build via CACertPath / caCertPEM ldflag)")
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM([]byte(caCertPEM)) {
+		return nil, fmt.Errorf("failed to parse CA certificate PEM")
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:            certPool,
+		InsecureSkipVerify: false,
 	}
 
 	// Domain fronting: SNI = CDN domain; Host header = real origin (callback host).

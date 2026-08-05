@@ -3,6 +3,7 @@ package listeners
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -224,8 +225,11 @@ func (l *HTTPSListener) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := HandleRegister(l.handler, reg, "https", l.resolveRemoteAddr(r))
 	if err != nil {
-		if err != ErrBeaconAuth {
-			log.Printf("[https] register error: %v", err)
+		// Wire stays 404 (anti-fingerprint); always log reason for operators.
+		if errors.Is(err, ErrBeaconAuth) {
+			log.Printf("[https] register drop implant=%s: %v", reg.GetImplantId(), err)
+		} else {
+			log.Printf("[https] register error implant=%s: %v", reg.GetImplantId(), err)
 		}
 		http.NotFound(w, r)
 		return
@@ -256,8 +260,10 @@ func (l *HTTPSListener) handleBeacon(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := HandleBeacon(l.handler, beacon)
 	if err != nil {
-		if err != ErrBeaconAuth {
-			log.Printf("[https] beacon error: %v", err)
+		if errors.Is(err, ErrBeaconAuth) {
+			log.Printf("[https] beacon drop implant=%s: %v", beacon.GetImplantId(), err)
+		} else {
+			log.Printf("[https] beacon error implant=%s: %v", beacon.GetImplantId(), err)
 		}
 		http.NotFound(w, r)
 		return

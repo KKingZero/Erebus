@@ -457,28 +457,55 @@ static int encode_kerberoast_hash(const char *spn, const char *sam, const char *
     return 1;
 }
 
+int erebus_pb_encode_kerberoast_result_multi(const erebus_kerberoast_hash *hashes, size_t count,
+    uint8_t **out, size_t *out_len) {
+    erebus_pb_writer w;
+    if (!erebus_pb_writer_init(&w, 512)) return 0;
+    for (size_t i = 0; i < count; i++) {
+        uint8_t *sub = NULL;
+        size_t sub_len = 0;
+        if (!encode_kerberoast_hash(hashes[i].spn, hashes[i].sam, hashes[i].hash, hashes[i].enc,
+                &sub, &sub_len)) {
+            erebus_pb_writer_free(&w);
+            return 0;
+        }
+        if (!erebus_pb_write_bytes(&w, 1, sub, sub_len)) {
+            free(sub);
+            erebus_pb_writer_free(&w);
+            return 0;
+        }
+        free(sub);
+    }
+    *out = w.data;
+    *out_len = w.len;
+    return 1;
+}
+
 int erebus_pb_encode_kerberoast_result(const char *spn, const char *sam, const char *hash, const char *enc, uint8_t **out, size_t *out_len) {
+    erebus_kerberoast_hash h = { spn, sam, hash, enc };
+    return erebus_pb_encode_kerberoast_result_multi(&h, 1, out, out_len);
+}
+
+int erebus_pb_encode_asreproast_result_multi(const erebus_asreproast_hash *hashes, size_t count,
+    uint8_t **out, size_t *out_len) {
     erebus_pb_writer w;
     if (!erebus_pb_writer_init(&w, 256)) return 0;
-    uint8_t *sub = NULL;
-    size_t sub_len = 0;
-    if (!encode_kerberoast_hash(spn, sam, hash, enc, &sub, &sub_len)) { erebus_pb_writer_free(&w); return 0; }
-    erebus_pb_write_bytes(&w, 1, sub, sub_len);
-    free(sub);
+    for (size_t i = 0; i < count; i++) {
+        size_t mark;
+        if (!erebus_pb_write_submsg_begin(&w, 1, &mark)) {
+            erebus_pb_writer_free(&w);
+            return 0;
+        }
+        if (hashes[i].username) erebus_pb_write_string(&w, 1, hashes[i].username);
+        if (hashes[i].hash) erebus_pb_write_string(&w, 2, hashes[i].hash);
+        erebus_pb_write_submsg_end(&w, mark);
+    }
     *out = w.data;
     *out_len = w.len;
     return 1;
 }
 
 int erebus_pb_encode_asreproast_result(const char *username, const char *hash, uint8_t **out, size_t *out_len) {
-    erebus_pb_writer w;
-    if (!erebus_pb_writer_init(&w, 128)) return 0;
-    size_t mark;
-    erebus_pb_write_submsg_begin(&w, 1, &mark);
-    if (username) erebus_pb_write_string(&w, 1, username);
-    if (hash) erebus_pb_write_string(&w, 2, hash);
-    erebus_pb_write_submsg_end(&w, mark);
-    *out = w.data;
-    *out_len = w.len;
-    return 1;
+    erebus_asreproast_hash h = { username, hash };
+    return erebus_pb_encode_asreproast_result_multi(&h, 1, out, out_len);
 }

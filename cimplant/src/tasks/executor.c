@@ -7,11 +7,24 @@
 #include "erebus/task_handlers.h"
 #include "erebus/tasks.h"
 
+static void apply_handler_failure(erebus_task_result *r, const char *fallback) {
+    if (r->data && r->data_len > 0) {
+        size_t n = r->data_len < sizeof(r->error) - 1 ? r->data_len : sizeof(r->error) - 1;
+        memcpy(r->error, r->data, n);
+        r->error[n] = '\0';
+        free(r->data);
+        r->data = NULL;
+        r->data_len = 0;
+    } else {
+        strncpy(r->error, fallback, sizeof(r->error) - 1);
+    }
+    r->success = 0;
+}
+
 static int run_handler(int (*fn)(const uint8_t *, size_t, uint8_t **, size_t *),
     const erebus_task *task, erebus_task_result *r) {
     if (!fn(task->data, task->data_len, &r->data, &r->data_len)) {
-        strncpy(r->error, "task handler failed", sizeof(r->error) - 1);
-        r->success = 0;
+        apply_handler_failure(r, "task handler failed");
         return 0;
     }
     r->success = 1;
@@ -20,8 +33,7 @@ static int run_handler(int (*fn)(const uint8_t *, size_t, uint8_t **, size_t *),
 
 static int run_handler_noarg(int (*fn)(uint8_t **, size_t *), erebus_task_result *r) {
     if (!fn(&r->data, &r->data_len)) {
-        strncpy(r->error, "task handler failed", sizeof(r->error) - 1);
-        r->success = 0;
+        apply_handler_failure(r, "task handler failed");
         return 0;
     }
     r->success = 1;
@@ -74,8 +86,7 @@ erebus_task_result erebus_execute_task(const erebus_task *task) {
         break;
     case EREBUS_TASK_MODULE:
         if (!erebus_task_module(task->data, task->data_len, &r.data, &r.data_len)) {
-            strncpy(r.error, "module execution failed or unknown module", sizeof(r.error) - 1);
-            r.success = 0;
+            apply_handler_failure(&r, "module execution failed or unknown module");
         } else {
             r.success = 1;
         }

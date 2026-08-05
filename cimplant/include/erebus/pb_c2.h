@@ -27,6 +27,11 @@
 #define EREBUS_MAX_FILE_SIZE (50u << 20)
 #define EREBUS_MAX_PORTS     1024
 
+/* Protocol decoder caps (DoS / OOM guard) */
+#define EREBUS_MAX_BEACON_TASKS       64
+#define EREBUS_MAX_TASK_DATA_LEN      (16u << 20)  /* 16 MiB per task data blob */
+#define EREBUS_MAX_ENCRYPTED_TASKS    (32u << 20)  /* 32 MiB encrypted payload */
+
 typedef struct erebus_register_msg {
     char     implant_id[128];
     char     hostname[256];

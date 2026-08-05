@@ -119,9 +119,10 @@ static int decode_task_msg(const uint8_t *in, size_t in_len, erebus_task *t) {
             break;
         case 4:
             if (erebus_pb_read_bytes(&r, &b, &n)) {
-                t->data = (uint8_t *)malloc(n);
+                if (n > EREBUS_MAX_TASK_DATA_LEN) return 0;
+                t->data = (uint8_t *)malloc(n ? n : 1);
                 if (!t->data) return 0;
-                memcpy(t->data, b, n);
+                if (n) memcpy(t->data, b, n);
                 t->data_len = n;
             }
             break;
@@ -150,8 +151,10 @@ int erebus_pb_decode_beacon_resp(const uint8_t *in, size_t in_len, erebus_beacon
         switch (field) {
         case 1:
             if (erebus_pb_read_bytes(&r, &b, &n)) {
+                if (m->task_count >= EREBUS_MAX_BEACON_TASKS) return 0;
                 if (m->task_count >= cap) {
                     cap = cap ? cap * 2 : 4;
+                    if (cap > EREBUS_MAX_BEACON_TASKS) cap = EREBUS_MAX_BEACON_TASKS;
                     erebus_task *p = (erebus_task *)realloc(m->tasks, cap * sizeof(erebus_task));
                     if (!p) return 0;
                     m->tasks = p;
@@ -170,9 +173,10 @@ int erebus_pb_decode_beacon_resp(const uint8_t *in, size_t in_len, erebus_beacon
             break;
         case 4:
             if (erebus_pb_read_bytes(&r, &b, &n)) {
-                m->encrypted_tasks = (uint8_t *)malloc(n);
+                if (n > EREBUS_MAX_ENCRYPTED_TASKS) return 0;
+                m->encrypted_tasks = (uint8_t *)malloc(n ? n : 1);
                 if (!m->encrypted_tasks) return 0;
-                memcpy(m->encrypted_tasks, b, n);
+                if (n) memcpy(m->encrypted_tasks, b, n);
                 m->encrypted_tasks_len = n;
             }
             break;
@@ -226,8 +230,10 @@ int erebus_pb_decode_tasks_payload(const uint8_t *in, size_t in_len, erebus_task
             continue;
         }
         if (!erebus_pb_read_bytes(&r, &b, &n)) return 0;
+        if (*count >= EREBUS_MAX_BEACON_TASKS) return 0;
         if (*count >= cap) {
             cap = cap ? cap * 2 : 4;
+            if (cap > EREBUS_MAX_BEACON_TASKS) cap = EREBUS_MAX_BEACON_TASKS;
             erebus_task *p = (erebus_task *)realloc(*tasks, cap * sizeof(erebus_task));
             if (!p) return 0;
             *tasks = p;

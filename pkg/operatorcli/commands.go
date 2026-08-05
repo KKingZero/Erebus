@@ -331,14 +331,14 @@ func (c *Commands) cmdSleep(args []string) error {
 // cmdGenerate builds an implant via GenerateImplant RPC.
 // usage: generate [--os windows|linux] [--arch amd64] [--format exe|dll|shellcode]
 //
-//	[--sleep ms] [--jitter pct] [--callback URL] [--language go|c] [--out path]
+//	[--sleep ms] [--jitter pct] [--callback URL] [--language c|go] [--out path]
 func (c *Commands) cmdGenerate(args []string) error {
-	osName := "linux"
+	osName := "windows"
 	arch := "amd64"
 	format := "exe"
 	sleepMs := int64(500)
 	jitter := int32(10)
-	language := "go"
+	language := "c"
 	outPath := ""
 	var callbacks []string
 
@@ -410,13 +410,13 @@ func (c *Commands) cmdGenerate(args []string) error {
 			outPath = v
 		case "-h", "--help":
 			fmt.Println(`usage: generate [options]
-  --os windows|linux|darwin   target OS (default linux)
+  --os windows|linux|darwin   target OS (default windows)
   --arch amd64|arm64          target arch (default amd64)
-  --format exe|dll|shellcode  output format (default exe)
+  --format exe|dll|shellcode  output format (default exe; C = exe only)
   --sleep ms                  beacon sleep (default 500)
   --jitter pct                jitter percent (default 10)
   --callback URL              C2 callback (repeatable)
-  --language go|c             implant language (default go; c = windows/amd64 only)
+  --language c|go             implant language (default c; Windows PE full / Linux basic peer; go for dll/shellcode)
   --out path                  write binary to path (default ./<filename>)`)
 			return nil
 		default:
@@ -427,8 +427,8 @@ func (c *Commands) cmdGenerate(args []string) error {
 	if len(callbacks) == 0 {
 		callbacks = []string{"https://127.0.0.1:443"}
 	}
-	if osName == "windows" && language == "go" && format == "exe" {
-		// fine
+	if language == "c" && osName != "windows" && osName != "linux" {
+		return fmt.Errorf("language c supports windows|linux (got %s); use --language go for %s", osName, osName)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
@@ -464,7 +464,9 @@ func (c *Commands) cmdGenerate(args []string) error {
 	}
 	fmt.Printf("OK build_id=%s format=%s size=%d bytes → %s\n",
 		resp.BuildId, resp.Format, len(resp.Binary), outPath)
-	fmt.Println("OPSEC: Go implants are large (dev/demo). Prefer --language c for Windows engagement PE when toolchain is available.")
+	if language == "go" {
+		fmt.Println("OPSEC: Go implants are large (dev/demo). Default generate language is c for Windows engagement PE.")
+	}
 	return nil
 }
 

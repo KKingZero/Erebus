@@ -28,9 +28,6 @@ int erebus_transport_beacon(erebus_transport *t, const uint8_t *req, size_t req_
 }
 
 void erebus_transport_set_session_id(erebus_transport *t, const char *session_id) {
-    if (!t || !t->ctx || !session_id) return;
-    /* dns_ctx layout: session_id at offset after domain+server+sock+addr - use struct field via cast */
-    typedef struct { char domain[256]; char server[64]; char session_id[64]; } dns_layout;
-    dns_layout *d = (dns_layout *)t->ctx;
-    strncpy(d->session_id, session_id, sizeof(d->session_id) - 1);
+    if (!t || !session_id || !t->ops || !t->ops->set_session_id) return;
+    t->ops->set_session_id(t, session_id);
 }

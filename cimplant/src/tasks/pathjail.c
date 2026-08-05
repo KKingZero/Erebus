@@ -1,10 +1,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 #ifndef EREBUS_PATHJAIL_HOST_TEST
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <limits.h>
+#include <unistd.h>
+#endif
 #endif
 
 #include "erebus/pathjail.h"
@@ -64,7 +70,11 @@ int erebus_path_has_dotdot_escape(const char *path) {
 static int path_under_cwd(const char *cwd, const char *resolved) {
     size_t cl = strlen(cwd);
     if (cl == 0) return 0;
+#ifdef _WIN32
     if (_strnicmp(resolved, cwd, cl) != 0) return 0;
+#else
+    if (strncmp(resolved, cwd, cl) != 0) return 0;
+#endif
     if (resolved[cl] == '\0') return 1;
     if (resolved[cl] == '\\' || resolved[cl] == '/') return 1;
     return 0;
@@ -75,6 +85,7 @@ int erebus_resolve_jailed_path(const char *remote_path, char *out, size_t out_ca
     if (erebus_path_is_absolute(remote_path)) return 0;
     if (erebus_path_has_dotdot_escape(remote_path)) return 0;
 
+#ifdef _WIN32
     char cwd[EREBUS_PATH_MAX];
     DWORD n = GetCurrentDirectoryA((DWORD)sizeof(cwd), cwd);
     if (n == 0 || n >= sizeof(cwd)) return 0;
@@ -105,6 +116,43 @@ int erebus_resolve_jailed_path(const char *remote_path, char *out, size_t out_ca
     if (strlen(full) + 1 > out_cap) return 0;
     memcpy(out, full, strlen(full) + 1);
     return 1;
+#else
+    char cwd[EREBUS_PATH_MAX];
+    if (!getcwd(cwd, sizeof(cwd))) return 0;
+    size_t cl = strlen(cwd);
+    while (cl > 0 && cwd[cl - 1] == '/') cwd[--cl] = '\0';
+
+    char joined[EREBUS_PATH_MAX];
+    if (snprintf(joined, sizeof(joined), "%s/%s", cwd, remote_path) >= (int)sizeof(joined))
+        return 0;
+
+    char full[PATH_MAX];
+    if (!realpath(joined, full)) {
+        /* File may not exist yet (upload): resolve parent + basename */
+        char parent[EREBUS_PATH_MAX];
+        strncpy(parent, joined, sizeof(parent) - 1);
+        parent[sizeof(parent) - 1] = '\0';
+        char *slash = strrchr(parent, '/');
+        if (!slash) return 0;
+        *slash = '\0';
+        const char *base = slash + 1;
+        char parent_real[PATH_MAX];
+        if (!realpath(parent[0] ? parent : "/", parent_real)) return 0;
+        if (snprintf(full, sizeof(full), "%s/%s", parent_real, base) >= (int)sizeof(full))
+            return 0;
+    }
+
+    if (!path_under_cwd(cwd, full)) {
+        /* also try realpath of cwd for symlink cwd */
+        char cwd_real[PATH_MAX];
+        if (!realpath(cwd, cwd_real) || !path_under_cwd(cwd_real, full))
+            return 0;
+    }
+
+    if (strlen(full) + 1 > out_cap) return 0;
+    memcpy(out, full, strlen(full) + 1);
+    return 1;
+#endif
 }
 
 #endif /* !EREBUS_PATHJAIL_HOST_TEST */
