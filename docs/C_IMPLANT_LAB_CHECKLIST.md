@@ -30,7 +30,9 @@ make implant-c-linux \
 
 **Beacon timing:** C implant uses **Unix millisecond** HMAC timestamps so `SLEEP_MS=500` no longer collides with the server replay cache (same wall second). Prefer ≥500 ms for lab; ≥1 s on flaky links.
 
-**WinRM PTH:** `ntlm_hash` = 32-hex NT or `LM:NT`. Failures return reason strings (bad hash form, HTTP 401, etc.). Live parity with pypsrp still eng-verify.
+**WinRM PTH:** `ntlm_hash` = 32-hex NT or `LM:NT`. Failures return reason strings (bad hash form, HTTP 401, etc.).  
+Go implant **password and hash paths** seal SOAP (NTLM message encryption / SPNEGO) when Sign/Seal is negotiated — works with `AllowUnencrypted=false`. Live pypsrp parity still eng-verify.  
+**Auth drops:** teamserver logs `unknown_implant|hmac|skew|replay|parse|io` — see `docs/OPERATOR_INBOUND.md`.
 
 - [ ] Host unit tests green (`pathjail`, `pb-copy`, `kerberoast-pb`, `ntlm-parse`)  
 - [ ] PE / Linux peer builds without error  
@@ -67,7 +69,9 @@ loot
 | Offline crack or known-lab password confirms | |
 | Bad password → clear failure (no fake hash) | |
 
-**Status:** _fill after run_ — verified on: [ ] GOAD  [ ] HTB  
+**Code status (2026-08-07):** real AS-REQ → TGS → hashcat lines; empty SPN list → empty result (no placeholders); operator-facing error strings on bind/AS fail.  
+
+**Lab status:** _fill after run_ — verified on: [ ] GOAD  [ ] HTB  
 
 ---
 

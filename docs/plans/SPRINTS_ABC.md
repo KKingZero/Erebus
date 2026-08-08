@@ -21,7 +21,7 @@ Related: `reports/htb-logging/EREBUS_AFTER_ACTION.md`, `docs/HTB_NEXT_RUNBOOK.md
 2. **Fail closed** — empty implant ID/secret, bad hash, skew unknown → clear errors.
 3. **External tools only as temporary** — no permanent “just shell out” for P0 foothold.
 4. **Sprint B native Go where feasible** — if a piece would balloon (full ADCS wire), ship a **thin, tested subset** rather than a half-broken mega-module.
-5. **Out of scope for A–C:** full wsuks, RBCD UI, LSASS, SOCKS rewrite, C implant feature parity.
+5. **Out of scope for A–C:** full wsuks, LSASS, SOCKS rewrite. **RBCD write + S4U + KeyList MVP are in Sprint B** (see `SPRINT_B_AD.md` post-Garfield). C implant lateral is parallel Track C, not blocked by Go B packages.
 
 ---
 
@@ -69,31 +69,46 @@ Related: `reports/htb-logging/EREBUS_AFTER_ACTION.md`, `docs/HTB_NEXT_RUNBOOK.md
 
 ---
 
-## Sprint B — Logging-class path to **user** (native implant)
+## Sprint B — AD path (Logging-class **user** + Garfield-class identity)
 
-**Goal:** Reproduce Logging **through user flag** with Erebus-owned steps where possible:  
-AES/Kerberos bind → (shadow or hash) → WinRM PTH → enough post-ex to read user flag (DLL path may remain hybrid).
+**Canonical detail:** `docs/plans/SPRINT_B_AD.md` (extended after Garfield HTB eng).
 
-**Duration target:** ~2–4 weeks.  
-**Exit (must all pass):**
+**Goal:**  
+1. Logging-class path to **user** ≥70% in-Erebus (AES/shadow/tickets/ACL).  
+2. Garfield-class identity primitives lab-green: soft set ops → RBCD/S4U AES → KeyList MVP; C WinRM lateral in parallel.
+
+**Duration target:** ~4–6 weeks (Go + C); see SPRINT_B_AD.md for packages B.0–B.12.
+
+**Exit (must all pass):** See **SPRINT_B_AD.md** exit tables B1–B6 + B7–B10 + C1. Summary:
 
 | # | Criterion |
 | --- | --- |
-| B1 | Obtain **AES TGT** for Protected Users–style account with **clock skew** handled (lab helper + implant or operator-side kerb module used by implant tasks) |
-| B2 | **Shadow Creds MVP**: add key credential + recover NT hash for a target account (msa/user) |
-| B3 | **Ticket import**: load kirbi/ccache into session/task; at least one of SMB or LDAP using ticket |
-| B4 | Soft path regression: SMB list/download + ldap-enum interesting still work (no regressions) |
-| B5 | **Dry-run writeup**: on GOAD (or HTB Logging re-run), document “in-Erebus vs external” — user path ≥70% in-Erebus by step count |
+| B1 | **AES TGT** + **clock skew** preflight |
+| B2 | **Shadow Creds MVP** (critical approval) |
+| B3 | **Ticket import** + use on SMB/LDAP/lateral |
+| B4 | **ACL / RBCD presence** LDAP surface |
+| B5 | Soft path regression green |
+| B6 | Operator CLI + agent catalog |
+| B7 | **RBCD write** + **S4U AES** (promoted; was deferred) |
+| B8 | **scriptPath** / **ForceChangePassword** / **addcomputer** |
+| B9 | **KeyList MVP** (RODC partial TGT + one NT hash) |
+| B10 | Logon-script staging **recipe** (docs/skill) |
+| C1 | C implant ≥1 real WinRM lateral |
 
 ### B work packages
 
 | ID | Work | Notes |
 | --- | --- | --- |
-| **B.1** | **Clock skew + AES TGT** | Prefer implant or shared `pkg/krb` used by tasks; `scripts/htb_krb_env.sh` as thin wrapper OK for operator host time, but product path must not *require* Docker for the happy path if GOAD clocks are synced |
-| **B.2** | **Shadow Creds module** | Minimal: write `msDS-KeyCredentialLink`, PKINIT/cert auth path to NT hash — port proven certipy flow carefully; security: approval = critical |
-| **B.3** | **Ticket store + lateral/smb with ticket** | Proto fields already have `ticket` on lateral; wire end-to-end |
-| **B.4** | **LDAP/SMB with hash already shipped** — verify + fix any gaps found while testing B.1–B.3 | |
-| **B.5** | **Optional thin DNS add A** | Only if time remains after B1–B3; else document as external for C recipe |
+| **B.1** | **Clock skew + AES TGT** | Prefer shared `pkg/krb`; operator thin wrapper OK; no Docker required when clocks synced |
+| **B.2** | **Shadow Creds module** | Minimal KeyCredentialLink → NT; approval = critical |
+| **B.3** | **Ticket store + lateral/smb with ticket** | Proto `ticket` field end-to-end |
+| **B.4** | **ACL / RBCD presence** LDAP | Extend `ldap-enum` |
+| **B.5** | Soft path regression | smoke + checklist |
+| **B.6** | CLI + catalog | After commands exist |
+| **B.7** | **RBCD write + S4U AES** | Critical approval; was stretch — **now in-scope** |
+| **B.8** | Soft AD set ops | scriptPath, ForceChangePassword, addcomputer |
+| **B.9** | **KeyList MVP** | Partial TGT + KERB-KEY-LIST; not full DA suite |
+| **B.10** | Logon-script recipe | Docs/skill only (no bot automation) |
 
 ### B ADCS note (native “where feasible”)
 
@@ -104,20 +119,22 @@ AES/Kerberos bind → (shadow or hash) → WinRM PTH → enough post-ex to read 
 ### B explicitly deferred
 
 - WSUS MITM automation  
-- RBCD helpers  
-- Domain Admin / root automation  
-- Agent Auto full Logging plan  
+- Product mimikatz/schtasks RODC dump (KeyList is the in-product DA-class path)  
+- Full domain DCSync / “Auto own domain”  
+- Agent Auto full Logging root plan  
+- ADCS ESC8/11 product (→ Sprint E / Ghostlink)
 
 ### B acceptance demo script
 
 ```text
 1. Soft recon: smb + ldap-enum (existing)
-2. Kerberos AES to service account (skew OK)
-3. Shadow → msa/user NT hash
-4. lateral winrm --hash whoami
-5. Read user-equivalent flag/file on lab host
+2. Clock skew preflight + Kerberos AES
+3. Soft set: scriptPath and/or ForceChangePassword; addcomputer
+4. RBCD write + S4U AES → ticket
+5. Shadow or KeyList → NT hash (lab-dependent)
+6. lateral winrm --hash whoami
+7. C: lateral winrm from C implant session
 ```
-
 ---
 
 ## Sprint C — Docs, skill, ESC17/WSUS recipe only
@@ -205,22 +222,24 @@ A.1 WinRM PTH ──────┘         │
 
 ---
 
-## Implementation status (2026-07-30)
+## Implementation status (2026-08-07)
 
 | ID | Status | Notes |
 | --- | --- | --- |
 | **A.2** | **Done** | Makefile: openssl/python ID+secret; fail closed if empty/not 64 hex; default callback `:8443` |
 | **A.3** | **Done** | Implant uses Unix **ms** timestamps; VerifyHMAC accepts s or ms; replay allows sub-second |
-| **A.1** | **Partial** | Domain-aware NTLMv2 TYPE3 for PTH; conn pin MaxConnsPerHost=1; password path uses ClientNTLM. **Message encryption still open** (pypsrp `encryption=auto` parity) — validate on GOAD |
+| **A.1** | **Partial → improved** | Domain-aware NTLMv2 TYPE3 for PTH; **both** password (`winrm.NewEncryption("ntlm")`) and **hash path** seal SOAP (MS-NLMP Sign/Seal + SPNEGO multipart). Unit tests for wrap/unwrap + MIME. **Live GOAD/pypsrp parity eng-verify still open** |
 | **A.4** | **Done** | `erebus op sessions\|shell\|lateral\|pending\|approve-all` dual-seat |
 | **A.6** | **Done** | `erebus certs seats` |
 | **A.5** | **Done** | `scripts/deploy_winrm.py` (pypsrp temporary bridge) |
+| **Auth logs** | **Done** | reason=`unknown_implant\|hmac\|skew\|replay\|parse\|io\|internal`; wire still 404 — see `docs/OPERATOR_INBOUND.md` |
+| **Inbound checklist** | **Done** | `docs/OPERATOR_INBOUND.md` |
 
-Next: GOAD live validation of A.1; then B.1 Kerberos.
+Next: GOAD live validation of A.1 PTH; then Sprint B (`docs/plans/SPRINT_B_AD.md`).
 
 ---
 
 ## Open items (non-blocking)
 
 - Exact GOAD hostnames/IPs for the WinRM PTH e2e target.  
-- WinRM **message encryption** with NT hash (A.1 follow-up if GOAD requires AllowUnencrypted=false).
+- Live eng-verify WinRM PTH + message encryption vs pypsrp on AllowUnencrypted=false host.

@@ -1,6 +1,10 @@
 package lateral
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestNormalizeNTHashHex(t *testing.T) {
 	nt := "603fc24ee01a9409f83c9d1d701485c5"
@@ -73,5 +77,27 @@ func TestMarshalAuthenticateMessage_RoundTripShape(t *testing.T) {
 	}
 	if msg[8] != 3 {
 		t.Fatalf("bad type %d", msg[8])
+	}
+}
+
+func TestClassifyWinRMError_Hints(t *testing.T) {
+	err := classifyWinRMError(fmt.Errorf("http error 401: denied"), true, `LOGGING\msa$`)
+	if err == nil || !strings.Contains(err.Error(), "PTH") {
+		t.Fatalf("expected PTH hint, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "message encryption") && !strings.Contains(err.Error(), "plain SOAP") {
+		t.Fatalf("expected hash seal/fallback hint, got %v", err)
+	}
+	err = classifyWinRMError(fmt.Errorf("http error 401: denied"), false, `CORP\bob`)
+	if err == nil || !strings.Contains(err.Error(), "message encryption") {
+		t.Fatalf("expected encryption hint, got %v", err)
+	}
+	err = classifyWinRMError(fmt.Errorf("http error 415: encrypt required"), true, `CORP\bob`)
+	if err == nil || !strings.Contains(err.Error(), "retries plain SOAP") {
+		t.Fatalf("expected plain-retry hint, got %v", err)
+	}
+	plain := fmt.Errorf("connection refused")
+	if got := classifyWinRMError(plain, false, "u"); got.Error() != plain.Error() {
+		t.Fatalf("unexpected wrap: %v", got)
 	}
 }
